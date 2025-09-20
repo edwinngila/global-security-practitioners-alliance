@@ -468,14 +468,18 @@ const RegistrationFormComponent = () => {
   }
 
   const validateCurrentStep = async () => {
+    console.log("[v0] Before validation - hasAttemptedSubmit:", hasAttemptedSubmit)
     setHasAttemptedSubmit(true)
     const currentStepFields = getStepFields(currentStep)
     const isStepValid = await trigger(currentStepFields)
+
     console.log("[v0] Step validation result:", isStepValid)
+    console.log("[v0] Form values:", getValues())
     console.log(
       "[v0] Current step errors:",
       currentStepFields.map((field) => ({ field, error: errors[field] })),
     )
+
     return isStepValid
   }
 
@@ -483,12 +487,14 @@ const RegistrationFormComponent = () => {
     const isValid = await validateCurrentStep()
     if (isValid) {
       setCurrentStep((prev) => Math.min(prev + 1, 4))
+      setHasAttemptedSubmit(false) // Reset for next step
       saveFormData()
     }
   }
 
   const prevStep = () => {
     setCurrentStep((prev) => prev - 1)
+    setHasAttemptedSubmit(false) // Reset when going back
     saveFormData()
   }
 
@@ -619,7 +625,7 @@ const RegistrationFormComponent = () => {
             </TooltipProvider>
           )}
         </div>
-        {children}
+        <div className={shouldShowError ? "[&>*]:border-red-500" : ""}>{children}</div>
         {shouldShowError && (
           <p className="text-sm text-red-600 flex items-center gap-1">
             <AlertCircle className="h-3 w-3" />
