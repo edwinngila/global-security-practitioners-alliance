@@ -1,9 +1,9 @@
+
 "use client"
 
 import type React from "react"
-
-import { useState } from "react"
-import { useForm } from "react-hook-form"
+import { useState, useEffect, useCallback, useRef } from "react"
+import { useForm, Controller } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
 import Navigation from "@/components/navigation"
@@ -15,130 +15,579 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Camera, AlertCircle, CheckCircle } from "lucide-react"
+import { Camera, AlertCircle, CheckCircle, Upload, X, ChevronLeft, ChevronRight, Save, Eye, EyeOff } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 import SignatureCanvas from "react-signature-canvas"
+import { Progress } from "@/components/ui/progress"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { format } from "date-fns"
+
+// Enhanced validation schemas
+const phoneRegex = /^[\+]?[1-9][\d]{0,15}$/
+
+const documentNumberValidation = {
+  passport: z.string().regex(/^[A-Z0-9]{6,12}$/, "Passport number must be 6-12 alphanumeric characters"),
+  national_id: z.string().regex(/^[A-Z0-9]{8,15}$/, "National ID must be 8-15 alphanumeric characters"),
+  drivers_license: z.string().regex(/^[A-Z0-9]{6,12}$/, "Driver's license must be 6-12 alphanumeric characters"),
+}
 
 const registrationSchema = z.object({
-  firstName: z.string().min(2, "First name must be at least 2 characters"),
-  lastName: z.string().min(2, "Last name must be at least 2 characters"),
-  email: z.string().email("Invalid email address"),
-  phone: z.string().min(10, "Phone number must be at least 10 digits"),
-  nationality: z.string().min(2, "Please select your nationality"),
+  firstName: z.string()
+    .min(2, "First name must be at least 2 characters")
+    .max(50, "First name must not exceed 50 characters")
+    .regex(/^[a-zA-Z\s'-]+$/, "First name can only contain letters, spaces, hyphens, and apostrophes"),
+  
+  lastName: z.string()
+    .min(2, "Last name must be at least 2 characters")
+    .max(50, "Last name must not exceed 50 characters")
+    .regex(/^[a-zA-Z\s'-]+$/, "Last name can only contain letters, spaces, hyphens, and apostrophes"),
+  
+  email: z.string()
+    .email("Invalid email address")
+    .toLowerCase()
+    .trim(),
+  
+  phone: z.string()
+    .regex(phoneRegex, "Please enter a valid phone number (e.g., +1234567890)")
+    .min(10, "Phone number must be at least 10 digits")
+    .max(16, "Phone number must not exceed 16 digits"),
+  
+  nationality: z.string().min(1, "Please select your nationality"),
+  
   gender: z.enum(["male", "female", "other"], {
     required_error: "Please select your gender",
   }),
-  dateOfBirth: z.string().refine((date) => {
-    const birthDate = new Date(date)
-    const today = new Date()
-    const age = today.getFullYear() - birthDate.getFullYear()
-    return age >= 18
-  }, "You must be at least 18 years old"),
-  designation: z.string().min(2, "Designation is required"),
-  organization: z.string().min(2, "Organization name is required"),
+  
+  dateOfBirth: z.string()
+    .min(1, "Date of birth is required")
+    .refine((date) => {
+      const birthDate = new Date(date)
+      const today = new Date()
+      
+      if (isNaN(birthDate.getTime())) return false
+      if (birthDate > today) return false
+      
+      const age = today.getFullYear() - birthDate.getFullYear()
+      const monthDiff = today.getMonth() - birthDate.getMonth()
+      const dayDiff = today.getDate() - birthDate.getDate()
+      
+      const adjustedAge = monthDiff < 0 || (monthDiff === 0 && dayDiff < 0) ? age - 1 : age
+      
+      return adjustedAge >= 18 && adjustedAge <= 100
+    }, "You must be between 18 and 100 years old"),
+  
+  designation: z.string()
+    .min(2, "Designation is required")
+    .max(100, "Designation must not exceed 100 characters")
+    .regex(/^[a-zA-Z\s'-]+$/, "Designation can only contain letters, spaces, hyphens, and apostrophes"),
+  
+  organization: z.string()
+    .min(2, "Organization name is required")
+    .max(200, "Organization name must not exceed 200 characters"),
+  
   documentType: z.enum(["passport", "national_id", "drivers_license"], {
     required_error: "Please select document type",
   }),
-  documentNumber: z.string().min(5, "Document number is required"),
+  
+  documentNumber: z.string().min(1, "Document number is required"),
+  
   declarationAccepted: z.boolean().refine((val) => val === true, {
     message: "You must accept the declaration",
   }),
+  
+  passportPhoto: z.instanceof(File, {
+    message: "Please upload a passport-size photo",
+  }),
+  
+  signature: z.string().min(1, "Please provide your signature"),
+}).superRefine((data, ctx) => {
+  const documentType = data.documentType
+  const documentNumber = data.documentNumber
+  
+  let isValid = false
+  let errorMessage = ""
+  
+  switch (documentType) {
+    case "passport":
+      isValid = /^[A-Z0-9]{6,12}$/.test(documentNumber)
+      errorMessage = "Passport number must be 6-12 alphanumeric characters"
+      break
+    case "national_id":
+      isValid = /^[A-Z0-9]{8,15}$/.test(documentNumber)
+      errorMessage = "National ID must be 8-15 alphanumeric characters"
+      break
+    case "drivers_license":
+      isValid = /^[A-Z0-9]{6,12}$/.test(documentNumber)
+      errorMessage = "Driver's license must be 6-12 alphanumeric characters"
+      break
+  }
+  
+  if (!isValid) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: errorMessage,
+      path: ["documentNumber"],
+    })
+  }
 })
 
 type RegistrationForm = z.infer<typeof registrationSchema>
 
-export default function RegisterPage() {
+// Helper components
+const FormField = ({ 
+  label, 
+  error, 
+  required, 
+  children, 
+  tooltip,
+  className = "" 
+}: { 
+  label: string
+  error?: string
+  required?: boolean
+  children: React.ReactNode
+  tooltip?: string
+  className?: string
+}) => (
+  <div className={`space-y-2 ${className}`}>
+    <div className="flex items-center gap-2">
+      <Label className={error ? "text-red-600" : ""}>
+        {label}
+        {required && <span className="text-red-500 ml-1">*</span>}
+      </Label>
+      {tooltip && (
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger>
+              <AlertCircle className="h-4 w-4 text-gray-400" />
+            </TooltipTrigger>
+            <TooltipContent>
+              <p className="max-w-xs">{tooltip}</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      )}
+    </div>
+    {children}
+    {error && (
+      <p className="text-sm text-red-600 flex items-center gap-1">
+        <AlertCircle className="h-3 w-3" />
+        {error}
+      </p>
+    )}
+  </div>
+)
+
+const FileUploadArea = ({ 
+  onFileSelect, 
+  preview, 
+  error, 
+  clearFile,
+  accept = "image/*",
+  maxSize = 5 * 1024 * 1024
+}: {
+  onFileSelect: (file: File) => void
+  preview?: string
+  error?: string
+  clearFile: () => void
+  accept?: string
+  maxSize?: number
+}) => {
+  const [isDragOver, setIsDragOver] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragOver(true)
+  }
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragOver(false)
+  }
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragOver(false)
+    
+    const files = e.dataTransfer.files
+    if (files.length > 0) {
+      validateAndProcessFile(files[0])
+    }
+  }
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      validateAndProcessFile(file)
+    }
+  }
+
+  const validateAndProcessFile = (file: File) => {
+    if (!file.type.startsWith("image/")) {
+      return
+    }
+    
+    if (file.size > maxSize) {
+      return
+    }
+    
+    onFileSelect(file)
+  }
+
+  return (
+    <div className="space-y-2">
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept={accept}
+        onChange={handleFileSelect}
+        className="hidden"
+      />
+      
+      <div
+        className={`border-2 border-dashed rounded-lg p-6 text-center transition-all cursor-pointer
+          ${isDragOver ? "border-blue-500 bg-blue-50" : ""}
+          ${error ? "border-red-500" : "border-gray-300 hover:border-gray-400"}`}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        onClick={() => fileInputRef.current?.click()}
+      >
+        {preview ? (
+          <div className="flex flex-col items-center gap-3">
+            <img src={preview} alt="Preview" className="h-24 w-24 object-cover rounded-lg" />
+            <div className="flex items-center gap-2">
+              <CheckCircle className="h-5 w-5 text-green-600" />
+              <span className="text-sm text-green-600 font-medium">Photo uploaded</span>
+            </div>
+            <Button 
+              type="button" 
+              variant="outline" 
+              size="sm" 
+              onClick={(e) => {
+                e.stopPropagation()
+                clearFile()
+              }}
+            >
+              <X className="h-4 w-4 mr-1" />
+              Remove
+            </Button>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center gap-3">
+            <Upload className="h-10 w-10 text-gray-400" />
+            <div className="space-y-1">
+              <p className="text-sm font-medium text-gray-700">
+                Click to upload or drag and drop
+              </p>
+              <p className="text-xs text-gray-500">
+                Max 5MB, JPG/PNG only
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
+      
+      {error && (
+        <p className="text-sm text-red-600 flex items-center gap-1">
+          <AlertCircle className="h-3 w-3" />
+          {error}
+        </p>
+      )}
+    </div>
+  )
+}
+
+const SignaturePad = ({ 
+  onSignatureSave, 
+  error,
+  signatureRef
+}: {
+  onSignatureSave: (dataUrl: string) => void
+  error?: string
+  signatureRef: React.RefObject<SignatureCanvas>
+}) => {
+  const [isDrawing, setIsDrawing] = useState(false)
+
+  const handleSave = () => {
+    if (signatureRef.current && !signatureRef.current.isEmpty()) {
+      const dataUrl = signatureRef.current.toDataURL()
+      onSignatureSave(dataUrl)
+    }
+  }
+
+  const handleClear = () => {
+    signatureRef.current?.clear()
+  }
+
+  return (
+    <div className="space-y-2">
+      <Label>Digital Signature *</Label>
+      <div className="border rounded-lg p-4 bg-gray-50">
+        <div className="mb-3 flex items-center justify-between">
+          <span className="text-sm text-gray-600">Please sign in the box below</span>
+          <div className="flex gap-2">
+            <Button 
+              type="button" 
+              variant="outline" 
+              size="sm" 
+              onClick={handleClear}
+            >
+              <X className="h-4 w-4 mr-1" />
+              Clear
+            </Button>
+            <Button 
+              type="button" 
+              variant="outline" 
+              size="sm" 
+              onClick={handleSave}
+            >
+              <Save className="h-4 w-4 mr-1" />
+              Save
+            </Button>
+          </div>
+        </div>
+        
+        <div className="border border-gray-300 rounded bg-white overflow-hidden">
+          <SignatureCanvas
+            ref={signatureRef as React.RefObject<SignatureCanvas>}
+            canvasProps={{
+              width: 500,
+              height: 200,
+              className: "signature-canvas w-full touch-none",
+            }}
+            backgroundColor="white"
+            onBegin={() => setIsDrawing(true)}
+            onEnd={() => setIsDrawing(false)}
+          />
+        </div>
+        
+        {error && (
+          <p className="text-sm text-red-600 mt-2 flex items-center gap-1">
+            <AlertCircle className="h-3 w-3" />
+            {error}
+          </p>
+        )}
+      </div>
+    </div>
+  )
+}
+
+export default function EnhancedRegistrationPage() {
   const [isLoading, setIsLoading] = useState(false)
-  const [passportPhoto, setPassportPhoto] = useState<File | null>(null)
-  const [signatureData, setSignatureData] = useState<string>("")
-  const [signatureRef, setSignatureRef] = useState<SignatureCanvas | null>(null)
   const [step, setStep] = useState(1)
+  const [photoPreview, setPhotoPreview] = useState<string>("")
+  const signatureRef = useRef<SignatureCanvas>(null)
+  const [errorMessage, setErrorMessage] = useState<string>("")
+  const [successMessage, setSuccessMessage] = useState<string>("")
+  const [isAutoSaving, setIsAutoSaving] = useState(false)
+  const [showReview, setShowReview] = useState(false)
   const router = useRouter()
   const supabase = createClient()
+  const autoSaveInterval = useRef<NodeJS.Timeout>()
 
   const {
     register,
     handleSubmit,
-    formState: { errors },
+    formState: { errors, isValid, isDirty },
     setValue,
     watch,
     trigger,
+    control,
+    setError,
+    clearErrors,
     getValues,
+    reset
   } = useForm<RegistrationForm>({
     resolver: zodResolver(registrationSchema),
+    mode: "onChange",
+    defaultValues: {
+      declarationAccepted: false,
+    },
   })
 
-  const handlePhotoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        // 5MB limit
-        alert("File size must be less than 5MB")
-        return
+  const watchDocumentType = watch("documentType")
+  const watchPassportPhoto = watch("passportPhoto")
+  const watchSignature = watch("signature")
+
+  // Auto-save functionality
+  useEffect(() => {
+    const saveFormData = () => {
+      if (isDirty && isValid) {
+        setIsAutoSaving(true)
+        const formData = getValues()
+        localStorage.setItem('registration_form_draft', JSON.stringify({
+          data: formData,
+          timestamp: new Date().toISOString(),
+          step: step
+        }))
+        setTimeout(() => setIsAutoSaving(false), 1000)
       }
-      if (!file.type.startsWith("image/")) {
-        alert("Please upload an image file")
-        return
-      }
-      setPassportPhoto(file)
     }
+
+    autoSaveInterval.current = setInterval(saveFormData, 30000) // Auto-save every 30 seconds
+
+    return () => {
+      if (autoSaveInterval.current) {
+        clearInterval(autoSaveInterval.current)
+      }
+    }
+  }, [isDirty, isValid, getValues, step])
+
+  // Load saved draft
+  useEffect(() => {
+    const savedDraft = localStorage.getItem('registration_form_draft')
+    if (savedDraft) {
+      try {
+        const { data, timestamp, step: savedStep } = JSON.parse(savedDraft)
+        const savedDate = new Date(timestamp)
+        const now = new Date()
+        const hoursDiff = (now.getTime() - savedDate.getTime()) / (1000 * 60 * 60)
+        
+        if (hoursDiff < 24) { // Load if less than 24 hours old
+          // Restore form data (excluding files)
+          const { passportPhoto, signature, ...restData } = data
+          Object.keys(restData).forEach(key => {
+            setValue(key as keyof RegistrationForm, restData[key as keyof RegistrationForm])
+          })
+          setStep(savedStep)
+        }
+      } catch (error) {
+        console.error('Error loading draft:', error)
+      }
+    }
+  }, [setValue])
+
+  const nationalityLabels: Record<string, string> = {
+    us: "United States",
+    uk: "United Kingdom", 
+    ca: "Canada",
+    au: "Australia",
+    de: "Germany",
+    fr: "France",
+    jp: "Japan",
+    other: "Other"
   }
 
-  const clearSignature = () => {
-    signatureRef?.clear()
-    setSignatureData("")
+  const genderLabels: Record<string, string> = {
+    male: "Male",
+    female: "Female",
+    other: "Other"
   }
 
-  const saveSignature = () => {
-    if (signatureRef && !signatureRef.isEmpty()) {
-      setSignatureData(signatureRef.toDataURL())
+  const documentTypeLabels: Record<string, string> = {
+    passport: "Passport",
+    national_id: "National ID",
+    drivers_license: "Driver's License"
+  }
+
+  const handlePhotoUpload = useCallback((file: File) => {
+    // Validate file
+    if (!file.type.startsWith("image/")) {
+      setError("passportPhoto", {
+        type: "manual",
+        message: "Please upload an image file (JPG, PNG, etc.)",
+      })
+      return
     }
+    
+    if (file.size > 5 * 1024 * 1024) {
+      setError("passportPhoto", {
+        type: "manual", 
+        message: "File size must be less than 5MB",
+      })
+      return
+    }
+    
+    // Set the file in form
+    setValue("passportPhoto", file, { shouldValidate: true })
+    
+    // Create preview
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      setPhotoPreview(e.target?.result as string)
+    }
+    reader.readAsDataURL(file)
+    
+    clearErrors("passportPhoto")
+  }, [setValue, setError, clearErrors])
+
+  const clearPhoto = () => {
+    setValue("passportPhoto", undefined as any)
+    setPhotoPreview("")
+  }
+
+  const handleSignatureSave = (signatureData: string) => {
+    setValue("signature", signatureData, { shouldValidate: true })
+    clearErrors("signature")
+  }
+
+  const validateStep = async (stepNumber: number): Promise<boolean> => {
+    let fieldsToValidate: (keyof RegistrationForm)[] = []
+    
+    switch (stepNumber) {
+      case 1:
+        fieldsToValidate = [
+          "firstName", 
+          "lastName", 
+          "email", 
+          "phone", 
+          "nationality", 
+          "gender", 
+          "dateOfBirth",
+          "passportPhoto"
+        ]
+        break
+      case 2:
+        fieldsToValidate = [
+          "designation", 
+          "organization", 
+          "documentType", 
+          "documentNumber", 
+          "declarationAccepted",
+          "signature"
+        ]
+        break
+    }
+    
+    const results = await trigger(fieldsToValidate)
+    return results
   }
 
   const nextStep = async () => {
-    const fieldsToValidate =
-      step === 1
-        ? ["firstName", "lastName", "email", "phone", "nationality", "gender", "dateOfBirth"]
-        : ["designation", "organization", "documentType", "documentNumber"]
-
-    console.log("[v0] Current form values:", getValues())
-    console.log("[v0] Validating fields:", fieldsToValidate)
-
-    const isValid = await trigger(fieldsToValidate as any)
-    console.log("[v0] Validation result:", isValid)
-    console.log("[v0] Current errors:", errors)
-
+    const isValid = await validateStep(step)
     if (isValid) {
-      setStep(step + 1)
+      setStep(prev => prev + 1)
+      window.scrollTo({ top: 0, behavior: 'smooth' })
     }
   }
 
-  const onSubmit = async (data: RegistrationForm) => {
-    if (!passportPhoto) {
-      alert("Please upload a passport-size photo")
-      return
-    }
+  const prevStep = () => {
+    setStep(prev => prev - 1)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
 
-    if (!signatureData) {
-      alert("Please provide your signature")
-      return
-    }
-
+  const handleFormSubmit = async (data: RegistrationForm) => {
     setIsLoading(true)
+    setErrorMessage("")
+    setSuccessMessage("")
 
     try {
-      // First, sign up the user
+      // Sign up the user
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: data.email,
-        password: Math.random().toString(36) + Math.random().toString(36), // Generate random password
+        password: Math.random().toString(36) + Math.random().toString(36),
       })
 
       if (authError) throw authError
 
       if (authData.user) {
         // Upload passport photo
+        const passportPhoto = data.passportPhoto
         const photoFileName = `${authData.user.id}_passport.${passportPhoto.name.split(".").pop()}`
+
         const { data: photoData, error: photoError } = await supabase.storage
           .from("documents")
           .upload(photoFileName, passportPhoto)
@@ -160,22 +609,27 @@ export default function RegisterPage() {
           organization_name: data.organization,
           document_type: data.documentType,
           document_number: data.documentNumber,
-          signature_data: signatureData,
+          signature_data: data.signature,
           declaration_accepted: data.declarationAccepted,
         })
 
         if (profileError) throw profileError
 
-        // Redirect to payment
-        router.push("/payment")
+        // Clear saved draft
+        localStorage.removeItem('registration_form_draft')
+        
+        setSuccessMessage("Registration successful! Redirecting to payment...")
+        setTimeout(() => router.push("/payment"), 2000)
       }
     } catch (error) {
       console.error("Registration error:", error)
-      alert("Registration failed. Please try again.")
+      setErrorMessage(error instanceof Error ? error.message : "Registration failed. Please try again.")
     } finally {
       setIsLoading(false)
     }
   }
+
+  const progressPercentage = (step / 3) * 100
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -186,10 +640,21 @@ export default function RegisterPage() {
         <section className="py-20 lg:py-32 bg-gradient-to-br from-background via-background to-muted/30">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="text-center max-w-4xl mx-auto">
-              <h1 className="text-4xl lg:text-6xl font-bold text-balance mb-6">Registration</h1>
+              <h1 className="text-4xl lg:text-6xl font-bold text-balance mb-6">
+                Professional Registration
+              </h1>
               <p className="text-xl text-muted-foreground text-pretty mb-8 leading-relaxed">
-                Complete your profile to begin your journey towards GSPA certification.
+                Join our certification program with a streamlined registration process.
               </p>
+              
+              {/* Progress Bar */}
+              <div className="max-w-md mx-auto">
+                <div className="flex justify-between text-sm text-gray-600 mb-2">
+                  <span>Step {step} of 3</span>
+                  <span>{Math.round(progressPercentage)}% Complete</span>
+                </div>
+                <Progress value={progressPercentage} className="h-2" />
+              </div>
             </div>
           </div>
         </section>
@@ -197,242 +662,309 @@ export default function RegisterPage() {
         {/* Registration Form */}
         <section className="py-20">
           <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-            <Card>
+            <Card className="shadow-lg">
               <CardHeader>
-                <CardTitle className="text-2xl">Professional Profile Registration</CardTitle>
-                <CardDescription>
-                  Step {step} of 3:{" "}
-                  {step === 1 ? "Personal Information" : step === 2 ? "Professional Details" : "Review & Submit"}
-                </CardDescription>
+                <div className="flex justify-between items-start">
+                  <div>
+                    <CardTitle className="text-2xl md:text-3xl">
+                      Registration Form
+                    </CardTitle>
+                    <CardDescription className="mt-2">
+                      {step === 1 && "Personal Information"}
+                      {step === 2 && "Professional Details & Verification"}
+                      {step === 3 && "Review & Submit"}
+                    </CardDescription>
+                  </div>
+                  
+                  {isAutoSaving && (
+                    <div className="flex items-center gap-2 text-sm text-gray-500">
+                      <div className="w-3 h-3 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin" />
+                      Auto-saving...
+                    </div>
+                  )}
+                </div>
+                
+                {/* Messages */}
+                {errorMessage && (
+                  <Alert variant="destructive" className="mt-4">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>{errorMessage}</AlertDescription>
+                  </Alert>
+                )}
+                
+                {successMessage && (
+                  <Alert className="mt-4 bg-green-50 border-green-200">
+                    <CheckCircle className="h-4 w-4 text-green-600" />
+                    <AlertDescription className="text-green-800">{successMessage}</AlertDescription>
+                  </Alert>
+                )}
               </CardHeader>
+              
               <CardContent>
-                <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
+                <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-8">
                   {step === 1 && (
                     <div className="space-y-6">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                          <Label htmlFor="firstName">First Name *</Label>
-                          <Input id="firstName" {...register("firstName")} placeholder="John" />
-                          {errors.firstName && <p className="text-sm text-red-600 mt-1">{errors.firstName.message}</p>}
-                        </div>
-                        <div>
-                          <Label htmlFor="lastName">Last Name *</Label>
-                          <Input id="lastName" {...register("lastName")} placeholder="Doe" />
-                          {errors.lastName && <p className="text-sm text-red-600 mt-1">{errors.lastName.message}</p>}
-                        </div>
-                      </div>
-
-                      <div>
-                        <Label htmlFor="email">Email Address *</Label>
-                        <Input id="email" type="email" {...register("email")} placeholder="john.doe@example.com" />
-                        {errors.email && <p className="text-sm text-red-600 mt-1">{errors.email.message}</p>}
-                      </div>
-
-                      <div>
-                        <Label htmlFor="phone">Phone Number *</Label>
-                        <Input id="phone" {...register("phone")} placeholder="+1 (555) 123-4567" />
-                        {errors.phone && <p className="text-sm text-red-600 mt-1">{errors.phone.message}</p>}
+                      {/* Personal Information Section */}
+                      <div className="bg-gray-50 rounded-lg p-4 mb-6">
+                        <h3 className="font-semibold text-gray-800 mb-2">Personal Details</h3>
+                        <p className="text-sm text-gray-600">Please provide your basic personal information</p>
                       </div>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                          <Label htmlFor="nationality">Nationality *</Label>
-                          <Select
-                            onValueChange={(value: string) => {
-                              setValue("nationality", value)
-                              trigger("nationality")
-                            }}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select nationality" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="us">United States</SelectItem>
-                              <SelectItem value="uk">United Kingdom</SelectItem>
-                              <SelectItem value="ca">Canada</SelectItem>
-                              <SelectItem value="au">Australia</SelectItem>
-                              <SelectItem value="de">Germany</SelectItem>
-                              <SelectItem value="fr">France</SelectItem>
-                              <SelectItem value="jp">Japan</SelectItem>
-                              <SelectItem value="other">Other</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          {errors.nationality && (
-                            <p className="text-sm text-red-600 mt-1">{errors.nationality.message}</p>
-                          )}
-                        </div>
-
-                        <div>
-                          <Label htmlFor="gender">Gender *</Label>
-                          <Select
-                            onValueChange={(value: "male" | "female" | "other") => {
-                              setValue("gender", value)
-                              trigger("gender")
-                            }}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select gender" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="male">Male</SelectItem>
-                              <SelectItem value="female">Female</SelectItem>
-                              <SelectItem value="other">Other</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          {errors.gender && <p className="text-sm text-red-600 mt-1">{errors.gender.message}</p>}
-                        </div>
-                      </div>
-
-                      <div>
-                        <Label htmlFor="dateOfBirth">Date of Birth *</Label>
-                        <Input id="dateOfBirth" type="date" {...register("dateOfBirth")} />
-                        {errors.dateOfBirth && (
-                          <p className="text-sm text-red-600 mt-1">{errors.dateOfBirth.message}</p>
-                        )}
-                      </div>
-
-                      <div>
-                        <Label>Passport-Size Photo *</Label>
-                        <div className="mt-2">
-                          <input
-                            type="file"
-                            accept="image/*"
-                            onChange={handlePhotoUpload}
-                            className="hidden"
-                            id="photo-upload"
+                        <FormField 
+                          label="First Name" 
+                          error={errors.firstName?.message} 
+                          required
+                          tooltip="Enter your legal first name as it appears on your documents"
+                        >
+                          <Input 
+                            {...register("firstName")} 
+                            placeholder="John"
+                            className={errors.firstName ? "border-red-500" : ""}
+                            aria-invalid={!!errors.firstName}
                           />
-                          <Label htmlFor="photo-upload" className="cursor-pointer">
-                            <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors">
-                              {passportPhoto ? (
-                                <div className="flex items-center justify-center gap-2">
-                                  <CheckCircle className="h-5 w-5 text-green-600" />
-                                  <span className="text-sm text-green-600">{passportPhoto.name}</span>
-                                </div>
-                              ) : (
-                                <div className="flex flex-col items-center gap-2">
-                                  <Camera className="h-8 w-8 text-gray-400" />
-                                  <span className="text-sm text-gray-600">Click to upload passport photo</span>
-                                  <span className="text-xs text-gray-500">Max 5MB, JPG/PNG</span>
-                                </div>
-                              )}
-                            </div>
-                          </Label>
-                        </div>
+                        </FormField>
+                        
+                        <FormField 
+                          label="Last Name" 
+                          error={errors.lastName?.message} 
+                          required
+                          tooltip="Enter your legal last name as it appears on your documents"
+                        >
+                          <Input 
+                            {...register("lastName")} 
+                            placeholder="Doe"
+                            className={errors.lastName ? "border-red-500" : ""}
+                            aria-invalid={!!errors.lastName}
+                          />
+                        </FormField>
                       </div>
+
+                      <FormField 
+                        label="Email Address" 
+                        error={errors.email?.message} 
+                        required
+                        tooltip="We'll use this email for all communications"
+                      >
+                        <Input 
+                          type="email" 
+                          {...register("email")} 
+                          placeholder="john.doe@example.com"
+                          className={errors.email ? "border-red-500" : ""}
+                          aria-invalid={!!errors.email}
+                        />
+                      </FormField>
+
+                      <FormField 
+                        label="Phone Number" 
+                        error={errors.phone?.message} 
+                        required
+                        tooltip="Include country code (e.g., +1 for US)"
+                      >
+                        <Input 
+                          {...register("phone")} 
+                          placeholder="+1 (555) 123-4567"
+                          className={errors.phone ? "border-red-500" : ""}
+                          aria-invalid={!!errors.phone}
+                        />
+                      </FormField>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <FormField 
+                          label="Nationality" 
+                          error={errors.nationality?.message} 
+                          required
+                        >
+                          <Controller
+                            name="nationality"
+                            control={control}
+                            render={({ field }) => (
+                              <Select onValueChange={field.onChange} value={field.value}>
+                                <SelectTrigger className={errors.nationality ? "border-red-500" : ""}>
+                                  <SelectValue placeholder="Select nationality" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="us">United States</SelectItem>
+                                  <SelectItem value="uk">United Kingdom</SelectItem>
+                                  <SelectItem value="ca">Canada</SelectItem>
+                                  <SelectItem value="au">Australia</SelectItem>
+                                  <SelectItem value="de">Germany</SelectItem>
+                                  <SelectItem value="fr">France</SelectItem>
+                                  <SelectItem value="jp">Japan</SelectItem>
+                                  <SelectItem value="other">Other</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            )}
+                          />
+                        </FormField>
+
+                        <FormField 
+                          label="Gender" 
+                          error={errors.gender?.message} 
+                          required
+                        >
+                          <Controller
+                            name="gender"
+                            control={control}
+                            render={({ field }) => (
+                              <Select onValueChange={field.onChange} value={field.value}>
+                                <SelectTrigger className={errors.gender ? "border-red-500" : ""}>
+                                  <SelectValue placeholder="Select gender" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="male">Male</SelectItem>
+                                  <SelectItem value="female">Female</SelectItem>
+                                  <SelectItem value="other">Other</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            )}
+                          />
+                        </FormField>
+                      </div>
+
+                      <FormField 
+                        label="Date of Birth" 
+                        error={errors.dateOfBirth?.message} 
+                        required
+                        tooltip="You must be between 18 and 100 years old"
+                      >
+                        <Input 
+                          type="date" 
+                          {...register("dateOfBirth")}
+                          className={errors.dateOfBirth ? "border-red-500" : ""}
+                          max={new Date().toISOString().split('T')[0]}
+                          aria-invalid={!!errors.dateOfBirth}
+                        />
+                      </FormField>
+
+                      <FormField 
+                        label="Passport-Size Photo" 
+                        error={errors.passportPhoto?.message} 
+                        required
+                        tooltip="Recent passport-size photo with white background"
+                      >
+                        <FileUploadArea
+                          onFileSelect={handlePhotoUpload}
+                          preview={photoPreview}
+                          error={errors.passportPhoto?.message}
+                          clearFile={clearPhoto}
+                        />
+                      </FormField>
                     </div>
                   )}
 
                   {step === 2 && (
                     <div className="space-y-6">
-                      <div>
-                        <Label htmlFor="designation">Designation/Role *</Label>
-                        <Input id="designation" {...register("designation")} placeholder="Security Manager" />
-                        {errors.designation && (
-                          <p className="text-sm text-red-600 mt-1">{errors.designation.message}</p>
-                        )}
+                      {/* Professional Information Section */}
+                      <div className="bg-gray-50 rounded-lg p-4 mb-6">
+                        <h3 className="font-semibold text-gray-800 mb-2">Professional Details</h3>
+                        <p className="text-sm text-gray-600">Information about your current role and organization</p>
                       </div>
 
-                      <div>
-                        <Label htmlFor="organization">Organization *</Label>
-                        <Input id="organization" {...register("organization")} placeholder="ABC Corporation" />
-                        {errors.organization && (
-                          <p className="text-sm text-red-600 mt-1">{errors.organization.message}</p>
-                        )}
-                      </div>
+                      <FormField 
+                        label="Designation/Role" 
+                        error={errors.designation?.message} 
+                        required
+                        tooltip="Your current job title or position"
+                      >
+                        <Input 
+                          {...register("designation")} 
+                          placeholder="Security Manager"
+                          className={errors.designation ? "border-red-500" : ""}
+                          aria-invalid={!!errors.designation}
+                        />
+                      </FormField>
+
+                      <FormField 
+                        label="Organization" 
+                        error={errors.organization?.message} 
+                        required
+                        tooltip="Name of your current employer or organization"
+                      >
+                        <Input 
+                          {...register("organization")} 
+                          placeholder="ABC Corporation"
+                          className={errors.organization ? "border-red-500" : ""}
+                          aria-invalid={!!errors.organization}
+                        />
+                      </FormField>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                          <Label htmlFor="documentType">Document Type *</Label>
-                          <Select
-                            onValueChange={(value: "passport" | "national_id" | "drivers_license") => {
-                              setValue("documentType", value)
-                              trigger("documentType")
-                            }}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select document type" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="passport">Passport</SelectItem>
-                              <SelectItem value="national_id">National ID</SelectItem>
-                              <SelectItem value="drivers_license">Driver's License</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          {errors.documentType && (
-                            <p className="text-sm text-red-600 mt-1">{errors.documentType.message}</p>
-                          )}
-                        </div>
-
-                        <div>
-                          <Label htmlFor="documentNumber">Document Number *</Label>
-                          <Input
-                            id="documentNumber"
-                            {...register("documentNumber")}
-                            placeholder="Enter document number"
+                        <FormField 
+                          label="Document Type" 
+                          error={errors.documentType?.message} 
+                          required
+                          tooltip="Type of identification document"
+                        >
+                          <Controller
+                            name="documentType"
+                            control={control}
+                            render={({ field }) => (
+                              <Select onValueChange={field.onChange} value={field.value}>
+                                <SelectTrigger className={errors.documentType ? "border-red-500" : ""}>
+                                  <SelectValue placeholder="Select document type" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="passport">Passport</SelectItem>
+                                  <SelectItem value="national_id">National ID</SelectItem>
+                                  <SelectItem value="drivers_license">Driver's License</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            )}
                           />
-                          {errors.documentNumber && (
-                            <p className="text-sm text-red-600 mt-1">{errors.documentNumber.message}</p>
-                          )}
-                        </div>
+                        </FormField>
+
+                        <FormField 
+                          label="Document Number" 
+                          error={errors.documentNumber?.message} 
+                          required
+                          tooltip={`Enter your ${watchDocumentType ? documentTypeLabels[watchDocumentType] : 'document'} number`}
+                        >
+                          <Input
+                            {...register("documentNumber")}
+                            placeholder={watchDocumentType === "passport" ? "e.g., A12345678" : "Enter document number"}
+                            className={errors.documentNumber ? "border-red-500" : ""}
+                            aria-invalid={!!errors.documentNumber}
+                          />
+                        </FormField>
                       </div>
 
-                      <div>
-                        <Label>Digital Signature *</Label>
-                        <div className="mt-2 border rounded-lg p-4 bg-gray-50">
-                          <div className="mb-2 flex items-center justify-between">
-                            <span className="text-sm text-gray-600">Please sign below</span>
-                            <div className="flex gap-2">
-                              <Button type="button" variant="outline" size="sm" onClick={clearSignature}>
-                                Clear
-                              </Button>
-                              <Button type="button" variant="outline" size="sm" onClick={saveSignature}>
-                                Save
-                              </Button>
-                            </div>
-                          </div>
-                          <div className="border border-gray-300 rounded bg-white">
-                            <SignatureCanvas
-                              ref={(ref) => setSignatureRef(ref)}
-                              canvasProps={{
-                                width: 500,
-                                height: 200,
-                                className: "signature-canvas w-full",
-                              }}
-                              backgroundColor="white"
-                            />
-                          </div>
-                          {signatureData && (
-                            <div className="mt-2 flex items-center gap-2">
-                              <CheckCircle className="h-4 w-4 text-green-600" />
-                              <span className="text-sm text-green-600">Signature saved</span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
+                      <SignaturePad
+                        onSignatureSave={handleSignatureSave}
+                        error={errors.signature?.message}
+                        signatureRef={signatureRef}
+                      />
 
-                      <div className="flex items-start gap-3">
-                        <Checkbox
-                          id="declaration"
-                          onCheckedChange={(checked) => {
-                            setValue("declarationAccepted", checked === true)
-                            trigger("declarationAccepted")
-                          }}
-                        />
-                        <div className="grid gap-1.5 leading-none">
-                          <Label
-                            htmlFor="declaration"
-                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                          >
-                            Declaration *
-                          </Label>
-                          <p className="text-xs text-muted-foreground">
-                            I hereby declare that all information provided is true and accurate to the best of my
-                            knowledge. I understand that any false information may result in disqualification from the
-                            certification process.
-                          </p>
-                          {errors.declarationAccepted && (
-                            <p className="text-sm text-red-600">{errors.declarationAccepted.message}</p>
-                          )}
+                      <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                        <div className="flex items-start gap-3">
+                          <Controller
+                            name="declarationAccepted"
+                            control={control}
+                            render={({ field }) => (
+                              <Checkbox
+                                id="declaration"
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                                className="mt-1"
+                              />
+                            )}
+                          />
+                          <div className="grid gap-1.5 leading-none">
+                            <Label
+                              htmlFor="declaration"
+                              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                            >
+                              Declaration *
+                            </Label>
+                            <p className="text-xs text-muted-foreground">
+                              I hereby declare that all information provided is true and accurate to the best of my
+                              knowledge. I understand that any false information may result in disqualification from the
+                              certification process and may have legal consequences.
+                            </p>
+                            {errors.declarationAccepted && (
+                              <p className="text-sm text-red-600">{errors.declarationAccepted.message}</p>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -440,84 +972,109 @@ export default function RegisterPage() {
 
                   {step === 3 && (
                     <div className="space-y-6">
-                      <Alert>
-                        <AlertCircle className="h-4 w-4" />
-                        <AlertDescription>
-                          Please review your information carefully. Once submitted, you will be redirected to payment.
-                        </AlertDescription>
-                      </Alert>
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <Alert>
+                          <AlertCircle className="h-4 w-4" />
+                          <AlertDescription>
+                            Please review your information carefully before submitting. All details will be verified during the certification process.
+                          </AlertDescription>
+                        </Alert>
+                      </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
-                        <div>
-                          <h4 className="font-semibold mb-2">Personal Information</h4>
-                          <p>
-                            <strong>Name:</strong> {watch("firstName")} {watch("lastName")}
-                          </p>
-                          <p>
-                            <strong>Email:</strong> {watch("email")}
-                          </p>
-                          <p>
-                            <strong>Phone:</strong> {watch("phone")}
-                          </p>
-                          <p>
-                            <strong>Nationality:</strong> {watch("nationality")}
-                          </p>
-                          <p>
-                            <strong>Gender:</strong> {watch("gender")}
-                          </p>
-                          <p>
-                            <strong>Date of Birth:</strong> {watch("dateOfBirth")}
-                          </p>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-4">
+                          <h4 className="font-semibold text-gray-800 border-b pb-2">Personal Information</h4>
+                          <div className="space-y-2 text-sm">
+                            <p><strong>Name:</strong> {watch("firstName")} {watch("lastName")}</p>
+                            <p><strong>Email:</strong> {watch("email")}</p>
+                            <p><strong>Phone:</strong> {watch("phone")}</p>
+                            <p><strong>Nationality:</strong> {nationalityLabels[watch("nationality")] || watch("nationality")}</p>
+                            <p><strong>Gender:</strong> {genderLabels[watch("gender")] || watch("gender")}</p>
+                            <p><strong>Date of Birth:</strong> {watch("dateOfBirth") ? format(new Date(watch("dateOfBirth")), 'MMMM dd, yyyy') : ''}</p>
+                          </div>
                         </div>
-                        <div>
-                          <h4 className="font-semibold mb-2">Professional Information</h4>
-                          <p>
-                            <strong>Designation:</strong> {watch("designation")}
-                          </p>
-                          <p>
-                            <strong>Organization:</strong> {watch("organization")}
-                          </p>
-                          <p>
-                            <strong>Document Type:</strong> {watch("documentType")}
-                          </p>
-                          <p>
-                            <strong>Document Number:</strong> {watch("documentNumber")}
-                          </p>
+                        
+                        <div className="space-y-4">
+                          <h4 className="font-semibold text-gray-800 border-b pb-2">Professional Information</h4>
+                          <div className="space-y-2 text-sm">
+                            <p><strong>Designation:</strong> {watch("designation")}</p>
+                            <p><strong>Organization:</strong> {watch("organization")}</p>
+                            <p><strong>Document Type:</strong> {documentTypeLabels[watch("documentType")] || watch("documentType")}</p>
+                            <p><strong>Document Number:</strong> {watch("documentNumber")}</p>
+                          </div>
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-4">
-                        {passportPhoto && (
-                          <div>
-                            <p className="text-sm font-semibold mb-1">Photo:</p>
+                      <div className="flex items-center gap-6 p-4 bg-green-50 rounded-lg">
+                        {watchPassportPhoto && (
+                          <div className="flex items-center gap-2">
                             <CheckCircle className="h-5 w-5 text-green-600" />
+                            <span className="text-sm font-medium text-green-800">Photo uploaded</span>
                           </div>
                         )}
-                        {signatureData && (
-                          <div>
-                            <p className="text-sm font-semibold mb-1">Signature:</p>
+                        {watchSignature && (
+                          <div className="flex items-center gap-2">
                             <CheckCircle className="h-5 w-5 text-green-600" />
+                            <span className="text-sm font-medium text-green-800">Signature provided</span>
+                          </div>
+                        )}
+                        {watch("declarationAccepted") && (
+                          <div className="flex items-center gap-2">
+                            <CheckCircle className="h-5 w-5 text-green-600" />
+                            <span className="text-sm font-medium text-green-800">Declaration accepted</span>
                           </div>
                         )}
                       </div>
                     </div>
                   )}
 
-                  <div className="flex justify-between pt-6">
-                    {step > 1 && (
-                      <Button type="button" variant="outline" onClick={() => setStep(step - 1)}>
-                        Previous
-                      </Button>
-                    )}
-                    {step < 3 ? (
-                      <Button type="button" onClick={nextStep} className="ml-auto">
-                        Next
-                      </Button>
-                    ) : (
-                      <Button type="submit" disabled={isLoading} className="ml-auto">
-                        {isLoading ? "Submitting..." : "Submit Registration"}
-                      </Button>
-                    )}
+                  {/* Navigation Buttons */}
+                  <div className="flex justify-between items-center pt-6 border-t">
+                    <div>
+                      {step > 1 && (
+                        <Button 
+                          type="button" 
+                          variant="outline" 
+                          onClick={prevStep}
+                          className="flex items-center gap-2"
+                        >
+                          <ChevronLeft className="h-4 w-4" />
+                          Previous
+                        </Button>
+                      )}
+                    </div>
+                    
+                    <div>
+                      {step < 3 ? (
+                        <Button 
+                          type="button" 
+                          onClick={nextStep}
+                          className="flex items-center gap-2"
+                          disabled={isLoading}
+                        >
+                          Next
+                          <ChevronRight className="h-4 w-4" />
+                        </Button>
+                      ) : (
+                        <Button 
+                          type="submit" 
+                          disabled={isLoading}
+                          className="flex items-center gap-2 bg-green-600 hover:bg-green-700"
+                        >
+                          {isLoading ? (
+                            <>
+                              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                              Submitting...
+                            </>
+                          ) : (
+                            <>
+                              <CheckCircle className="h-4 w-4" />
+                              Submit Registration
+                            </>
+                          )}
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </form>
               </CardContent>
