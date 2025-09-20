@@ -1,8 +1,7 @@
-
 "use client"
 
 import type React from "react"
-import { useState, useEffect, useCallback, useRef } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useForm, Controller } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
@@ -15,7 +14,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Camera, AlertCircle, CheckCircle, Upload, X, ChevronLeft, ChevronRight, Save, Eye, EyeOff } from "lucide-react"
+import { AlertCircle, CheckCircle, Upload, X, ChevronLeft, ChevronRight, Save } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 import SignatureCanvas from "react-signature-canvas"
@@ -24,7 +23,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { format } from "date-fns"
 
 // Enhanced validation schemas
-const phoneRegex = /^[\+]?[1-9][\d]{0,15}$/
+const phoneRegex = /^[+]?[\d\s\-$$$$]+$/
 
 const documentNumberValidation = {
   passport: z.string().regex(/^[A-Z0-9]{6,12}$/, "Passport number must be 6-12 alphanumeric characters"),
@@ -33,116 +32,88 @@ const documentNumberValidation = {
 }
 
 const registrationSchema = z.object({
-  firstName: z.string()
+  firstName: z
+    .string()
     .min(2, "First name must be at least 2 characters")
     .max(50, "First name must not exceed 50 characters")
     .regex(/^[a-zA-Z\s'-]+$/, "First name can only contain letters, spaces, hyphens, and apostrophes"),
-  
-  lastName: z.string()
+
+  lastName: z
+    .string()
     .min(2, "Last name must be at least 2 characters")
     .max(50, "Last name must not exceed 50 characters")
     .regex(/^[a-zA-Z\s'-]+$/, "Last name can only contain letters, spaces, hyphens, and apostrophes"),
-  
-  email: z.string()
-    .email("Invalid email address")
-    .toLowerCase()
-    .trim(),
-  
-  phone: z.string()
-    .regex(phoneRegex, "Please enter a valid phone number (e.g., +1234567890)")
+
+  email: z.string().email("Invalid email address").toLowerCase().trim(),
+
+  phone: z
+    .string()
     .min(10, "Phone number must be at least 10 digits")
-    .max(16, "Phone number must not exceed 16 digits"),
-  
+    .max(16, "Phone number must not exceed 16 digits")
+    .regex(phoneRegex, "Please enter a valid phone number"),
+
   nationality: z.string().min(1, "Please select your nationality"),
-  
+
   gender: z.enum(["male", "female", "other"], {
     required_error: "Please select your gender",
   }),
-  
-  dateOfBirth: z.string()
+
+  dateOfBirth: z
+    .string()
     .min(1, "Date of birth is required")
     .refine((date) => {
       const birthDate = new Date(date)
       const today = new Date()
-      
+
       if (isNaN(birthDate.getTime())) return false
       if (birthDate > today) return false
-      
+
       const age = today.getFullYear() - birthDate.getFullYear()
       const monthDiff = today.getMonth() - birthDate.getMonth()
       const dayDiff = today.getDate() - birthDate.getDate()
-      
+
       const adjustedAge = monthDiff < 0 || (monthDiff === 0 && dayDiff < 0) ? age - 1 : age
-      
+
       return adjustedAge >= 18 && adjustedAge <= 100
     }, "You must be between 18 and 100 years old"),
-  
-  designation: z.string()
-    .min(2, "Designation is required")
-    .max(100, "Designation must not exceed 100 characters")
-    .regex(/^[a-zA-Z\s'-]+$/, "Designation can only contain letters, spaces, hyphens, and apostrophes"),
-  
-  organization: z.string()
+
+  designation: z.string().min(2, "Designation is required").max(100, "Designation must not exceed 100 characters"),
+
+  organization: z
+    .string()
     .min(2, "Organization name is required")
-    .max(200, "Organization name must not exceed 200 characters"),
-  
+    .max(100, "Organization name must not exceed 100 characters"),
+
   documentType: z.enum(["passport", "national_id", "drivers_license"], {
-    required_error: "Please select document type",
+    required_error: "Please select a document type",
   }),
-  
-  documentNumber: z.string().min(1, "Document number is required"),
-  
+
+  documentNumber: z
+    .string()
+    .min(6, "Document number must be at least 6 characters")
+    .max(15, "Document number must not exceed 15 characters")
+    .regex(/^[A-Z0-9]+$/i, "Document number can only contain letters and numbers"),
+
+  passportPhoto: z.any().optional(),
+
+  signature: z.string().min(1, "Digital signature is required"),
+
   declarationAccepted: z.boolean().refine((val) => val === true, {
-    message: "You must accept the declaration",
+    message: "You must accept the declaration to proceed",
   }),
-  
-  passportPhoto: z.instanceof(File, {
-    message: "Please upload a passport-size photo",
-  }),
-  
-  signature: z.string().min(1, "Please provide your signature"),
-}).superRefine((data, ctx) => {
-  const documentType = data.documentType
-  const documentNumber = data.documentNumber
-  
-  let isValid = false
-  let errorMessage = ""
-  
-  switch (documentType) {
-    case "passport":
-      isValid = /^[A-Z0-9]{6,12}$/.test(documentNumber)
-      errorMessage = "Passport number must be 6-12 alphanumeric characters"
-      break
-    case "national_id":
-      isValid = /^[A-Z0-9]{8,15}$/.test(documentNumber)
-      errorMessage = "National ID must be 8-15 alphanumeric characters"
-      break
-    case "drivers_license":
-      isValid = /^[A-Z0-9]{6,12}$/.test(documentNumber)
-      errorMessage = "Driver's license must be 6-12 alphanumeric characters"
-      break
-  }
-  
-  if (!isValid) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: errorMessage,
-      path: ["documentNumber"],
-    })
-  }
 })
 
 type RegistrationForm = z.infer<typeof registrationSchema>
 
 // Helper components
-const FormField = ({ 
-  label, 
-  error, 
-  required, 
-  children, 
+const FormField = ({
+  label,
+  error,
+  required,
+  children,
   tooltip,
-  className = "" 
-}: { 
+  className = "",
+}: {
   label: string
   error?: string
   required?: boolean
@@ -179,13 +150,14 @@ const FormField = ({
   </div>
 )
 
-const FileUploadArea = ({ 
-  onFileSelect, 
-  preview, 
-  error, 
+const FileUploadArea = ({
+  onFileSelect,
+  preview,
+  error,
   clearFile,
   accept = "image/*",
-  maxSize = 5 * 1024 * 1024
+  maxSize = 5 * 1024 * 1024,
+  currentFile,
 }: {
   onFileSelect: (file: File) => void
   preview?: string
@@ -193,6 +165,7 @@ const FileUploadArea = ({
   clearFile: () => void
   accept?: string
   maxSize?: number
+  currentFile?: File
 }) => {
   const [isDragOver, setIsDragOver] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -210,7 +183,7 @@ const FileUploadArea = ({
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault()
     setIsDragOver(false)
-    
+
     const files = e.dataTransfer.files
     if (files.length > 0) {
       validateAndProcessFile(files[0])
@@ -228,24 +201,18 @@ const FileUploadArea = ({
     if (!file.type.startsWith("image/")) {
       return
     }
-    
+
     if (file.size > maxSize) {
       return
     }
-    
+
     onFileSelect(file)
   }
 
   return (
     <div className="space-y-2">
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept={accept}
-        onChange={handleFileSelect}
-        className="hidden"
-      />
-      
+      <input ref={fileInputRef} type="file" accept={accept} onChange={handleFileSelect} className="hidden" />
+
       <div
         className={`border-2 border-dashed rounded-lg p-6 text-center transition-all cursor-pointer
           ${isDragOver ? "border-blue-500 bg-blue-50" : ""}
@@ -255,17 +222,25 @@ const FileUploadArea = ({
         onDrop={handleDrop}
         onClick={() => fileInputRef.current?.click()}
       >
-        {preview ? (
+        {preview || currentFile ? (
           <div className="flex flex-col items-center gap-3">
-            <img src={preview} alt="Preview" className="h-24 w-24 object-cover rounded-lg" />
+            {preview ? (
+              <img src={preview || "/placeholder.svg"} alt="Preview" className="h-24 w-24 object-cover rounded-lg" />
+            ) : (
+              <img
+                src={URL.createObjectURL(currentFile as File) || "/placeholder.svg"}
+                alt="Preview"
+                className="h-24 w-24 object-cover rounded-lg"
+              />
+            )}
             <div className="flex items-center gap-2">
               <CheckCircle className="h-5 w-5 text-green-600" />
               <span className="text-sm text-green-600 font-medium">Photo uploaded</span>
             </div>
-            <Button 
-              type="button" 
-              variant="outline" 
-              size="sm" 
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
               onClick={(e) => {
                 e.stopPropagation()
                 clearFile()
@@ -279,17 +254,13 @@ const FileUploadArea = ({
           <div className="flex flex-col items-center gap-3">
             <Upload className="h-10 w-10 text-gray-400" />
             <div className="space-y-1">
-              <p className="text-sm font-medium text-gray-700">
-                Click to upload or drag and drop
-              </p>
-              <p className="text-xs text-gray-500">
-                Max 5MB, JPG/PNG only
-              </p>
+              <p className="text-sm font-medium text-gray-700">Click to upload or drag and drop</p>
+              <p className="text-xs text-gray-500">Max 5MB, JPG/PNG only</p>
             </div>
           </div>
         )}
       </div>
-      
+
       {error && (
         <p className="text-sm text-red-600 flex items-center gap-1">
           <AlertCircle className="h-3 w-3" />
@@ -300,10 +271,10 @@ const FileUploadArea = ({
   )
 }
 
-const SignaturePad = ({ 
-  onSignatureSave, 
+const SignaturePad = ({
+  onSignatureSave,
   error,
-  signatureRef
+  signatureRef,
 }: {
   onSignatureSave: (dataUrl: string) => void
   error?: string
@@ -329,27 +300,17 @@ const SignaturePad = ({
         <div className="mb-3 flex items-center justify-between">
           <span className="text-sm text-gray-600">Please sign in the box below</span>
           <div className="flex gap-2">
-            <Button 
-              type="button" 
-              variant="outline" 
-              size="sm" 
-              onClick={handleClear}
-            >
+            <Button type="button" variant="outline" size="sm" onClick={handleClear}>
               <X className="h-4 w-4 mr-1" />
               Clear
             </Button>
-            <Button 
-              type="button" 
-              variant="outline" 
-              size="sm" 
-              onClick={handleSave}
-            >
+            <Button type="button" variant="outline" size="sm" onClick={handleSave}>
               <Save className="h-4 w-4 mr-1" />
               Save
             </Button>
           </div>
         </div>
-        
+
         <div className="border border-gray-300 rounded bg-white overflow-hidden">
           <SignatureCanvas
             ref={signatureRef as React.RefObject<SignatureCanvas>}
@@ -363,7 +324,7 @@ const SignaturePad = ({
             onEnd={() => setIsDrawing(false)}
           />
         </div>
-        
+
         {error && (
           <p className="text-sm text-red-600 mt-2 flex items-center gap-1">
             <AlertCircle className="h-3 w-3" />
@@ -375,7 +336,7 @@ const SignaturePad = ({
   )
 }
 
-export default function EnhancedRegistrationPage() {
+export default function RegisterPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [step, setStep] = useState(1)
   const [photoPreview, setPhotoPreview] = useState<string>("")
@@ -399,10 +360,10 @@ export default function EnhancedRegistrationPage() {
     setError,
     clearErrors,
     getValues,
-    reset
+    reset,
   } = useForm<RegistrationForm>({
     resolver: zodResolver(registrationSchema),
-    mode: "onChange",
+    mode: "onBlur",
     defaultValues: {
       declarationAccepted: false,
     },
@@ -418,11 +379,14 @@ export default function EnhancedRegistrationPage() {
       if (isDirty && isValid) {
         setIsAutoSaving(true)
         const formData = getValues()
-        localStorage.setItem('registration_form_draft', JSON.stringify({
-          data: formData,
-          timestamp: new Date().toISOString(),
-          step: step
-        }))
+        localStorage.setItem(
+          "registration_form_draft",
+          JSON.stringify({
+            data: formData,
+            timestamp: new Date().toISOString(),
+            step: step,
+          }),
+        )
         setTimeout(() => setIsAutoSaving(false), 1000)
       }
     }
@@ -438,81 +402,57 @@ export default function EnhancedRegistrationPage() {
 
   // Load saved draft
   useEffect(() => {
-    const savedDraft = localStorage.getItem('registration_form_draft')
+    const savedDraft = localStorage.getItem("registration_form_draft")
     if (savedDraft) {
       try {
         const { data, timestamp, step: savedStep } = JSON.parse(savedDraft)
         const savedDate = new Date(timestamp)
         const now = new Date()
         const hoursDiff = (now.getTime() - savedDate.getTime()) / (1000 * 60 * 60)
-        
-        if (hoursDiff < 24) { // Load if less than 24 hours old
+
+        if (hoursDiff < 24) {
+          // Load if less than 24 hours old
           // Restore form data (excluding files)
           const { passportPhoto, signature, ...restData } = data
-          Object.keys(restData).forEach(key => {
+          Object.keys(restData).forEach((key) => {
             setValue(key as keyof RegistrationForm, restData[key as keyof RegistrationForm])
           })
           setStep(savedStep)
         }
       } catch (error) {
-        console.error('Error loading draft:', error)
+        console.error("Error loading draft:", error)
       }
     }
   }, [setValue])
 
   const nationalityLabels: Record<string, string> = {
     us: "United States",
-    uk: "United Kingdom", 
+    uk: "United Kingdom",
     ca: "Canada",
     au: "Australia",
     de: "Germany",
     fr: "France",
     jp: "Japan",
-    other: "Other"
+    other: "Other",
   }
 
   const genderLabels: Record<string, string> = {
     male: "Male",
     female: "Female",
-    other: "Other"
+    other: "Other",
   }
 
   const documentTypeLabels: Record<string, string> = {
     passport: "Passport",
     national_id: "National ID",
-    drivers_license: "Driver's License"
+    drivers_license: "Driver's License",
   }
 
-  const handlePhotoUpload = useCallback((file: File) => {
-    // Validate file
-    if (!file.type.startsWith("image/")) {
-      setError("passportPhoto", {
-        type: "manual",
-        message: "Please upload an image file (JPG, PNG, etc.)",
-      })
-      return
-    }
-    
-    if (file.size > 5 * 1024 * 1024) {
-      setError("passportPhoto", {
-        type: "manual", 
-        message: "File size must be less than 5MB",
-      })
-      return
-    }
-    
-    // Set the file in form
+  const handlePassportPhotoSelect = (file: File) => {
     setValue("passportPhoto", file, { shouldValidate: true })
-    
-    // Create preview
-    const reader = new FileReader()
-    reader.onload = (e) => {
-      setPhotoPreview(e.target?.result as string)
-    }
-    reader.readAsDataURL(file)
-    
     clearErrors("passportPhoto")
-  }, [setValue, setError, clearErrors])
+    console.log("[v0] Passport photo selected:", file.name)
+  }
 
   const clearPhoto = () => {
     setValue("passportPhoto", undefined as any)
@@ -522,51 +462,57 @@ export default function EnhancedRegistrationPage() {
   const handleSignatureSave = (signatureData: string) => {
     setValue("signature", signatureData, { shouldValidate: true })
     clearErrors("signature")
+    console.log("[v0] Signature saved")
   }
 
   const validateStep = async (stepNumber: number): Promise<boolean> => {
+    console.log("[v0] Validating step:", stepNumber)
+
     let fieldsToValidate: (keyof RegistrationForm)[] = []
-    
+
     switch (stepNumber) {
       case 1:
-        fieldsToValidate = [
-          "firstName", 
-          "lastName", 
-          "email", 
-          "phone", 
-          "nationality", 
-          "gender", 
-          "dateOfBirth",
-          "passportPhoto"
-        ]
+        fieldsToValidate = ["firstName", "lastName", "email", "phone", "nationality", "gender", "dateOfBirth"]
+
+        const passportPhoto = getValues("passportPhoto")
+        if (!passportPhoto) {
+          setError("passportPhoto", { message: "Passport photo is required" })
+          return false
+        }
         break
+
       case 2:
-        fieldsToValidate = [
-          "designation", 
-          "organization", 
-          "documentType", 
-          "documentNumber", 
-          "declarationAccepted",
-          "signature"
-        ]
+        fieldsToValidate = ["designation", "organization", "documentType", "documentNumber", "declarationAccepted"]
+
+        const signature = getValues("signature")
+        if (!signature) {
+          setError("signature", { message: "Digital signature is required" })
+          return false
+        }
         break
     }
-    
+
     const results = await trigger(fieldsToValidate)
+    console.log("[v0] Step validation results:", results)
+
+    if (!results) {
+      console.log("[v0] Validation errors:", errors)
+    }
+
     return results
   }
 
   const nextStep = async () => {
     const isValid = await validateStep(step)
     if (isValid) {
-      setStep(prev => prev + 1)
-      window.scrollTo({ top: 0, behavior: 'smooth' })
+      setStep((prev) => prev + 1)
+      window.scrollTo({ top: 0, behavior: "smooth" })
     }
   }
 
   const prevStep = () => {
-    setStep(prev => prev - 1)
-    window.scrollTo({ top: 0, behavior: 'smooth' })
+    setStep((prev) => prev - 1)
+    window.scrollTo({ top: 0, behavior: "smooth" })
   }
 
   const handleFormSubmit = async (data: RegistrationForm) => {
@@ -616,8 +562,8 @@ export default function EnhancedRegistrationPage() {
         if (profileError) throw profileError
 
         // Clear saved draft
-        localStorage.removeItem('registration_form_draft')
-        
+        localStorage.removeItem("registration_form_draft")
+
         setSuccessMessage("Registration successful! Redirecting to payment...")
         setTimeout(() => router.push("/payment"), 2000)
       }
@@ -640,13 +586,11 @@ export default function EnhancedRegistrationPage() {
         <section className="py-20 lg:py-32 bg-gradient-to-br from-background via-background to-muted/30">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="text-center max-w-4xl mx-auto">
-              <h1 className="text-4xl lg:text-6xl font-bold text-balance mb-6">
-                Professional Registration
-              </h1>
+              <h1 className="text-4xl lg:text-6xl font-bold text-balance mb-6">Professional Registration</h1>
               <p className="text-xl text-muted-foreground text-pretty mb-8 leading-relaxed">
                 Join our certification program with a streamlined registration process.
               </p>
-              
+
               {/* Progress Bar */}
               <div className="max-w-md mx-auto">
                 <div className="flex justify-between text-sm text-gray-600 mb-2">
@@ -666,16 +610,14 @@ export default function EnhancedRegistrationPage() {
               <CardHeader>
                 <div className="flex justify-between items-start">
                   <div>
-                    <CardTitle className="text-2xl md:text-3xl">
-                      Registration Form
-                    </CardTitle>
+                    <CardTitle className="text-2xl md:text-3xl">Registration Form</CardTitle>
                     <CardDescription className="mt-2">
                       {step === 1 && "Personal Information"}
                       {step === 2 && "Professional Details & Verification"}
                       {step === 3 && "Review & Submit"}
                     </CardDescription>
                   </div>
-                  
+
                   {isAutoSaving && (
                     <div className="flex items-center gap-2 text-sm text-gray-500">
                       <div className="w-3 h-3 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin" />
@@ -683,7 +625,7 @@ export default function EnhancedRegistrationPage() {
                     </div>
                   )}
                 </div>
-                
+
                 {/* Messages */}
                 {errorMessage && (
                   <Alert variant="destructive" className="mt-4">
@@ -691,7 +633,7 @@ export default function EnhancedRegistrationPage() {
                     <AlertDescription>{errorMessage}</AlertDescription>
                   </Alert>
                 )}
-                
+
                 {successMessage && (
                   <Alert className="mt-4 bg-green-50 border-green-200">
                     <CheckCircle className="h-4 w-4 text-green-600" />
@@ -699,7 +641,7 @@ export default function EnhancedRegistrationPage() {
                   </Alert>
                 )}
               </CardHeader>
-              
+
               <CardContent>
                 <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-8">
                   {step === 1 && (
@@ -711,28 +653,28 @@ export default function EnhancedRegistrationPage() {
                       </div>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <FormField 
-                          label="First Name" 
-                          error={errors.firstName?.message} 
+                        <FormField
+                          label="First Name"
+                          error={errors.firstName?.message}
                           required
                           tooltip="Enter your legal first name as it appears on your documents"
                         >
-                          <Input 
-                            {...register("firstName")} 
+                          <Input
+                            {...register("firstName")}
                             placeholder="John"
                             className={errors.firstName ? "border-red-500" : ""}
                             aria-invalid={!!errors.firstName}
                           />
                         </FormField>
-                        
-                        <FormField 
-                          label="Last Name" 
-                          error={errors.lastName?.message} 
+
+                        <FormField
+                          label="Last Name"
+                          error={errors.lastName?.message}
                           required
                           tooltip="Enter your legal last name as it appears on your documents"
                         >
-                          <Input 
-                            {...register("lastName")} 
+                          <Input
+                            {...register("lastName")}
                             placeholder="Doe"
                             className={errors.lastName ? "border-red-500" : ""}
                             aria-invalid={!!errors.lastName}
@@ -740,29 +682,29 @@ export default function EnhancedRegistrationPage() {
                         </FormField>
                       </div>
 
-                      <FormField 
-                        label="Email Address" 
-                        error={errors.email?.message} 
+                      <FormField
+                        label="Email Address"
+                        error={errors.email?.message}
                         required
                         tooltip="We'll use this email for all communications"
                       >
-                        <Input 
-                          type="email" 
-                          {...register("email")} 
+                        <Input
+                          type="email"
+                          {...register("email")}
                           placeholder="john.doe@example.com"
                           className={errors.email ? "border-red-500" : ""}
                           aria-invalid={!!errors.email}
                         />
                       </FormField>
 
-                      <FormField 
-                        label="Phone Number" 
-                        error={errors.phone?.message} 
+                      <FormField
+                        label="Phone Number"
+                        error={errors.phone?.message}
                         required
                         tooltip="Include country code (e.g., +1 for US)"
                       >
-                        <Input 
-                          {...register("phone")} 
+                        <Input
+                          {...register("phone")}
                           placeholder="+1 (555) 123-4567"
                           className={errors.phone ? "border-red-500" : ""}
                           aria-invalid={!!errors.phone}
@@ -770,11 +712,7 @@ export default function EnhancedRegistrationPage() {
                       </FormField>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <FormField 
-                          label="Nationality" 
-                          error={errors.nationality?.message} 
-                          required
-                        >
+                        <FormField label="Nationality" error={errors.nationality?.message} required>
                           <Controller
                             name="nationality"
                             control={control}
@@ -798,11 +736,7 @@ export default function EnhancedRegistrationPage() {
                           />
                         </FormField>
 
-                        <FormField 
-                          label="Gender" 
-                          error={errors.gender?.message} 
-                          required
-                        >
+                        <FormField label="Gender" error={errors.gender?.message} required>
                           <Controller
                             name="gender"
                             control={control}
@@ -822,32 +756,32 @@ export default function EnhancedRegistrationPage() {
                         </FormField>
                       </div>
 
-                      <FormField 
-                        label="Date of Birth" 
-                        error={errors.dateOfBirth?.message} 
+                      <FormField
+                        label="Date of Birth"
+                        error={errors.dateOfBirth?.message}
                         required
                         tooltip="You must be between 18 and 100 years old"
                       >
-                        <Input 
-                          type="date" 
+                        <Input
+                          type="date"
                           {...register("dateOfBirth")}
                           className={errors.dateOfBirth ? "border-red-500" : ""}
-                          max={new Date().toISOString().split('T')[0]}
+                          max={new Date().toISOString().split("T")[0]}
                           aria-invalid={!!errors.dateOfBirth}
                         />
                       </FormField>
 
-                      <FormField 
-                        label="Passport-Size Photo" 
-                        error={errors.passportPhoto?.message} 
+                      <FormField
+                        label="Passport Photo"
+                        error={errors.passportPhoto?.message}
                         required
-                        tooltip="Recent passport-size photo with white background"
+                        tooltip="Upload a clear photo of yourself (JPEG, PNG, max 5MB)"
                       >
                         <FileUploadArea
-                          onFileSelect={handlePhotoUpload}
-                          preview={photoPreview}
-                          error={errors.passportPhoto?.message}
-                          clearFile={clearPhoto}
+                          onFileSelect={handlePassportPhotoSelect}
+                          accept="image/*"
+                          maxSize={5 * 1024 * 1024}
+                          currentFile={watchPassportPhoto}
                         />
                       </FormField>
                     </div>
@@ -861,28 +795,28 @@ export default function EnhancedRegistrationPage() {
                         <p className="text-sm text-gray-600">Information about your current role and organization</p>
                       </div>
 
-                      <FormField 
-                        label="Designation/Role" 
-                        error={errors.designation?.message} 
+                      <FormField
+                        label="Designation/Role"
+                        error={errors.designation?.message}
                         required
                         tooltip="Your current job title or position"
                       >
-                        <Input 
-                          {...register("designation")} 
+                        <Input
+                          {...register("designation")}
                           placeholder="Security Manager"
                           className={errors.designation ? "border-red-500" : ""}
                           aria-invalid={!!errors.designation}
                         />
                       </FormField>
 
-                      <FormField 
-                        label="Organization" 
-                        error={errors.organization?.message} 
+                      <FormField
+                        label="Organization"
+                        error={errors.organization?.message}
                         required
                         tooltip="Name of your current employer or organization"
                       >
-                        <Input 
-                          {...register("organization")} 
+                        <Input
+                          {...register("organization")}
                           placeholder="ABC Corporation"
                           className={errors.organization ? "border-red-500" : ""}
                           aria-invalid={!!errors.organization}
@@ -890,9 +824,9 @@ export default function EnhancedRegistrationPage() {
                       </FormField>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <FormField 
-                          label="Document Type" 
-                          error={errors.documentType?.message} 
+                        <FormField
+                          label="Document Type"
+                          error={errors.documentType?.message}
                           required
                           tooltip="Type of identification document"
                         >
@@ -914,11 +848,11 @@ export default function EnhancedRegistrationPage() {
                           />
                         </FormField>
 
-                        <FormField 
-                          label="Document Number" 
-                          error={errors.documentNumber?.message} 
+                        <FormField
+                          label="Document Number"
+                          error={errors.documentNumber?.message}
                           required
-                          tooltip={`Enter your ${watchDocumentType ? documentTypeLabels[watchDocumentType] : 'document'} number`}
+                          tooltip={`Enter your ${watchDocumentType ? documentTypeLabels[watchDocumentType] : "document"} number`}
                         >
                           <Input
                             {...register("documentNumber")}
@@ -976,7 +910,8 @@ export default function EnhancedRegistrationPage() {
                         <Alert>
                           <AlertCircle className="h-4 w-4" />
                           <AlertDescription>
-                            Please review your information carefully before submitting. All details will be verified during the certification process.
+                            Please review your information carefully before submitting. All details will be verified
+                            during the certification process.
                           </AlertDescription>
                         </Alert>
                       </div>
@@ -985,22 +920,45 @@ export default function EnhancedRegistrationPage() {
                         <div className="space-y-4">
                           <h4 className="font-semibold text-gray-800 border-b pb-2">Personal Information</h4>
                           <div className="space-y-2 text-sm">
-                            <p><strong>Name:</strong> {watch("firstName")} {watch("lastName")}</p>
-                            <p><strong>Email:</strong> {watch("email")}</p>
-                            <p><strong>Phone:</strong> {watch("phone")}</p>
-                            <p><strong>Nationality:</strong> {nationalityLabels[watch("nationality")] || watch("nationality")}</p>
-                            <p><strong>Gender:</strong> {genderLabels[watch("gender")] || watch("gender")}</p>
-                            <p><strong>Date of Birth:</strong> {watch("dateOfBirth") ? format(new Date(watch("dateOfBirth")), 'MMMM dd, yyyy') : ''}</p>
+                            <p>
+                              <strong>Name:</strong> {watch("firstName")} {watch("lastName")}
+                            </p>
+                            <p>
+                              <strong>Email:</strong> {watch("email")}
+                            </p>
+                            <p>
+                              <strong>Phone:</strong> {watch("phone")}
+                            </p>
+                            <p>
+                              <strong>Nationality:</strong>{" "}
+                              {nationalityLabels[watch("nationality")] || watch("nationality")}
+                            </p>
+                            <p>
+                              <strong>Gender:</strong> {genderLabels[watch("gender")] || watch("gender")}
+                            </p>
+                            <p>
+                              <strong>Date of Birth:</strong>{" "}
+                              {watch("dateOfBirth") ? format(new Date(watch("dateOfBirth")), "MMMM dd, yyyy") : ""}
+                            </p>
                           </div>
                         </div>
-                        
+
                         <div className="space-y-4">
                           <h4 className="font-semibold text-gray-800 border-b pb-2">Professional Information</h4>
                           <div className="space-y-2 text-sm">
-                            <p><strong>Designation:</strong> {watch("designation")}</p>
-                            <p><strong>Organization:</strong> {watch("organization")}</p>
-                            <p><strong>Document Type:</strong> {documentTypeLabels[watch("documentType")] || watch("documentType")}</p>
-                            <p><strong>Document Number:</strong> {watch("documentNumber")}</p>
+                            <p>
+                              <strong>Designation:</strong> {watch("designation")}
+                            </p>
+                            <p>
+                              <strong>Organization:</strong> {watch("organization")}
+                            </p>
+                            <p>
+                              <strong>Document Type:</strong>{" "}
+                              {documentTypeLabels[watch("documentType")] || watch("documentType")}
+                            </p>
+                            <p>
+                              <strong>Document Number:</strong> {watch("documentNumber")}
+                            </p>
                           </div>
                         </div>
                       </div>
@@ -1032,22 +990,22 @@ export default function EnhancedRegistrationPage() {
                   <div className="flex justify-between items-center pt-6 border-t">
                     <div>
                       {step > 1 && (
-                        <Button 
-                          type="button" 
-                          variant="outline" 
+                        <Button
+                          type="button"
+                          variant="outline"
                           onClick={prevStep}
-                          className="flex items-center gap-2"
+                          className="flex items-center gap-2 bg-transparent"
                         >
                           <ChevronLeft className="h-4 w-4" />
                           Previous
                         </Button>
                       )}
                     </div>
-                    
+
                     <div>
                       {step < 3 ? (
-                        <Button 
-                          type="button" 
+                        <Button
+                          type="button"
                           onClick={nextStep}
                           className="flex items-center gap-2"
                           disabled={isLoading}
@@ -1056,8 +1014,8 @@ export default function EnhancedRegistrationPage() {
                           <ChevronRight className="h-4 w-4" />
                         </Button>
                       ) : (
-                        <Button 
-                          type="submit" 
+                        <Button
+                          type="submit"
                           disabled={isLoading}
                           className="flex items-center gap-2 bg-green-600 hover:bg-green-700"
                         >
