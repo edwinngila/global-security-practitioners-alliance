@@ -336,9 +336,9 @@ const SignaturePad = ({
   )
 }
 
-export default function RegisterPage() {
+const RegistrationFormComponent = () => {
   const [isLoading, setIsLoading] = useState(false)
-  const [step, setStep] = useState(1)
+  const [currentStep, setCurrentStep] = useState(1)
   const [photoPreview, setPhotoPreview] = useState<string>("")
   const signatureRef = useRef<SignatureCanvas>(null)
   const [errorMessage, setErrorMessage] = useState<string>("")
@@ -348,6 +348,7 @@ export default function RegisterPage() {
   const router = useRouter()
   const supabase = createClient()
   const autoSaveInterval = useRef<NodeJS.Timeout>()
+  const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false)
 
   const {
     register,
@@ -363,7 +364,8 @@ export default function RegisterPage() {
     reset,
   } = useForm<RegistrationForm>({
     resolver: zodResolver(registrationSchema),
-    mode: "onBlur",
+    mode: "onSubmit",
+    reValidateMode: "onBlur",
     defaultValues: {
       declarationAccepted: false,
     },
@@ -384,7 +386,7 @@ export default function RegisterPage() {
           JSON.stringify({
             data: formData,
             timestamp: new Date().toISOString(),
-            step: step,
+            step: currentStep,
           }),
         )
         setTimeout(() => setIsAutoSaving(false), 1000)
@@ -398,7 +400,7 @@ export default function RegisterPage() {
         clearInterval(autoSaveInterval.current)
       }
     }
-  }, [isDirty, isValid, getValues, step])
+  }, [isDirty, isValid, getValues, currentStep])
 
   // Load saved draft
   useEffect(() => {
@@ -417,7 +419,7 @@ export default function RegisterPage() {
           Object.keys(restData).forEach((key) => {
             setValue(key as keyof RegistrationForm, restData[key as keyof RegistrationForm])
           })
-          setStep(savedStep)
+          setCurrentStep(savedStep)
         }
       } catch (error) {
         console.error("Error loading draft:", error)
@@ -465,54 +467,29 @@ export default function RegisterPage() {
     console.log("[v0] Signature saved")
   }
 
-  const validateStep = async (stepNumber: number): Promise<boolean> => {
-    console.log("[v0] Validating step:", stepNumber)
-
-    let fieldsToValidate: (keyof RegistrationForm)[] = []
-
-    switch (stepNumber) {
-      case 1:
-        fieldsToValidate = ["firstName", "lastName", "email", "phone", "nationality", "gender", "dateOfBirth"]
-
-        const passportPhoto = getValues("passportPhoto")
-        if (!passportPhoto) {
-          setError("passportPhoto", { message: "Passport photo is required" })
-          return false
-        }
-        break
-
-      case 2:
-        fieldsToValidate = ["designation", "organization", "documentType", "documentNumber", "declarationAccepted"]
-
-        const signature = getValues("signature")
-        if (!signature) {
-          setError("signature", { message: "Digital signature is required" })
-          return false
-        }
-        break
-    }
-
-    const results = await trigger(fieldsToValidate)
-    console.log("[v0] Step validation results:", results)
-
-    if (!results) {
-      console.log("[v0] Validation errors:", errors)
-    }
-
-    return results
+  const validateCurrentStep = async () => {
+    setHasAttemptedSubmit(true)
+    const currentStepFields = getStepFields(currentStep)
+    const isStepValid = await trigger(currentStepFields)
+    console.log("[v0] Step validation result:", isStepValid)
+    console.log(
+      "[v0] Current step errors:",
+      currentStepFields.map((field) => ({ field, error: errors[field] })),
+    )
+    return isStepValid
   }
 
   const nextStep = async () => {
-    const isValid = await validateStep(step)
+    const isValid = await validateCurrentStep()
     if (isValid) {
-      setStep((prev) => prev + 1)
-      window.scrollTo({ top: 0, behavior: "smooth" })
+      setCurrentStep((prev) => Math.min(prev + 1, 4))
+      saveFormData()
     }
   }
 
   const prevStep = () => {
-    setStep((prev) => prev - 1)
-    window.scrollTo({ top: 0, behavior: "smooth" })
+    setCurrentStep((prev) => prev - 1)
+    saveFormData()
   }
 
   const handleFormSubmit = async (data: RegistrationForm) => {
@@ -575,7 +552,83 @@ export default function RegisterPage() {
     }
   }
 
-  const progressPercentage = (step / 3) * 100
+  const saveFormData = () => {
+    if (isDirty && isValid) {
+      setIsAutoSaving(true)
+      const formData = getValues()
+      localStorage.setItem(
+        "registration_form_draft",
+        JSON.stringify({
+          data: formData,
+          timestamp: new Date().toISOString(),
+          step: currentStep,
+        }),
+      )
+      setTimeout(() => setIsAutoSaving(false), 1000)
+    }
+  }
+
+  const getStepFields = (step: number): (keyof RegistrationForm)[] => {
+    switch (step) {
+      case 1:
+        return ["firstName", "lastName", "email", "phone", "nationality", "gender", "dateOfBirth"]
+      case 2:
+        return ["designation", "organization", "documentType", "documentNumber", "declarationAccepted"]
+      default:
+        return []
+    }
+  }
+
+  const progressPercentage = (currentStep / 3) * 100
+
+  const FormFieldWithConditionalError = ({
+    label,
+    error,
+    required,
+    children,
+    tooltip,
+    className = "",
+    fieldName,
+  }: {
+    label: string
+    error?: string
+    required?: boolean
+    children: React.ReactNode
+    tooltip?: string
+    className?: string
+    fieldName?: string
+  }) => {
+    const shouldShowError = hasAttemptedSubmit && error
+    return (
+      <div className={`space-y-2 ${className}`}>
+        <div className="flex items-center gap-2">
+          <Label className={shouldShowError ? "text-red-600" : ""}>
+            {label}
+            {required && <span className="text-red-500 ml-1">*</span>}
+          </Label>
+          {tooltip && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger>
+                  <AlertCircle className="h-4 w-4 text-gray-400" />
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p className="max-w-xs">{tooltip}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
+        </div>
+        {children}
+        {shouldShowError && (
+          <p className="text-sm text-red-600 flex items-center gap-1">
+            <AlertCircle className="h-3 w-3" />
+            {error}
+          </p>
+        )}
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -594,7 +647,7 @@ export default function RegisterPage() {
               {/* Progress Bar */}
               <div className="max-w-md mx-auto">
                 <div className="flex justify-between text-sm text-gray-600 mb-2">
-                  <span>Step {step} of 3</span>
+                  <span>Step {currentStep} of 3</span>
                   <span>{Math.round(progressPercentage)}% Complete</span>
                 </div>
                 <Progress value={progressPercentage} className="h-2" />
@@ -612,9 +665,9 @@ export default function RegisterPage() {
                   <div>
                     <CardTitle className="text-2xl md:text-3xl">Registration Form</CardTitle>
                     <CardDescription className="mt-2">
-                      {step === 1 && "Personal Information"}
-                      {step === 2 && "Professional Details & Verification"}
-                      {step === 3 && "Review & Submit"}
+                      {currentStep === 1 && "Personal Information"}
+                      {currentStep === 2 && "Professional Details & Verification"}
+                      {currentStep === 3 && "Review & Submit"}
                     </CardDescription>
                   </div>
 
@@ -644,7 +697,7 @@ export default function RegisterPage() {
 
               <CardContent>
                 <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-8">
-                  {step === 1 && (
+                  {currentStep === 1 && (
                     <div className="space-y-6">
                       {/* Personal Information Section */}
                       <div className="bg-gray-50 rounded-lg p-4 mb-6">
@@ -653,72 +706,84 @@ export default function RegisterPage() {
                       </div>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <FormField
+                        <FormFieldWithConditionalError
                           label="First Name"
                           error={errors.firstName?.message}
                           required
                           tooltip="Enter your legal first name as it appears on your documents"
+                          fieldName="firstName"
                         >
                           <Input
                             {...register("firstName")}
                             placeholder="John"
-                            className={errors.firstName ? "border-red-500" : ""}
+                            className={hasAttemptedSubmit && errors.firstName ? "border-red-500" : ""}
                             aria-invalid={!!errors.firstName}
                           />
-                        </FormField>
+                        </FormFieldWithConditionalError>
 
-                        <FormField
+                        <FormFieldWithConditionalError
                           label="Last Name"
                           error={errors.lastName?.message}
                           required
                           tooltip="Enter your legal last name as it appears on your documents"
+                          fieldName="lastName"
                         >
                           <Input
                             {...register("lastName")}
                             placeholder="Doe"
-                            className={errors.lastName ? "border-red-500" : ""}
+                            className={hasAttemptedSubmit && errors.lastName ? "border-red-500" : ""}
                             aria-invalid={!!errors.lastName}
                           />
-                        </FormField>
+                        </FormFieldWithConditionalError>
                       </div>
 
-                      <FormField
+                      <FormFieldWithConditionalError
                         label="Email Address"
                         error={errors.email?.message}
                         required
                         tooltip="We'll use this email for all communications"
+                        fieldName="email"
                       >
                         <Input
                           type="email"
                           {...register("email")}
                           placeholder="john.doe@example.com"
-                          className={errors.email ? "border-red-500" : ""}
+                          className={hasAttemptedSubmit && errors.email ? "border-red-500" : ""}
                           aria-invalid={!!errors.email}
                         />
-                      </FormField>
+                      </FormFieldWithConditionalError>
 
-                      <FormField
+                      <FormFieldWithConditionalError
                         label="Phone Number"
                         error={errors.phone?.message}
                         required
-                        tooltip="Include country code (e.g., +1 for US)"
+                        tooltip="Include country code (e.g., +1234567890)"
+                        fieldName="phone"
                       >
                         <Input
+                          type="tel"
                           {...register("phone")}
-                          placeholder="+1 (555) 123-4567"
-                          className={errors.phone ? "border-red-500" : ""}
+                          placeholder="+1234567890"
+                          className={hasAttemptedSubmit && errors.phone ? "border-red-500" : ""}
                           aria-invalid={!!errors.phone}
                         />
-                      </FormField>
+                      </FormFieldWithConditionalError>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <FormField label="Nationality" error={errors.nationality?.message} required>
+                        <FormFieldWithConditionalError
+                          label="Nationality"
+                          error={errors.nationality?.message}
+                          required
+                          fieldName="nationality"
+                        >
                           <Controller
                             name="nationality"
                             control={control}
                             render={({ field }) => (
                               <Select onValueChange={field.onChange} value={field.value}>
-                                <SelectTrigger className={errors.nationality ? "border-red-500" : ""}>
+                                <SelectTrigger
+                                  className={hasAttemptedSubmit && errors.nationality ? "border-red-500" : ""}
+                                >
                                   <SelectValue placeholder="Select nationality" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -734,15 +799,20 @@ export default function RegisterPage() {
                               </Select>
                             )}
                           />
-                        </FormField>
+                        </FormFieldWithConditionalError>
 
-                        <FormField label="Gender" error={errors.gender?.message} required>
+                        <FormFieldWithConditionalError
+                          label="Gender"
+                          error={errors.gender?.message}
+                          required
+                          fieldName="gender"
+                        >
                           <Controller
                             name="gender"
                             control={control}
                             render={({ field }) => (
                               <Select onValueChange={field.onChange} value={field.value}>
-                                <SelectTrigger className={errors.gender ? "border-red-500" : ""}>
+                                <SelectTrigger className={hasAttemptedSubmit && errors.gender ? "border-red-500" : ""}>
                                   <SelectValue placeholder="Select gender" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -753,41 +823,30 @@ export default function RegisterPage() {
                               </Select>
                             )}
                           />
-                        </FormField>
+                        </FormFieldWithConditionalError>
                       </div>
 
-                      <FormField
+                      <FormFieldWithConditionalError
                         label="Date of Birth"
                         error={errors.dateOfBirth?.message}
                         required
-                        tooltip="You must be between 18 and 100 years old"
+                        tooltip="You must be at least 18 years old to register"
+                        fieldName="dateOfBirth"
                       >
                         <Input
                           type="date"
                           {...register("dateOfBirth")}
-                          className={errors.dateOfBirth ? "border-red-500" : ""}
-                          max={new Date().toISOString().split("T")[0]}
+                          className={hasAttemptedSubmit && errors.dateOfBirth ? "border-red-500" : ""}
                           aria-invalid={!!errors.dateOfBirth}
+                          max={
+                            new Date(new Date().setFullYear(new Date().getFullYear() - 18)).toISOString().split("T")[0]
+                          }
                         />
-                      </FormField>
-
-                      <FormField
-                        label="Passport Photo"
-                        error={errors.passportPhoto?.message}
-                        required
-                        tooltip="Upload a clear photo of yourself (JPEG, PNG, max 5MB)"
-                      >
-                        <FileUploadArea
-                          onFileSelect={handlePassportPhotoSelect}
-                          accept="image/*"
-                          maxSize={5 * 1024 * 1024}
-                          currentFile={watchPassportPhoto}
-                        />
-                      </FormField>
+                      </FormFieldWithConditionalError>
                     </div>
                   )}
 
-                  {step === 2 && (
+                  {currentStep === 2 && (
                     <div className="space-y-6">
                       {/* Professional Information Section */}
                       <div className="bg-gray-50 rounded-lg p-4 mb-6">
@@ -795,47 +854,52 @@ export default function RegisterPage() {
                         <p className="text-sm text-gray-600">Information about your current role and organization</p>
                       </div>
 
-                      <FormField
+                      <FormFieldWithConditionalError
                         label="Designation/Role"
                         error={errors.designation?.message}
                         required
                         tooltip="Your current job title or position"
+                        fieldName="designation"
                       >
                         <Input
                           {...register("designation")}
                           placeholder="Security Manager"
-                          className={errors.designation ? "border-red-500" : ""}
+                          className={hasAttemptedSubmit && errors.designation ? "border-red-500" : ""}
                           aria-invalid={!!errors.designation}
                         />
-                      </FormField>
+                      </FormFieldWithConditionalError>
 
-                      <FormField
+                      <FormFieldWithConditionalError
                         label="Organization"
                         error={errors.organization?.message}
                         required
                         tooltip="Name of your current employer or organization"
+                        fieldName="organization"
                       >
                         <Input
                           {...register("organization")}
                           placeholder="ABC Corporation"
-                          className={errors.organization ? "border-red-500" : ""}
+                          className={hasAttemptedSubmit && errors.organization ? "border-red-500" : ""}
                           aria-invalid={!!errors.organization}
                         />
-                      </FormField>
+                      </FormFieldWithConditionalError>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <FormField
+                        <FormFieldWithConditionalError
                           label="Document Type"
                           error={errors.documentType?.message}
                           required
                           tooltip="Type of identification document"
+                          fieldName="documentType"
                         >
                           <Controller
                             name="documentType"
                             control={control}
                             render={({ field }) => (
                               <Select onValueChange={field.onChange} value={field.value}>
-                                <SelectTrigger className={errors.documentType ? "border-red-500" : ""}>
+                                <SelectTrigger
+                                  className={hasAttemptedSubmit && errors.documentType ? "border-red-500" : ""}
+                                >
                                   <SelectValue placeholder="Select document type" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -846,21 +910,22 @@ export default function RegisterPage() {
                               </Select>
                             )}
                           />
-                        </FormField>
+                        </FormFieldWithConditionalError>
 
-                        <FormField
+                        <FormFieldWithConditionalError
                           label="Document Number"
                           error={errors.documentNumber?.message}
                           required
                           tooltip={`Enter your ${watchDocumentType ? documentTypeLabels[watchDocumentType] : "document"} number`}
+                          fieldName="documentNumber"
                         >
                           <Input
                             {...register("documentNumber")}
                             placeholder={watchDocumentType === "passport" ? "e.g., A12345678" : "Enter document number"}
-                            className={errors.documentNumber ? "border-red-500" : ""}
+                            className={hasAttemptedSubmit && errors.documentNumber ? "border-red-500" : ""}
                             aria-invalid={!!errors.documentNumber}
                           />
-                        </FormField>
+                        </FormFieldWithConditionalError>
                       </div>
 
                       <SignaturePad
@@ -904,7 +969,7 @@ export default function RegisterPage() {
                     </div>
                   )}
 
-                  {step === 3 && (
+                  {currentStep === 3 && (
                     <div className="space-y-6">
                       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                         <Alert>
@@ -989,7 +1054,7 @@ export default function RegisterPage() {
                   {/* Navigation Buttons */}
                   <div className="flex justify-between items-center pt-6 border-t">
                     <div>
-                      {step > 1 && (
+                      {currentStep > 1 && (
                         <Button
                           type="button"
                           variant="outline"
@@ -1003,7 +1068,7 @@ export default function RegisterPage() {
                     </div>
 
                     <div>
-                      {step < 3 ? (
+                      {currentStep < 3 ? (
                         <Button
                           type="button"
                           onClick={nextStep}
@@ -1045,3 +1110,5 @@ export default function RegisterPage() {
     </div>
   )
 }
+
+export default RegistrationFormComponent
