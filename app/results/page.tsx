@@ -9,8 +9,6 @@ import { Badge } from "@/components/ui/badge"
 import { CheckCircle, XCircle, Download, Award, User } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
-import jsPDF from "jspdf"
-import html2canvas from "html2canvas"
 
 interface TestResults {
   score: number
@@ -105,6 +103,10 @@ export default function ResultsPage() {
 
   const downloadCertificate = async () => {
     if (!user || !results?.passed) return
+
+    // Dynamically import client-side libraries
+    const { default: jsPDF } = await import("jspdf")
+    const { default: html2canvas } = await import("html2canvas")
 
     const certificateHTML = `
       <div style="
