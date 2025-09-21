@@ -67,12 +67,6 @@ export default function Navigation() {
             {user ? (
               <div className="flex items-center gap-4">
                 <Button variant="ghost" asChild>
-                  <Link href="/dashboard" className="flex items-center gap-2">
-                    <User className="h-4 w-4" />
-                    Dashboard
-                  </Link>
-                </Button>
-                <Button variant="ghost" asChild>
                   <Link href="/admin">Admin</Link>
                 </Button>
                 <Button variant="outline" onClick={handleLogout}>
@@ -117,12 +111,6 @@ export default function Navigation() {
 
               {user ? (
                 <div className="flex flex-col gap-2">
-                  <Button variant="ghost" asChild className="justify-start">
-                    <Link href="/dashboard" onClick={() => setIsMenuOpen(false)} className="flex items-center gap-2">
-                      <User className="h-4 w-4" />
-                      Dashboard
-                    </Link>
-                  </Button>
                   <Button variant="ghost" asChild className="justify-start">
                     <Link href="/admin" onClick={() => setIsMenuOpen(false)}>
                       Admin
