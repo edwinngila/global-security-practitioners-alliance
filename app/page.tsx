@@ -4,11 +4,13 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Shield, Award, Users, BookOpen, ArrowRight } from "lucide-react"
 import Link from "next/link"
+import { AdminSetupNotice } from "@/components/admin-setup-notice"
 
 export default function HomePage() {
   return (
     <div className="min-h-screen flex flex-col">
       <Navigation />
+      <AdminSetupNotice />
 
       <main className="flex-1">
         {/* Hero Section */}

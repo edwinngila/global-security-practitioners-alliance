@@ -45,8 +45,49 @@ export default function TestPage() {
   const router = useRouter()
   const supabase = createClient()
 
+  const getRandomQuestions = (allQuestions: Question[], count = 50): Question[] => {
+    const shuffled = [...allQuestions].sort(() => 0.5 - Math.random())
+    return shuffled.slice(0, Math.min(count, allQuestions.length))
+  }
+
   useEffect(() => {
     const getUserAndQuestions = async () => {
+      const paidUserId = localStorage.getItem("paid-user-id")
+
+      if (paidUserId) {
+        const { data: profile, error: profileError } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", paidUserId)
+          .single()
+
+        if (profile && profile.payment_status === "completed") {
+          setUser(profile)
+
+          if (profile.test_completed) {
+            router.push("/results")
+            return
+          }
+
+          // Get all questions and select 50 random ones
+          const { data: questionsData, error: questionsError } = await supabase
+            .from("test_questions")
+            .select("*")
+            .eq("is_active", true)
+
+          if (questionsError) {
+            console.error("Error fetching questions:", questionsError)
+            return
+          }
+
+          const randomQuestions = getRandomQuestions(questionsData || [], 50)
+          setQuestions(randomQuestions)
+          setIsLoading(false)
+          return
+        }
+      }
+
+      // Fallback to authenticated user flow
       const {
         data: { user: authUser },
       } = await supabase.auth.getUser()
@@ -56,7 +97,6 @@ export default function TestPage() {
         return
       }
 
-      // Get user profile
       const { data: profile, error: profileError } = await supabase
         .from("profiles")
         .select("*")
@@ -70,31 +110,28 @@ export default function TestPage() {
 
       setUser(profile)
 
-      // Check if already completed
       if (profile.test_completed) {
-        router.push("/dashboard")
+        router.push("/results")
         return
       }
 
-      // Check payment status
       if (profile.payment_status !== "completed") {
         router.push("/payment")
         return
       }
 
-      // Get questions
       const { data: questionsData, error: questionsError } = await supabase
         .from("test_questions")
         .select("*")
         .eq("is_active", true)
-        .order("id")
 
       if (questionsError) {
         console.error("Error fetching questions:", questionsError)
         return
       }
 
-      setQuestions(questionsData || [])
+      const randomQuestions = getRandomQuestions(questionsData || [], 50)
+      setQuestions(randomQuestions)
       setIsLoading(false)
     }
 
@@ -192,8 +229,20 @@ export default function TestPage() {
 
       if (profileError) throw profileError
 
+      localStorage.setItem(
+        "test-results",
+        JSON.stringify({
+          score,
+          passed,
+          correctAnswers,
+          totalQuestions: questions.length,
+          userId: user.id,
+        }),
+      )
+      localStorage.removeItem("paid-user-id")
+
       // Redirect to results
-      router.push("/dashboard")
+      router.push("/results")
     } catch (error) {
       console.error("Test submission error:", error)
       alert("There was an error submitting your test. Please try again.")
@@ -268,8 +317,9 @@ export default function TestPage() {
               <Alert>
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription>
-                  <strong>Important:</strong> Once you start the test, the timer will begin and you cannot pause. Make
-                  sure you have a stable internet connection and sufficient time to complete the assessment.
+                  <strong>Important:</strong> You will receive 50 randomly selected questions from our question bank.
+                  Once you start the test, the timer will begin and you cannot pause. Make sure you have a stable
+                  internet connection and sufficient time to complete the assessment.
                 </AlertDescription>
               </Alert>
 
@@ -337,28 +387,28 @@ export default function TestPage() {
                   className="space-y-4"
                 >
                   <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="a" id="a" />
+                    <RadioGroupItem value="A" id="a" />
                     <Label htmlFor="a" className="flex-1 cursor-pointer">
                       <span className="font-semibold mr-2">A)</span>
                       {currentQ.option_a}
                     </Label>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="b" id="b" />
+                    <RadioGroupItem value="B" id="b" />
                     <Label htmlFor="b" className="flex-1 cursor-pointer">
                       <span className="font-semibold mr-2">B)</span>
                       {currentQ.option_b}
                     </Label>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="c" id="c" />
+                    <RadioGroupItem value="C" id="c" />
                     <Label htmlFor="c" className="flex-1 cursor-pointer">
                       <span className="font-semibold mr-2">C)</span>
                       {currentQ.option_c}
                     </Label>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="d" id="d" />
+                    <RadioGroupItem value="D" id="d" />
                     <Label htmlFor="d" className="flex-1 cursor-pointer">
                       <span className="font-semibold mr-2">D)</span>
                       {currentQ.option_d}

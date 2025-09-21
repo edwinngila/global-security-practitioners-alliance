@@ -11,7 +11,7 @@ import { CreditCard, CheckCircle, AlertCircle, Loader2 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 
-const PaystackButton = dynamic(() => import('react-paystack').then(mod => mod.PaystackButton), { ssr: false })
+const PaystackButton = dynamic(() => import("react-paystack").then((mod) => mod.PaystackButton), { ssr: false })
 
 interface UserProfile {
   id: string
@@ -33,29 +33,48 @@ export default function PaymentPage() {
 
   useEffect(() => {
     const getUserProfile = async () => {
-      const { data: { user: authUser } } = await supabase.auth.getUser()
+      const registrationUserId = localStorage.getItem("registration-user-id")
+
+      if (registrationUserId) {
+        const { data: profile, error } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", registrationUserId)
+          .single()
+
+        if (profile) {
+          setUser(profile)
+
+          if (profile.payment_status === "completed") {
+            router.push("/test")
+            return
+          }
+
+          setIsLoading(false)
+          return
+        }
+      }
+
+      const {
+        data: { user: authUser },
+      } = await supabase.auth.getUser()
 
       if (!authUser) {
-        router.push('/auth/login')
+        router.push("/auth/login")
         return
       }
 
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', authUser.id)
-        .single()
+      const { data: profile, error } = await supabase.from("profiles").select("*").eq("id", authUser.id).single()
 
       if (error || !profile) {
-        router.push('/register')
+        router.push("/register")
         return
       }
 
       setUser(profile)
 
-      // If already paid, redirect to test
-      if (profile.payment_status === 'completed') {
-        router.push('/test')
+      if (profile.payment_status === "completed") {
+        router.push("/test")
       }
 
       setIsLoading(false)
@@ -68,32 +87,32 @@ export default function PaymentPage() {
     if (!user) return
 
     try {
-      // Update payment status in database
       const { error } = await supabase
-        .from('profiles')
+        .from("profiles")
         .update({
-          payment_status: 'completed',
+          payment_status: "completed",
           payment_reference: reference.reference,
         })
-        .eq('id', user.id)
+        .eq("id", user.id)
 
       if (error) throw error
 
       setPaymentSuccess(true)
 
-      // Redirect to test after a short delay
+      localStorage.setItem("paid-user-id", user.id)
+      localStorage.removeItem("registration-user-id")
+
       setTimeout(() => {
-        router.push('/test')
+        router.push("/test")
       }, 3000)
     } catch (error) {
-      console.error('Payment update error:', error)
-      alert('Payment was successful but there was an error updating your status. Please contact support.')
+      console.error("Payment update error:", error)
+      alert("Payment was successful but there was an error updating your status. Please contact support.")
     }
   }
 
   const handlePaymentClose = () => {
-    // Payment was cancelled or failed
-    console.log('Payment cancelled')
+    console.log("Payment cancelled")
   }
 
   const paystackConfig = {
@@ -101,17 +120,17 @@ export default function PaymentPage() {
     email: user?.email || "",
     amount: CERTIFICATION_FEE,
     publicKey: PAYSTACK_PUBLIC_KEY,
-    currency: 'NGN',
+    currency: "NGN",
     metadata: {
       user_id: user?.id,
       custom_fields: [
         {
           display_name: "Certification",
           variable_name: "certification_type",
-          value: "GSPA Security Professional"
-        }
-      ]
-    }
+          value: "GSPA Security Professional",
+        },
+      ],
+    },
   }
 
   if (isLoading) {
@@ -151,9 +170,14 @@ export default function PaymentPage() {
               <CheckCircle className="h-16 w-16 text-green-600 mx-auto mb-4" />
               <CardTitle className="text-2xl text-green-600">Payment Successful!</CardTitle>
               <CardDescription>
-                Your payment has been processed successfully. You will be redirected to the test shortly.
+                Your payment has been processed successfully. You can now access the security aptitude test.
               </CardDescription>
             </CardHeader>
+            <CardContent className="text-center">
+              <Button onClick={() => router.push("/test")} className="w-full">
+                Start Security Test
+              </Button>
+            </CardContent>
           </Card>
         </main>
         <Footer />
@@ -166,7 +190,6 @@ export default function PaymentPage() {
       <Navigation />
 
       <main className="flex-1">
-        {/* Hero Section */}
         <section className="py-20 lg:py-32 bg-gradient-to-br from-background via-background to-muted/30">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="text-center max-w-4xl mx-auto">
@@ -178,7 +201,6 @@ export default function PaymentPage() {
           </div>
         </section>
 
-        {/* Payment Section */}
         <section className="py-20">
           <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
             <Card>
@@ -188,27 +210,30 @@ export default function PaymentPage() {
                   Certification Fee Payment
                 </CardTitle>
                 <CardDescription>
-                  Complete your payment to access the security aptitude test.
+                  Complete your payment to access the security aptitude test and earn your certification.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                {/* User Info */}
                 <div className="bg-muted/50 p-4 rounded-lg">
                   <h3 className="font-semibold mb-2">Applicant Information</h3>
                   <div className="text-sm space-y-1">
-                    <p><strong>Name:</strong> {user.first_name} {user.last_name}</p>
-                    <p><strong>Email:</strong> {user.email}</p>
+                    <p>
+                      <strong>Name:</strong> {user.first_name} {user.last_name}
+                    </p>
+                    <p>
+                      <strong>Email:</strong> {user.email}
+                    </p>
                   </div>
                 </div>
 
-                {/* Payment Details */}
                 <div className="border rounded-lg p-6">
                   <div className="flex justify-between items-center mb-4">
                     <span className="text-lg font-semibold">Certification Fee</span>
                     <span className="text-2xl font-bold">₦{CERTIFICATION_FEE / 100}</span>
                   </div>
                   <p className="text-sm text-muted-foreground mb-4">
-                    This fee covers the security aptitude test, certificate issuance, and lifetime access to GSPA resources.
+                    This fee covers the security aptitude test (50 questions), certificate issuance upon passing, and
+                    lifetime access to GSPA resources.
                   </p>
 
                   <Alert>
@@ -219,7 +244,6 @@ export default function PaymentPage() {
                   </Alert>
                 </div>
 
-                {/* Payment Button */}
                 <div className="pt-4">
                   <PaystackButton
                     {...paystackConfig}
@@ -233,6 +257,9 @@ export default function PaymentPage() {
 
                 <div className="text-center text-sm text-muted-foreground">
                   <p>By proceeding with payment, you agree to our terms and conditions.</p>
+                  <p className="mt-2">
+                    After payment, you'll have access to take the 50-question security aptitude test.
+                  </p>
                 </div>
               </CardContent>
             </Card>

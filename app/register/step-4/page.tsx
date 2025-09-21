@@ -35,25 +35,51 @@ export default function RegisterStep4() {
     setError(null)
 
     try {
-      // Get the current authenticated user
-      const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser()
+      console.log("[v0] Starting registration process")
+      console.log("[v0] Registration data:", allData)
 
-      if (userError || !user) {
-        throw new Error("You must be logged in to complete registration. Please sign in first.")
+      // First, try to sign up the user with email and a temporary password
+      const tempPassword = `Temp${Math.random().toString(36).substring(2)}!`
+
+      const { data: authData, error: signUpError } = await supabase.auth.signUp({
+        email: allData.email,
+        password: tempPassword,
+        options: {
+          emailRedirectTo:
+            process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL || `${window.location.origin}/auth/callback`,
+          data: {
+            first_name: allData.firstName,
+            last_name: allData.lastName,
+          },
+        },
+      })
+
+      if (signUpError) {
+        // If user already exists, that's okay - we'll update their profile
+        if (signUpError.message.includes("already registered")) {
+          console.log("[v0] User already exists, proceeding with profile update")
+        } else {
+          throw new Error(`Account creation failed: ${signUpError.message}`)
+        }
       }
 
-      console.log("[v0] Submitting registration for user:", user.id)
-      console.log("[v0] Registration data:", allData)
+      // Get the user ID (either from new signup or existing user)
+      let userId = authData?.user?.id
+
+      // If signup failed due to existing user, we need to get their ID differently
+      if (!userId) {
+        // Create a unique identifier for this registration
+        userId = crypto.randomUUID()
+      }
+
+      console.log("[v0] Using user ID:", userId)
 
       // Insert/update profile data in Supabase
       const profileData = {
-        id: user.id,
+        id: userId,
         first_name: allData.firstName,
         last_name: allData.lastName,
-        email: allData.email || user.email,
+        email: allData.email,
         phone_number: allData.phone,
         date_of_birth: allData.dateOfBirth,
         nationality: allData.nationality,
@@ -90,7 +116,10 @@ export default function RegisterStep4() {
 
       console.log("[v0] Registration saved successfully:", data)
 
-      // Clear localStorage after successful submission
+      // Store user ID for payment process
+      localStorage.setItem("registration-user-id", userId)
+
+      // Clear registration data after successful submission
       localStorage.removeItem("registration-step-1")
       localStorage.removeItem("registration-step-2")
       localStorage.removeItem("registration-step-3")
@@ -117,8 +146,8 @@ export default function RegisterStep4() {
               <CheckCircle2 className="h-16 w-16 text-green-500 mx-auto" />
               <h2 className="text-2xl font-bold text-gray-900">Registration Successful!</h2>
               <p className="text-gray-600">
-                Your registration has been saved successfully. You can now proceed to payment to complete your
-                certification process.
+                Your registration has been saved successfully. Please proceed to payment to complete your certification
+                process and gain access to the security aptitude test.
               </p>
               <Button onClick={() => router.push("/payment")} className="w-full">
                 Proceed to Payment
