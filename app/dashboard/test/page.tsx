@@ -1,8 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import Navigation from "@/components/navigation"
-import { Footer } from "@/components/footer"
+import { DashboardSidebar } from "@/components/dashboard-sidebar"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
@@ -34,105 +33,36 @@ interface UserProfile {
   test_completed: boolean
 }
 
-export default function TestPage() {
+interface OngoingTest {
+  id: string
+  user_id: string
+  questions_data: any[]
+  answers_data: Record<string, string>
+  current_question: number
+  time_left: number
+  test_started: boolean
+  started_at: string
+  updated_at: string
+}
+
+export default function DashboardTestPage() {
   const [questions, setQuestions] = useState<Question[]>([])
   const [currentQuestion, setCurrentQuestion] = useState(0)
   const [answers, setAnswers] = useState<Record<string, string>>({})
   const [user, setUser] = useState<UserProfile | null>(null)
+  const [ongoingTest, setOngoingTest] = useState<OngoingTest | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [timeLeft, setTimeLeft] = useState(3600) // 60 minutes in seconds
   const [testStarted, setTestStarted] = useState(false)
   const [isOnline, setIsOnline] = useState(true)
-  const [ongoingTestId, setOngoingTestId] = useState<string | null>(null)
-  const [showTimeWarning, setShowTimeWarning] = useState(false)
+  const [isAdmin, setIsAdmin] = useState(false)
   const router = useRouter()
   const supabase = createClient()
 
   const getRandomQuestions = (allQuestions: Question[], count = 30): Question[] => {
     const shuffled = [...allQuestions].sort(() => 0.5 - Math.random())
     return shuffled.slice(0, Math.min(count, allQuestions.length))
-  }
-
-  const saveOngoingTest = async () => {
-    if (!user || !questions.length || !testStarted || Object.keys(answers).length < 3) return
-
-    const testData = {
-      user_id: user.id,
-      questions_data: questions,
-      answers_data: answers,
-      current_question: currentQuestion,
-      time_left: timeLeft,
-      test_started: testStarted,
-      updated_at: new Date().toISOString()
-    }
-
-    if (!isOnline) {
-      // Save to localStorage as backup
-      localStorage.setItem('ongoing-test-backup', JSON.stringify(testData))
-      return
-    }
-
-    try {
-      if (ongoingTestId) {
-        const { error } = await supabase
-          .from('ongoing_tests')
-          .update(testData)
-          .eq('id', ongoingTestId)
-        if (error) console.error('Error updating ongoing test:', error)
-      } else {
-        const { data, error } = await supabase
-          .from('ongoing_tests')
-          .insert(testData)
-          .select('id')
-          .single()
-        if (error) {
-          console.error('Error inserting ongoing test:', error)
-        } else {
-          setOngoingTestId(data.id)
-        }
-      }
-    } catch (error) {
-      console.error('Error saving ongoing test:', error)
-      // Fallback to localStorage
-      localStorage.setItem('ongoing-test-backup', JSON.stringify(testData))
-    }
-  }
-
-  const loadOngoingTest = async () => {
-    if (!user) return null
-
-    try {
-      const { data, error } = await supabase
-        .from('ongoing_tests')
-        .select('*')
-        .eq('user_id', user.id)
-        .single()
-
-      if (error && error.code !== 'PGRST116') { // PGRST116 is "not found"
-        console.error('Error loading ongoing test:', error)
-        return null
-      }
-
-      return data
-    } catch (error) {
-      console.error('Error loading ongoing test:', error)
-      return null
-    }
-  }
-
-  const deleteOngoingTest = async () => {
-    if (!ongoingTestId) return
-
-    try {
-      const { error } = await supabase
-        .from('ongoing_tests')
-        .delete()
-        .eq('id', ongoingTestId)
-      if (error) console.error('Error deleting ongoing test:', error)
-    } catch (error) {
-      console.error('Error deleting ongoing test:', error)
-    }
   }
 
   // Internet connection monitoring
@@ -151,24 +81,68 @@ export default function TestPage() {
     }
   }, [])
 
-  // Save on page unload
+  // Load saved test progress
   useEffect(() => {
-    const handleBeforeUnload = () => {
-      if (testStarted && Object.keys(answers).length >= 3) {
-        // Note: synchronous save not possible, but we can try
-        saveOngoingTest()
+    const savedProgress = localStorage.getItem('test-progress')
+    if (savedProgress) {
+      try {
+        const progress = JSON.parse(savedProgress)
+        if (progress.userId === user?.id && progress.questions?.length === questions.length) {
+          setAnswers(progress.answers || {})
+          setCurrentQuestion(progress.currentQuestion || 0)
+          setTimeLeft(progress.timeLeft || 3600)
+          setTestStarted(progress.testStarted || false)
+        }
+      } catch (error) {
+        console.warn('Failed to load saved test progress:', error)
+      }
+    }
+  }, [user?.id, questions.length])
+
+  // Save test progress periodically
+  useEffect(() => {
+    const saveProgress = async () => {
+      if (user && questions.length > 0) {
+        const progressData = {
+          user_id: user.id,
+          questions_data: questions,
+          answers_data: answers,
+          current_question: currentQuestion,
+          time_left: timeLeft,
+          test_started: testStarted,
+        }
+
+        if (ongoingTest) {
+          // Update existing
+          await supabase
+            .from("ongoing_tests")
+            .update(progressData)
+            .eq("id", ongoingTest.id)
+        } else if (testStarted || Object.keys(answers).length > 0) {
+          // Create new if test started or answers exist
+          const { data, error } = await supabase
+            .from("ongoing_tests")
+            .insert(progressData)
+            .select()
+            .single()
+
+          if (!error && data) {
+            setOngoingTest(data)
+          }
+        }
       }
     }
 
-    window.addEventListener('beforeunload', handleBeforeUnload)
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
-  }, [testStarted, answers, currentQuestion, timeLeft, user, questions.length, ongoingTestId])
+    // Save immediately when key dependencies change
+    saveProgress()
 
+    // Also save periodically every 30 seconds if test is active
+    const interval = testStarted ? setInterval(saveProgress, 30000) : null
 
-  // Save test progress to database
-  useEffect(() => {
-    saveOngoingTest()
-  }, [answers, currentQuestion, timeLeft, testStarted, user, questions.length, ongoingTestId])
+    return () => {
+      if (interval) clearInterval(interval)
+    }
+  }, [answers, currentQuestion, timeLeft, testStarted, user, questions, ongoingTest, supabase])
 
   useEffect(() => {
     const getUserAndQuestions = async () => {
@@ -189,38 +163,44 @@ export default function TestPage() {
             return
           }
 
-          // Get all questions and select 50 random ones
-          const { data: questionsData, error: questionsError } = await supabase
-            .from("test_questions")
+          // Check for ongoing test
+          const { data: ongoing, error: ongoingError } = await supabase
+            .from("ongoing_tests")
             .select("*")
-            .eq("is_active", true)
+            .eq("user_id", paidUserId)
+            .single()
 
-          if (questionsError) {
-            console.error("Error fetching questions:", questionsError)
-            return
-          }
+          if (!ongoingError && ongoing) {
+            // Load ongoing test
+            setOngoingTest(ongoing)
+            setQuestions(ongoing.questions_data)
+            setAnswers(ongoing.answers_data)
+            setCurrentQuestion(ongoing.current_question)
+            setTestStarted(ongoing.test_started)
 
-          const randomQuestions = getRandomQuestions(questionsData || [], 30)
-          setQuestions(randomQuestions)
-
-          // Load ongoing test if exists
-          const ongoingTest = await loadOngoingTest()
-          if (ongoingTest && ongoingTest.questions_data.length === randomQuestions.length) {
-            let adjustedTimeLeft = ongoingTest.time_left || 3600
-            if (ongoingTest.started_at) {
-              const elapsed = (Date.now() - new Date(ongoingTest.started_at).getTime()) / 1000
-              const consumed = 60 * 60 - adjustedTimeLeft // total time - remaining
-              if (consumed >= 20 * 60) {
-                adjustedTimeLeft = Math.max(0, adjustedTimeLeft - 20 * 60)
-              }
+            // Calculate remaining time
+            if (ongoing.test_started) {
+              const elapsed = Math.floor((Date.now() - new Date(ongoing.started_at).getTime()) / 1000)
+              const remaining = Math.max(0, ongoing.time_left - elapsed)
+              setTimeLeft(remaining)
+            } else {
+              setTimeLeft(ongoing.time_left)
             }
-            setAnswers(ongoingTest.answers_data || {})
-            setCurrentQuestion(ongoingTest.current_question || 0)
-            setTimeLeft(adjustedTimeLeft)
-            setTestStarted(ongoingTest.test_started || false)
-            setOngoingTestId(ongoingTest.id)
-          }
+          } else {
+            // Get all questions and select random ones
+            const { data: questionsData, error: questionsError } = await supabase
+              .from("test_questions")
+              .select("*")
+              .eq("is_active", true)
 
+            if (questionsError) {
+              console.error("Error fetching questions:", questionsError)
+              return
+            }
+
+            const randomQuestions = getRandomQuestions(questionsData || [], 30)
+            setQuestions(randomQuestions)
+          }
           setIsLoading(false)
           return
         }
@@ -235,6 +215,9 @@ export default function TestPage() {
         router.push("/auth/login")
         return
       }
+
+      // Check if user is admin
+      setIsAdmin(authUser.email === 'admin@gmail.com')
 
       const { data: profile, error: profileError } = await supabase
         .from("profiles")
@@ -255,41 +238,48 @@ export default function TestPage() {
       }
 
       if (!profile.membership_fee_paid || profile.payment_status !== "completed") {
-        router.push("/payment")
+        router.push("/dashboard/payment")
         return
       }
 
-      const { data: questionsData, error: questionsError } = await supabase
-        .from("test_questions")
+      // Check for ongoing test
+      const { data: ongoing, error: ongoingError } = await supabase
+        .from("ongoing_tests")
         .select("*")
-        .eq("is_active", true)
+        .eq("user_id", authUser.id)
+        .single()
 
-      if (questionsError) {
-        console.error("Error fetching questions:", questionsError)
-        return
-      }
+      if (!ongoingError && ongoing) {
+        // Load ongoing test
+        setOngoingTest(ongoing)
+        setQuestions(ongoing.questions_data)
+        setAnswers(ongoing.answers_data)
+        setCurrentQuestion(ongoing.current_question)
+        setTestStarted(ongoing.test_started)
 
-      const randomQuestions = getRandomQuestions(questionsData || [], 30)
-      setQuestions(randomQuestions)
-
-      // Load ongoing test if exists
-      const ongoingTest = await loadOngoingTest()
-      if (ongoingTest && ongoingTest.questions_data.length === randomQuestions.length) {
-        let adjustedTimeLeft = ongoingTest.time_left || 3600
-        if (ongoingTest.started_at) {
-          const elapsed = (Date.now() - new Date(ongoingTest.started_at).getTime()) / 1000
-          const consumed = 60 * 60 - adjustedTimeLeft // total time - remaining
-          if (consumed >= 20 * 60) {
-            adjustedTimeLeft = Math.max(0, adjustedTimeLeft - 20 * 60)
-          }
+        // Calculate remaining time
+        if (ongoing.test_started) {
+          const elapsed = Math.floor((Date.now() - new Date(ongoing.started_at).getTime()) / 1000)
+          const remaining = Math.max(0, ongoing.time_left - elapsed)
+          setTimeLeft(remaining)
+        } else {
+          setTimeLeft(ongoing.time_left)
         }
-        setAnswers(ongoingTest.answers_data || {})
-        setCurrentQuestion(ongoingTest.current_question || 0)
-        setTimeLeft(adjustedTimeLeft)
-        setTestStarted(ongoingTest.test_started || false)
-        setOngoingTestId(ongoingTest.id)
-      }
+      } else {
+        // Get all questions and select random ones
+        const { data: questionsData, error: questionsError } = await supabase
+          .from("test_questions")
+          .select("*")
+          .eq("is_active", true)
 
+        if (questionsError) {
+          console.error("Error fetching questions:", questionsError)
+          return
+        }
+
+        const randomQuestions = getRandomQuestions(questionsData || [], 30)
+        setQuestions(randomQuestions)
+      }
       setIsLoading(false)
     }
 
@@ -312,11 +302,6 @@ export default function TestPage() {
 
     return () => clearInterval(timer)
   }, [testStarted, timeLeft])
-
-  // Time warning effect
-  useEffect(() => {
-    setShowTimeWarning(timeLeft <= 300 && timeLeft > 0 && testStarted)
-  }, [timeLeft, testStarted])
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60)
@@ -404,6 +389,14 @@ export default function TestPage() {
 
       if (profileError) throw profileError
 
+      // Delete ongoing test record
+      if (ongoingTest) {
+        await supabase
+          .from("ongoing_tests")
+          .delete()
+          .eq("id", ongoingTest.id)
+      }
+
       localStorage.setItem(
         "test-results",
         JSON.stringify({
@@ -415,9 +408,6 @@ export default function TestPage() {
         }),
       )
       localStorage.removeItem("paid-user-id")
-
-      // Delete ongoing test
-      await deleteOngoingTest()
 
       // Redirect to results
       router.push("/dashboard/results")
@@ -431,84 +421,85 @@ export default function TestPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex flex-col">
-        <Navigation />
-        <main className="flex-1 flex items-center justify-center">
+      <div className="min-h-screen flex">
+        <div className="flex-1 flex items-center justify-center">
           <Loader2 className="h-8 w-8 animate-spin" />
-        </main>
-        <Footer />
+        </div>
       </div>
     )
   }
 
   if (!user || !questions.length) {
     return (
-      <div className="min-h-screen flex flex-col">
-        <Navigation />
-        <main className="flex-1 flex items-center justify-center">
+      <div className="min-h-screen flex">
+        <div className="flex-1 flex items-center justify-center">
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>Unable to load test. Please try again later.</AlertDescription>
           </Alert>
-        </main>
-        <Footer />
+        </div>
       </div>
     )
   }
 
   if (!testStarted) {
     return (
-      <div className="min-h-screen flex flex-col">
-        <Navigation />
-
-        <main className="flex-1 flex items-center justify-center py-20">
-          <Card className="max-w-2xl w-full">
-            <CardHeader className="text-center">
-              <CardTitle className="text-3xl">Security Aptitude Test</CardTitle>
-              <CardDescription className="text-lg">
-                Welcome {user.first_name}! You are about to begin your certification assessment.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="bg-muted/50 p-6 rounded-lg">
-                <h3 className="font-semibold mb-4">Test Information</h3>
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <p>
-                      <strong>Total Questions:</strong> {questions.length}
-                    </p>
-                    <p>
-                      <strong>Time Limit:</strong> 60 minutes
-                    </p>
+      <div className="min-h-screen flex">
+        <DashboardSidebar
+          isAdmin={isAdmin}
+          userName={`${user.first_name} ${user.last_name}`}
+          userEmail={user.email}
+        />
+        <main className="flex-1 overflow-y-auto md:ml-64">
+          <div className="p-4 md:p-8">
+            <div className="max-w-2xl mx-auto">
+              <Card>
+                <CardHeader className="text-center">
+                  <CardTitle className="text-3xl">Security Aptitude Test</CardTitle>
+                  <CardDescription className="text-lg">
+                    Welcome {user.first_name}! You are about to begin your certification assessment.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="bg-muted/50 p-6 rounded-lg">
+                    <h3 className="font-semibold mb-4">Test Information</h3>
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <p>
+                          <strong>Total Questions:</strong> {questions.length}
+                        </p>
+                        <p>
+                          <strong>Time Limit:</strong> 60 minutes
+                        </p>
+                      </div>
+                      <div>
+                        <p>
+                          <strong>Passing Score:</strong> 70%
+                        </p>
+                        <p>
+                          <strong>Format:</strong> Multiple Choice
+                        </p>
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <p>
-                      <strong>Passing Score:</strong> 70%
-                    </p>
-                    <p>
-                      <strong>Format:</strong> Multiple Choice
-                    </p>
-                  </div>
-                </div>
-              </div>
 
-              <Alert>
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>
-                  <strong>Important:</strong> You will receive 30 randomly selected questions from our question bank.
-                  Once you start the test, the timer will begin and you cannot pause. Make sure you have a stable
-                  internet connection and sufficient time to complete the assessment.
-                </AlertDescription>
-              </Alert>
+                  <Alert>
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>
+                      <strong>Important:</strong> You will receive 30 randomly selected questions from our question bank.
+                      Once you start the test, the timer will begin and you cannot pause. Make sure you have a stable
+                      internet connection and sufficient time to complete the assessment.
+                    </AlertDescription>
+                  </Alert>
 
-              <Button onClick={() => setTestStarted(true)} className="w-full text-lg py-6" size="lg">
-                Start Test
-              </Button>
-            </CardContent>
-          </Card>
+                  <Button onClick={() => setTestStarted(true)} className="w-full text-lg py-6" size="lg">
+                    Start Test
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
         </main>
-
-        <Footer />
       </div>
     )
   }
@@ -517,10 +508,14 @@ export default function TestPage() {
   const progress = ((currentQuestion + 1) / questions.length) * 100
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <Navigation />
+    <div className="min-h-screen flex">
+      <DashboardSidebar
+        isAdmin={isAdmin}
+        userName={`${user.first_name} ${user.last_name}`}
+        userEmail={user.email}
+      />
 
-      <main className="flex-1">
+      <main className="flex-1 overflow-y-auto md:ml-64">
         {/* Test Header */}
         <div className="bg-primary text-primary-foreground py-4">
           <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -552,16 +547,6 @@ export default function TestPage() {
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription>
                   <strong>Connection Lost:</strong> Your internet connection is offline. Your progress is being saved locally and will be submitted when connection is restored.
-                </AlertDescription>
-              </Alert>
-            )}
-
-            {/* Time Warning */}
-            {showTimeWarning && (
-              <Alert className="mt-4 border-red-500 bg-red-50 text-red-800">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>
-                  <strong>Time Running Low:</strong> You have less than 5 minutes remaining. Please complete your answers quickly.
                 </AlertDescription>
               </Alert>
             )}
@@ -637,8 +622,6 @@ export default function TestPage() {
           </div>
         </div>
       </main>
-
-      <Footer />
     </div>
   )
 }

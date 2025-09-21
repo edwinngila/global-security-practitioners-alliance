@@ -65,15 +65,12 @@ export default function Navigation() {
             ))}
 
             {user ? (
-              <div className="flex items-center gap-4">
-                <Button variant="ghost" asChild>
-                  <Link href="/admin">Admin</Link>
-                </Button>
-                <Button variant="outline" onClick={handleLogout}>
-                  <LogOut className="h-4 w-4 mr-2" />
-                  Logout
-                </Button>
-              </div>
+               <div className="flex items-center gap-4">
+                 <Button variant="outline" onClick={handleLogout}>
+                   <LogOut className="h-4 w-4 mr-2" />
+                   Logout
+                 </Button>
+               </div>
             ) : (
               <div className="flex items-center gap-4">
                 <Button variant="ghost" asChild>
@@ -111,11 +108,6 @@ export default function Navigation() {
 
               {user ? (
                 <div className="flex flex-col gap-2">
-                  <Button variant="ghost" asChild className="justify-start">
-                    <Link href="/admin" onClick={() => setIsMenuOpen(false)}>
-                      Admin
-                    </Link>
-                  </Button>
                   <Button variant="outline" onClick={() => { handleLogout(); setIsMenuOpen(false) }} className="justify-start">
                     <LogOut className="h-4 w-4 mr-2" />
                     Logout

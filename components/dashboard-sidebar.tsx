@@ -40,12 +40,12 @@ const userMenuItems = [
   },
   {
     title: "Test",
-    href: "/test",
+    href: "/dashboard/test",
     icon: FileText,
   },
   {
     title: "Results",
-    href: "/results",
+    href: "/dashboard/results",
     icon: BarChart3,
   },
   {
@@ -55,7 +55,7 @@ const userMenuItems = [
   },
   {
     title: "Payment",
-    href: "/payment",
+    href: "/dashboard/payment",
     icon: CreditCard,
   },
 ]

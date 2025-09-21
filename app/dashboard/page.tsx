@@ -35,9 +35,22 @@ interface TestAttempt {
   completed_at: string
 }
 
+interface OngoingTest {
+  id: string
+  user_id: string
+  questions_data: any[]
+  answers_data: Record<string, string>
+  current_question: number
+  time_left: number
+  test_started: boolean
+  started_at: string
+  updated_at: string
+}
+
 export default function DashboardPage() {
   const [user, setUser] = useState<UserProfile | null>(null)
   const [testAttempt, setTestAttempt] = useState<TestAttempt | null>(null)
+  const [ongoingTest, setOngoingTest] = useState<OngoingTest | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isAdmin, setIsAdmin] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
@@ -87,6 +100,17 @@ export default function DashboardPage() {
 
         if (!attemptError && attempt) {
           setTestAttempt(attempt)
+        }
+      } else {
+        // Check for ongoing test
+        const { data: ongoing, error: ongoingError } = await supabase
+          .from("ongoing_tests")
+          .select("*")
+          .eq("user_id", authUser.id)
+          .single()
+
+        if (!ongoingError && ongoing) {
+          setOngoingTest(ongoing)
         }
       }
 
@@ -272,7 +296,27 @@ export default function DashboardPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {user.test_completed ? (
+                  {ongoingTest ? (
+                    <>
+                      <div className="flex items-center gap-2">
+                        <Clock className="h-5 w-5 text-blue-600" />
+                        <span className="font-semibold text-blue-600">Test In Progress</span>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        You have an ongoing security aptitude test. Continue where you left off.
+                      </p>
+                      <div className="text-sm space-y-1">
+                        <p>Progress: Question {ongoingTest.current_question + 1} of {ongoingTest.questions_data.length}</p>
+                        <p>Answered: {Object.keys(ongoingTest.answers_data).length} questions</p>
+                        {ongoingTest.test_started && (
+                          <p>Time Remaining: {Math.floor(ongoingTest.time_left / 60)}:{(ongoingTest.time_left % 60).toString().padStart(2, '0')}</p>
+                        )}
+                      </div>
+                      <Button asChild className="w-full">
+                        <Link href="/dashboard/test">Continue Test</Link>
+                      </Button>
+                    </>
+                  ) : user.test_completed ? (
                     <>
                       <div className="flex items-center gap-2">
                         <CheckCircle className="h-5 w-5 text-green-600" />
@@ -306,7 +350,7 @@ export default function DashboardPage() {
                                 You scored below 50%. You can retake the test for $35.
                               </p>
                               <Button asChild variant="outline" className="w-full mt-2">
-                                <Link href="/payment?type=retake">Retake Test ($35)</Link>
+                                <Link href="/dashboard/payment?type=retake">Retake Test ($35)</Link>
                               </Button>
                             </div>
                           )}
@@ -321,7 +365,7 @@ export default function DashboardPage() {
                       </div>
                       <p className="text-sm text-muted-foreground">Complete your membership payment to access the test.</p>
                       <Button asChild variant="outline" className="w-full bg-transparent">
-                        <Link href="/payment">Complete Membership Payment</Link>
+                        <Link href="/dashboard/payment">Complete Membership Payment</Link>
                       </Button>
                     </>
                   ) : user.payment_status === "completed" ? (
@@ -332,7 +376,7 @@ export default function DashboardPage() {
                       </div>
                       <p className="text-sm text-muted-foreground">You can now take the security aptitude test.</p>
                       <Button asChild className="w-full">
-                        <Link href="/test">Start Test</Link>
+                        <Link href="/dashboard/test">Start Test</Link>
                       </Button>
                     </>
                   ) : (
@@ -343,7 +387,7 @@ export default function DashboardPage() {
                       </div>
                       <p className="text-sm text-muted-foreground">Complete your test payment to access the aptitude test.</p>
                       <Button asChild variant="outline" className="w-full bg-transparent">
-                        <Link href="/payment">Complete Test Payment</Link>
+                        <Link href="/dashboard/payment">Complete Test Payment</Link>
                       </Button>
                     </>
                   )}
@@ -427,7 +471,7 @@ export default function DashboardPage() {
                         Complete the security aptitude assessment to earn your certification.
                       </p>
                       <Button asChild size="sm">
-                        <Link href="/test">Start Test</Link>
+                        <Link href="/dashboard/test">Start Test</Link>
                       </Button>
                     </div>
                   )}

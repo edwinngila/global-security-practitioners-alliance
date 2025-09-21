@@ -92,6 +92,7 @@ export default function LoginPage() {
                   <Input
                     id="email"
                     type="email"
+                    className="mt-3"
                     {...register("email")}
                     placeholder="your.email@example.com"
                   />
@@ -105,6 +106,7 @@ export default function LoginPage() {
                   <Input
                     id="password"
                     type="password"
+                    className="mt-3"
                     {...register("password")}
                     placeholder="Enter your password"
                   />
