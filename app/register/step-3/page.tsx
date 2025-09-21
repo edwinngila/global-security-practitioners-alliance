@@ -75,17 +75,17 @@ export default function RegisterStep3() {
 
       // Upload passport photo
       if (photoFile) {
-        const fileExt = photoFile.name.split('.').pop()
+        const fileExt = photoFile.name.split(".").pop()
         const fileName = `passport-${Date.now()}.${fileExt}`
         const { data: uploadData, error: uploadError } = await supabase.storage
-          .from('documents')
+          .from("documents")
           .upload(`passports/${fileName}`, photoFile)
 
         if (uploadError) throw uploadError
 
-        const { data: { publicUrl } } = supabase.storage
-          .from('documents')
-          .getPublicUrl(`passports/${fileName}`)
+        const {
+          data: { publicUrl },
+        } = supabase.storage.from("documents").getPublicUrl(`passports/${fileName}`)
 
         passportPhotoUrl = publicUrl
       }
@@ -93,18 +93,18 @@ export default function RegisterStep3() {
       // Upload signature
       if (data.signature) {
         // Convert base64 to blob
-        const signatureBlob = await fetch(data.signature).then(res => res.blob())
-        const signatureFile = new File([signatureBlob], `signature-${Date.now()}.png`, { type: 'image/png' })
+        const signatureBlob = await fetch(data.signature).then((res) => res.blob())
+        const signatureFile = new File([signatureBlob], `signature-${Date.now()}.png`, { type: "image/png" })
 
         const { data: uploadData, error: uploadError } = await supabase.storage
-          .from('documents')
+          .from("documents")
           .upload(`signatures/${signatureFile.name}`, signatureFile)
 
         if (uploadError) throw uploadError
 
-        const { data: { publicUrl } } = supabase.storage
-          .from('documents')
-          .getPublicUrl(`signatures/${signatureFile.name}`)
+        const {
+          data: { publicUrl },
+        } = supabase.storage.from("documents").getPublicUrl(`signatures/${signatureFile.name}`)
 
         signatureUrl = publicUrl
       }
@@ -204,14 +204,24 @@ export default function RegisterStep3() {
                   <Controller
                     name="passportPhoto"
                     control={control}
-                    rules={{ required: "Passport photo is required" }}
+                    rules={{
+                      required: "Passport photo is required",
+                      validate: () => {
+                        if (!photoFile) return "Please upload a passport photo"
+                        if (!(photoFile instanceof File)) return "Invalid file format"
+                        if (!photoFile.type.startsWith("image/")) return "Please upload an image file"
+                        if (photoFile.size > 5 * 1024 * 1024) return "File size must be less than 5MB"
+                        return true
+                      },
+                    }}
                     render={({ field }) => (
                       <PhotoUpload
                         onPhotoChange={(file) => {
+                          console.log("[v0] Photo file selected:", file) // Debug log
                           setPhotoFile(file)
                           field.onChange(file)
                         }}
-                        value={field.value}
+                        value={photoFile} // Use photoFile state instead of field.value for better sync
                         required
                         error={errors.passportPhoto?.message}
                       />

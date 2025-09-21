@@ -57,6 +57,13 @@ export function PhotoUpload({ onPhotoChange, value, label = "Passport Photo", re
     }
   }
 
+  // Trigger file input click when the upload area is clicked
+  const handleUploadAreaClick = () => {
+    if (!preview && fileInputRef.current) {
+      fileInputRef.current.click()
+    }
+  }
+
   return (
     <div className="space-y-3">
       <Label className="text-sm font-medium">
@@ -64,13 +71,18 @@ export function PhotoUpload({ onPhotoChange, value, label = "Passport Photo", re
       </Label>
 
       <div
-        className={cn("photo-upload-area p-6 text-center", dragOver && "dragover")}
+        className={cn(
+          "photo-upload-area p-6 text-center border-2 border-dashed border-gray-300 rounded-lg cursor-pointer transition-colors",
+          dragOver && "border-blue-500 bg-blue-50",
+          !preview && "hover:border-gray-400"
+        )}
         onDrop={handleDrop}
         onDragOver={(e) => {
           e.preventDefault()
           setDragOver(true)
         }}
         onDragLeave={() => setDragOver(false)}
+        onClick={handleUploadAreaClick}
       >
         {preview ? (
           <div className="relative inline-block">
@@ -84,7 +96,10 @@ export function PhotoUpload({ onPhotoChange, value, label = "Passport Photo", re
               variant="destructive"
               size="sm"
               className="absolute -top-2 -right-2 h-6 w-6 rounded-full p-0"
-              onClick={removePhoto}
+              onClick={(e) => {
+                e.stopPropagation()
+                removePhoto()
+              }}
             >
               <X className="w-3 h-3" />
             </Button>
@@ -100,14 +115,26 @@ export function PhotoUpload({ onPhotoChange, value, label = "Passport Photo", re
               <p className="text-xs text-gray-500">Drag and drop or click to browse</p>
             </div>
 
-            <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()} className="mx-auto">
+            <Button
+              type="button"
+              variant="outline"
+              className="mx-auto pointer-events-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
               <Upload className="w-4 h-4 mr-2" />
               Choose File
             </Button>
           </div>
         )}
 
-        <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileInput} className="hidden" />
+        <input
+          id="photo-upload-input"
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          onChange={handleFileInput}
+          className="hidden"
+        />
       </div>
 
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">

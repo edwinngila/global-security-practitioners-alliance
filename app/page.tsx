@@ -53,6 +53,25 @@ export default function HomePage() {
           </div>
         </section>
 
+        {/* Accreditation Prompt */}
+        <section className="py-12 bg-gradient-to-r from-accent/10 to-primary/10 border-y border-border/50">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="text-center">
+              <h2 className="text-2xl lg:text-3xl font-bold text-balance mb-4">
+                Get Accredited Globally – Take the Security Aptitude Exam
+              </h2>
+              <p className="text-lg text-muted-foreground text-pretty mb-6 max-w-3xl mx-auto">
+                Join thousands of professionals worldwide who have earned their GSPA certification. Demonstrate your security expertise and stand out in the industry.
+              </p>
+              <Button size="lg" asChild className="bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90">
+                <Link href="/register">
+                  Start Accreditation Process <ArrowRight className="ml-2 h-5 w-5" />
+                </Link>
+              </Button>
+            </div>
+          </div>
+        </section>
+
         {/* Features Section */}
         <section className="py-20 bg-muted/20">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

@@ -29,6 +29,7 @@ interface UserProfile {
   first_name: string
   last_name: string
   email: string
+  membership_fee_paid: boolean
   payment_status: string
   test_completed: boolean
 }
@@ -113,7 +114,7 @@ export default function TestPage() {
           .eq("id", paidUserId)
           .single()
 
-        if (profile && profile.payment_status === "completed") {
+        if (profile && profile.membership_fee_paid && profile.payment_status === "completed") {
           setUser(profile)
 
           if (profile.test_completed) {
@@ -167,7 +168,7 @@ export default function TestPage() {
         return
       }
 
-      if (profile.payment_status !== "completed") {
+      if (!profile.membership_fee_paid || profile.payment_status !== "completed") {
         router.push("/payment")
         return
       }
@@ -280,12 +281,14 @@ export default function TestPage() {
       if (attemptError) throw attemptError
 
       // Update profile
+      const certificateAvailableAt = passed ? new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString() : null
       const { error: profileError } = await supabase
         .from("profiles")
         .update({
           test_completed: true,
           test_score: score,
-          certificate_issued: passed,
+          certificate_issued: false, // Will be issued after 48 hours
+          certificate_available_at: certificateAvailableAt,
         })
         .eq("id", user.id)
 
@@ -429,7 +432,7 @@ export default function TestPage() {
                 </div>
               </div>
             </div>
-            <Progress value={progress} className="mt-4 bg-primary-foreground/20" />
+            <Progress value={progress} className="mt-4 h-2 bg-gray-200" />
 
             {/* Internet Connection Warning */}
             {!isOnline && (

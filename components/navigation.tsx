@@ -42,7 +42,7 @@ export default function Navigation() {
   ]
 
   return (
-    <nav className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-50">
+    <nav className="border-b bg-primary text-primary-foreground sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           <Link href="/" className="flex items-center gap-2 font-bold text-xl">
@@ -56,8 +56,8 @@ export default function Navigation() {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`text-sm font-medium transition-colors hover:text-primary ${
-                  pathname === item.href ? "text-primary" : "text-muted-foreground"
+                className={`text-sm font-medium transition-colors hover:text-accent ${
+                  pathname === item.href ? "text-secondary font-semibold" : "text-primary-foreground/80"
                 }`}
               >
                 {item.label}
@@ -100,8 +100,8 @@ export default function Navigation() {
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`text-sm font-medium transition-colors hover:text-primary ${
-                    pathname === item.href ? "text-primary" : "text-muted-foreground"
+                  className={`text-sm font-medium transition-colors hover:text-accent ${
+                    pathname === item.href ? "text-secondary font-semibold" : "text-primary-foreground/80"
                   }`}
                   onClick={() => setIsMenuOpen(false)}
                 >

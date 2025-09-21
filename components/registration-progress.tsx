@@ -11,7 +11,7 @@ interface RegistrationProgressProps {
 
 export function RegistrationProgress({ currentStep, totalSteps, stepTitles }: RegistrationProgressProps) {
   return (
-    <div className="w-full bg-gradient-to-r from-primary/10 via-primary/5 to-accent/10 py-8 border-b border-border/50">
+    <div className="w-full bg-gradient-to-r from-primary via-secondary to-accent py-6 shadow-2xl">
       <div className="max-w-4xl mx-auto px-4">
         <div className="flex items-center justify-between">
           {stepTitles.map((title, index) => {

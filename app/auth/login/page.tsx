@@ -42,15 +42,19 @@ export default function LoginPage() {
     setError(null)
 
     try {
-      const { error: authError } = await supabase.auth.signInWithPassword({
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
         email: data.email,
         password: data.password,
       })
 
       if (authError) throw authError
 
-      // Redirect to dashboard
-      router.push('/dashboard')
+      // Redirect based on user role
+      if (authData.user?.email === 'admin@gmail.com') {
+        router.push('/admin')
+      } else {
+        router.push('/dashboard')
+      }
     } catch (error: any) {
       setError(error.message || 'Login failed. Please try again.')
     } finally {
@@ -107,6 +111,15 @@ export default function LoginPage() {
                   {errors.password && (
                     <p className="text-sm text-red-600 mt-1">{errors.password.message}</p>
                   )}
+                </div>
+
+                <div className="text-right">
+                  <Link
+                    href="/auth/forgot-password"
+                    className="text-sm text-primary hover:underline"
+                  >
+                    Forgot password?
+                  </Link>
                 </div>
 
                 <Button type="submit" className="w-full" disabled={isLoading}>

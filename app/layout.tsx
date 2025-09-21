@@ -10,6 +10,11 @@ export const metadata: Metadata = {
   title: "Global Security Practitioners Alliance",
   description: "Professional Security Certification and Training",
   generator: "v0.app",
+  icons: {
+    icon: "/favicon.ico",
+    shortcut: "/favicon.ico",
+    apple: "/apple-touch-icon.png",
+  },
 }
 
 export default function RootLayout({

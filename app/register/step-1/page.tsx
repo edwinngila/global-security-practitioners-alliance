@@ -15,6 +15,8 @@ interface Step1Form {
   lastName: string
   email: string
   phone: string
+  password: string
+  confirmPassword: string
 }
 
 const stepTitles = ["Personal Info", "Professional Info", "Documents", "Review"]
@@ -36,6 +38,8 @@ export default function RegisterStep1() {
       lastName: "",
       email: "",
       phone: "",
+      password: "",
+      confirmPassword: "",
     },
   })
 
@@ -148,6 +152,45 @@ export default function RegisterStep1() {
                     )}
                   />
                   {errors.phone && <p className="text-sm text-destructive">{errors.phone.message}</p>}
+                </div>
+
+                <div className="space-y-3">
+                  <Label htmlFor="password" className="text-sm font-medium">Password *</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    {...register("password", {
+                      required: "Password is required",
+                      minLength: { value: 8, message: "Password must be at least 8 characters" },
+                      pattern: {
+                        value: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/,
+                        message: "Password must contain at least one uppercase letter, one lowercase letter, and one number"
+                      }
+                    })}
+                    placeholder="Create a strong password"
+                    className={`h-12 ${errors.password ? "border-destructive" : ""}`}
+                  />
+                  {errors.password && <p className="text-sm text-destructive">{errors.password.message}</p>}
+                </div>
+
+                <div className="space-y-3">
+                  <Label htmlFor="confirmPassword" className="text-sm font-medium">Confirm Password *</Label>
+                  <Input
+                    id="confirmPassword"
+                    type="password"
+                    {...register("confirmPassword", {
+                      required: "Please confirm your password",
+                      validate: (value) => {
+                        if (value !== watch("password")) {
+                          return "Passwords do not match"
+                        }
+                        return true
+                      }
+                    })}
+                    placeholder="Confirm your password"
+                    className={`h-12 ${errors.confirmPassword ? "border-destructive" : ""}`}
+                  />
+                  {errors.confirmPassword && <p className="text-sm text-destructive">{errors.confirmPassword.message}</p>}
                 </div>
 
                 <Button type="submit" className="w-full h-12 text-base font-medium">Continue to Professional Info</Button>

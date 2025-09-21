@@ -18,6 +18,7 @@ interface UserProfile {
   first_name: string
   last_name: string
   email: string
+  membership_fee_paid: boolean
   payment_status: string
 }
 
@@ -25,14 +26,20 @@ export default function PaymentPage() {
   const [user, setUser] = useState<UserProfile | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [paymentSuccess, setPaymentSuccess] = useState(false)
+  const [paymentType, setPaymentType] = useState<'membership' | 'test' | 'retake'>('membership')
   const router = useRouter()
   const supabase = createClient()
 
   const PAYSTACK_PUBLIC_KEY = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || "pk_test_your_key_here"
-  const CERTIFICATION_FEE = 500000 // KSh 5,000 in cents
+  const MEMBERSHIP_FEE = 910000 // 9100 KES in cents
+  const TEST_FEE = 650000 // 6500 KES in cents
+  const RETAKE_FEE = 455000 // 4550 KES in cents
 
   useEffect(() => {
     const getUserProfile = async () => {
+      const urlParams = new URLSearchParams(window.location.search)
+      const requestedType = urlParams.get('type') as 'membership' | 'test' | 'retake' | null
+
       const registrationUserId = localStorage.getItem("registration-user-id")
 
       if (registrationUserId) {
@@ -45,11 +52,12 @@ export default function PaymentPage() {
         if (profile) {
           setUser(profile)
 
-          if (profile.payment_status === "completed") {
+          if (profile.membership_fee_paid && profile.payment_status === "completed" && !requestedType) {
             router.push("/test")
             return
           }
 
+          setPaymentType(requestedType || (profile.membership_fee_paid ? 'test' : 'membership'))
           setIsLoading(false)
           return
         }
@@ -73,10 +81,11 @@ export default function PaymentPage() {
 
       setUser(profile)
 
-      if (profile.payment_status === "completed") {
+      if (profile.membership_fee_paid && profile.payment_status === "completed" && !requestedType) {
         router.push("/test")
       }
 
+      setPaymentType(requestedType || (profile.membership_fee_paid ? 'test' : 'membership'))
       setIsLoading(false)
     }
 
@@ -87,12 +96,24 @@ export default function PaymentPage() {
     if (!user) return
 
     try {
+      const updateData: any = {}
+
+      if (paymentType === 'membership') {
+        updateData.membership_fee_paid = true
+        updateData.membership_payment_reference = reference.reference
+      } else if (paymentType === 'test') {
+        updateData.payment_status = "completed"
+        updateData.payment_reference = reference.reference
+      } else if (paymentType === 'retake') {
+        updateData.payment_status = "completed"
+        updateData.test_completed = false // Allow retake
+        updateData.test_score = null
+        updateData.payment_reference = reference.reference
+      }
+
       const { error } = await supabase
         .from("profiles")
-        .update({
-          payment_status: "completed",
-          payment_reference: reference.reference,
-        })
+        .update(updateData)
         .eq("id", user.id)
 
       if (error) throw error
@@ -103,7 +124,11 @@ export default function PaymentPage() {
       localStorage.removeItem("registration-user-id")
 
       setTimeout(() => {
-        router.push("/test")
+        if (paymentType === 'membership') {
+          router.push("/dashboard")
+        } else {
+          router.push("/test")
+        }
       }, 3000)
     } catch (error) {
       console.error("Payment update error:", error)
@@ -115,19 +140,38 @@ export default function PaymentPage() {
     console.log("Payment cancelled")
   }
 
+  const getAmount = () => {
+    switch (paymentType) {
+      case 'membership': return MEMBERSHIP_FEE
+      case 'test': return TEST_FEE
+      case 'retake': return RETAKE_FEE
+      default: return MEMBERSHIP_FEE
+    }
+  }
+
+  const getPaymentTitle = () => {
+    switch (paymentType) {
+      case 'membership': return 'Membership Fee'
+      case 'test': return 'Security Aptitude Test Fee'
+      case 'retake': return 'Test Retake Fee'
+      default: return 'Fee'
+    }
+  }
+
   const paystackConfig = {
-    reference: `GSPA-${user?.id}-${Date.now()}`,
+    reference: `GSPA-${paymentType}-${user?.id}-${Date.now()}`,
     email: user?.email || "",
-    amount: CERTIFICATION_FEE,
+    amount: getAmount(),
     publicKey: PAYSTACK_PUBLIC_KEY,
     currency: "KES",
     metadata: {
       user_id: user?.id,
+      payment_type: paymentType,
       custom_fields: [
         {
-          display_name: "Certification",
-          variable_name: "certification_type",
-          value: "GSPA Security Professional",
+          display_name: getPaymentTitle(),
+          variable_name: "payment_type",
+          value: paymentType,
         },
       ],
     },
@@ -170,12 +214,17 @@ export default function PaymentPage() {
               <CheckCircle className="h-16 w-16 text-green-600 mx-auto mb-4" />
               <CardTitle className="text-2xl text-green-600">Payment Successful!</CardTitle>
               <CardDescription>
-                Your payment has been processed successfully. You can now access the security aptitude test.
+                {paymentType === 'membership'
+                  ? 'Your membership payment has been processed successfully. You are now a GSPA member and can access the dashboard.'
+                  : paymentType === 'test'
+                  ? 'Your payment has been processed successfully. You can now access the security aptitude test.'
+                  : 'Your retake payment has been processed successfully. You can now retake the security aptitude test.'
+                }
               </CardDescription>
             </CardHeader>
             <CardContent className="text-center">
-              <Button onClick={() => router.push("/test")} className="w-full">
-                Start Security Test
+              <Button onClick={() => router.push(paymentType === 'membership' ? "/dashboard" : "/test")} className="w-full">
+                {paymentType === 'membership' ? 'Go to Dashboard' : 'Start Security Test'}
               </Button>
             </CardContent>
           </Card>
@@ -207,10 +256,15 @@ export default function PaymentPage() {
               <CardHeader>
                 <CardTitle className="text-2xl flex items-center gap-2">
                   <CreditCard className="h-6 w-6" />
-                  Certification Fee Payment
+                  {getPaymentTitle()} Payment
                 </CardTitle>
                 <CardDescription>
-                  Complete your payment to access the security aptitude test and earn your certification.
+                  {paymentType === 'membership'
+                    ? 'Complete your membership payment to become a GSPA member and access the security aptitude test.'
+                    : paymentType === 'test'
+                    ? 'Complete your payment to access the security aptitude test and earn your certification.'
+                    : 'Complete your payment to retake the security aptitude test.'
+                  }
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
@@ -228,18 +282,22 @@ export default function PaymentPage() {
 
                 <div className="border rounded-lg p-6">
                   <div className="flex justify-between items-center mb-4">
-                    <span className="text-lg font-semibold">Certification Fee</span>
-                    <span className="text-2xl font-bold">KSh {CERTIFICATION_FEE / 100}</span>
+                    <span className="text-lg font-semibold">{getPaymentTitle()}</span>
+                    <span className="text-2xl font-bold">KES {getAmount() / 100}</span>
                   </div>
                   <p className="text-sm text-muted-foreground mb-4">
-                    This fee covers the security aptitude test (30 questions), certificate issuance upon passing, and
-                    lifetime access to GSPA resources.
+                    {paymentType === 'membership'
+                      ? 'This fee covers GSPA membership, access to the security aptitude test, and membership benefits.'
+                      : paymentType === 'test'
+                      ? 'This fee covers the security aptitude test (30 questions), immediate results, and certificate issuance upon passing.'
+                      : 'This fee covers the retake of the security aptitude test with a new set of questions.'
+                    }
                   </p>
 
                   <Alert>
                     <AlertCircle className="h-4 w-4" />
                     <AlertDescription>
-                      Payment is processed securely through Paystack. We accept Visa, Mastercard, and other major cards. All amounts in Kenyan Shillings (KES).
+                      Payment is processed securely through Paystack. We accept Visa, Mastercard, and other major cards. All amounts in KES.
                     </AlertDescription>
                   </Alert>
                 </div>
@@ -251,14 +309,19 @@ export default function PaymentPage() {
                     onClose={handlePaymentClose}
                     className="w-full bg-primary text-primary-foreground hover:bg-primary/90 h-12 px-4 py-2 rounded-md font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none"
                   >
-                    Pay KSh {CERTIFICATION_FEE / 100} with Paystack
+                    Pay KES {getAmount() / 100} with Paystack
                   </PaystackButton>
                 </div>
 
                 <div className="text-center text-sm text-muted-foreground">
                   <p>By proceeding with payment, you agree to our terms and conditions.</p>
                   <p className="mt-2">
-                    After payment, you'll have access to take the 30-question security aptitude test. All payments are processed in Kenyan Shillings.
+                    {paymentType === 'membership'
+                      ? 'After payment, you become a GSPA member and can access the dashboard to take the security aptitude test.'
+                      : paymentType === 'test'
+                      ? 'After payment, you can take the 30-question security aptitude test and receive immediate results.'
+                      : 'After payment, you can retake the security aptitude test with a new set of questions.'
+                    } All payments are processed in KES.
                   </p>
                 </div>
               </CardContent>

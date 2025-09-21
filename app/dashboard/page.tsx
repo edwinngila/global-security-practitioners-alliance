@@ -1,14 +1,13 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import Navigation from "@/components/navigation"
-import { Footer } from "@/components/footer"
+import { DashboardSidebar } from "@/components/dashboard-sidebar"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Progress } from "@/components/ui/progress"
-import { Award, Download, CheckCircle, XCircle, Clock, FileText, User, Calendar } from "lucide-react"
+import { Award, Download, CheckCircle, XCircle, Clock, FileText, User, Calendar, Menu } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
@@ -18,11 +17,13 @@ interface UserProfile {
   first_name: string
   last_name: string
   email: string
+  membership_fee_paid: boolean
   payment_status: string
   test_completed: boolean
   test_score: number | null
   certificate_issued: boolean
   certificate_url: string | null
+  certificate_available_at: string | null
   created_at: string
 }
 
@@ -38,6 +39,8 @@ export default function DashboardPage() {
   const [user, setUser] = useState<UserProfile | null>(null)
   const [testAttempt, setTestAttempt] = useState<TestAttempt | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const router = useRouter()
   const supabase = createClient()
 
@@ -66,6 +69,12 @@ export default function DashboardPage() {
 
       setUser(profile)
 
+      // Check if user is admin
+      setIsAdmin(authUser.email === 'admin@gmail.com')
+
+      // Check and issue certificate if available
+      await checkAndIssueCertificate()
+
       // Get latest test attempt if test completed
       if (profile.test_completed) {
         const { data: attempt, error: attemptError } = await supabase
@@ -87,28 +96,49 @@ export default function DashboardPage() {
     getUserData()
   }, [supabase, router])
 
+  const checkAndIssueCertificate = async () => {
+    if (!user || !user.certificate_available_at) return
+
+    const now = new Date()
+    const availableAt = new Date(user.certificate_available_at)
+
+    if (now >= availableAt && !user.certificate_issued) {
+      try {
+        const { error } = await supabase
+          .from("profiles")
+          .update({
+            certificate_issued: true,
+            certificate_url: `certificate-${user.id}.pdf`, // Placeholder URL
+          })
+          .eq("id", user.id)
+
+        if (error) throw error
+
+        // Update local state
+        setUser((prev) =>
+          prev ? { ...prev, certificate_issued: true, certificate_url: `certificate-${user.id}.pdf` } : null,
+        )
+      } catch (error) {
+        console.error("Certificate issuance error:", error)
+      }
+    }
+  }
+
   const generateCertificate = async () => {
     if (!user || !testAttempt) return
 
     try {
+      // Check if certificate is available
+      await checkAndIssueCertificate()
+
+      if (!user.certificate_issued) {
+        alert("Certificate is not yet available. Please wait 48 hours after test completion.")
+        return
+      }
+
       // In a real implementation, you'd generate a PDF certificate
-      // For now, we'll just mark it as issued
-      const { error } = await supabase
-        .from("profiles")
-        .update({
-          certificate_issued: true,
-          certificate_url: `certificate-${user.id}.pdf`, // Placeholder URL
-        })
-        .eq("id", user.id)
-
-      if (error) throw error
-
-      // Update local state
-      setUser((prev) =>
-        prev ? { ...prev, certificate_issued: true, certificate_url: `certificate-${user.id}.pdf` } : null,
-      )
-
-      alert("Certificate generated successfully!")
+      // For now, we'll just confirm it's issued
+      alert("Certificate is ready for download!")
     } catch (error) {
       console.error("Certificate generation error:", error)
       alert("Error generating certificate. Please try again.")
@@ -122,52 +152,76 @@ export default function DashboardPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex flex-col">
-        <Navigation />
-        <main className="flex-1 flex items-center justify-center">
+      <div className="min-h-screen flex">
+        <div className="flex-1 flex items-center justify-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-        </main>
-        <Footer />
+        </div>
       </div>
     )
   }
 
   if (!user) {
     return (
-      <div className="min-h-screen flex flex-col">
-        <Navigation />
-        <main className="flex-1 flex items-center justify-center">
+      <div className="min-h-screen flex">
+        <div className="flex-1 flex items-center justify-center">
           <Alert variant="destructive">
             <XCircle className="h-4 w-4" />
             <AlertDescription>Please complete your registration first.</AlertDescription>
           </Alert>
-        </main>
-        <Footer />
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <Navigation />
+    <div className="min-h-screen flex">
+      {/* Mobile Sidebar */}
+      {mobileMenuOpen && (
+        <div className="fixed inset-0 z-50 md:hidden">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setMobileMenuOpen(false)} />
+          <div className="absolute left-0 top-0 h-full w-64">
+            <DashboardSidebar
+              isAdmin={isAdmin}
+              userName={`${user.first_name} ${user.last_name}`}
+              userEmail={user.email}
+            />
+          </div>
+        </div>
+      )}
 
-      <main className="flex-1">
-        {/* Hero Section */}
-        <section className="py-20 lg:py-32 bg-gradient-to-br from-background via-background to-muted/30">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="text-center max-w-4xl mx-auto">
-              <h1 className="text-4xl lg:text-6xl font-bold text-balance mb-6">Dashboard</h1>
-              <p className="text-xl text-muted-foreground text-pretty mb-8 leading-relaxed">
+      {/* Desktop Sidebar */}
+      <DashboardSidebar
+        isAdmin={isAdmin}
+        userName={`${user.first_name} ${user.last_name}`}
+        userEmail={user.email}
+      />
+
+      <main className="flex-1 overflow-y-auto md:ml-64">
+        {/* Mobile Header */}
+        <div className="md:hidden bg-white border-b p-4 flex items-center justify-between">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setMobileMenuOpen(true)}
+            className="md:hidden"
+          >
+            <Menu className="h-5 w-5" />
+          </Button>
+          <h1 className="text-lg font-semibold">Dashboard</h1>
+          <div className="w-8" /> {/* Spacer */}
+        </div>
+
+        {/* Dashboard Content */}
+        <div className="p-4 md:p-8">
+          <div className="max-w-7xl mx-auto">
+            <div className="mb-8">
+              <h1 className="text-2xl md:text-3xl font-bold mb-2">Dashboard</h1>
+              <p className="text-muted-foreground">
                 Welcome back, {user.first_name}! Here's your certification progress.
               </p>
             </div>
-          </div>
-        </section>
 
-        {/* Dashboard Content */}
-        <section className="py-20">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-8">
               {/* Profile Card */}
               <Card>
                 <CardHeader>
@@ -195,7 +249,13 @@ export default function DashboardPage() {
                     </p>
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground">Payment Status</p>
+                    <p className="text-sm text-muted-foreground">Membership Status</p>
+                    <Badge variant={user.membership_fee_paid ? "default" : "secondary"}>
+                      {user.membership_fee_paid ? "Active Member" : "Pending Payment"}
+                    </Badge>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Test Payment Status</p>
                     <Badge variant={user.payment_status === "completed" ? "default" : "secondary"}>
                       {user.payment_status}
                     </Badge>
@@ -240,8 +300,29 @@ export default function DashboardPage() {
                             <p className="text-sm text-muted-foreground">Completed On</p>
                             <p className="font-semibold">{new Date(testAttempt.completed_at).toLocaleDateString()}</p>
                           </div>
+                          {!testAttempt.passed && (
+                            <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                              <p className="text-sm text-red-800">
+                                You scored below 50%. You can retake the test for $35.
+                              </p>
+                              <Button asChild variant="outline" className="w-full mt-2">
+                                <Link href="/payment?type=retake">Retake Test ($35)</Link>
+                              </Button>
+                            </div>
+                          )}
                         </>
                       )}
+                    </>
+                  ) : !user.membership_fee_paid ? (
+                    <>
+                      <div className="flex items-center gap-2">
+                        <XCircle className="h-5 w-5 text-red-600" />
+                        <span className="font-semibold text-red-600">Membership Required</span>
+                      </div>
+                      <p className="text-sm text-muted-foreground">Complete your membership payment to access the test.</p>
+                      <Button asChild variant="outline" className="w-full bg-transparent">
+                        <Link href="/payment">Complete Membership Payment</Link>
+                      </Button>
                     </>
                   ) : user.payment_status === "completed" ? (
                     <>
@@ -258,11 +339,11 @@ export default function DashboardPage() {
                     <>
                       <div className="flex items-center gap-2">
                         <XCircle className="h-5 w-5 text-red-600" />
-                        <span className="font-semibold text-red-600">Payment Required</span>
+                        <span className="font-semibold text-red-600">Test Payment Required</span>
                       </div>
-                      <p className="text-sm text-muted-foreground">Complete your payment to access the test.</p>
+                      <p className="text-sm text-muted-foreground">Complete your test payment to access the aptitude test.</p>
                       <Button asChild variant="outline" className="w-full bg-transparent">
-                        <Link href="/payment">Complete Payment</Link>
+                        <Link href="/payment">Complete Test Payment</Link>
                       </Button>
                     </>
                   )}
@@ -335,7 +416,7 @@ export default function DashboardPage() {
                 <CardDescription>Here's what you can do next in your certification journey.</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
                   {!user.test_completed && user.payment_status === "completed" && (
                     <div className="text-center">
                       <div className="w-12 h-12 bg-primary rounded-full flex items-center justify-center mx-auto mb-4">
@@ -395,10 +476,8 @@ export default function DashboardPage() {
               </CardContent>
             </Card>
           </div>
-        </section>
+        </div>
       </main>
-
-      <Footer />
     </div>
   )
 }

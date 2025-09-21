@@ -38,10 +38,40 @@ export default function RegisterStep4() {
       console.log("[v0] Starting registration process")
       console.log("[v0] Registration data:", allData)
 
-      // Generate a unique ID for the test taker
-      const userId = crypto.randomUUID()
+      // Check if user is already authenticated
+      const { data: { user: currentUser } } = await supabase.auth.getUser()
 
-      console.log("[v0] Generated user ID:", userId)
+      let userId: string
+
+      if (currentUser) {
+        // User is already authenticated, use existing user ID
+        userId = currentUser.id
+        console.log("[v0] Using existing auth user ID:", userId)
+      } else {
+        // Create new auth user
+        const { data: authData, error: authError } = await supabase.auth.signUp({
+          email: allData.email,
+          password: allData.password,
+          options: {
+            data: {
+              first_name: allData.firstName,
+              last_name: allData.lastName,
+            }
+          }
+        })
+
+        if (authError) {
+          console.error("[v0] Auth signup error:", authError)
+          throw new Error(`Failed to create account: ${authError.message}`)
+        }
+
+        if (!authData.user) {
+          throw new Error("Failed to create user account")
+        }
+
+        userId = authData.user.id
+        console.log("[v0] Created auth user ID:", userId)
+      }
 
       // Insert profile data in Supabase
       const profileData = {
@@ -60,6 +90,7 @@ export default function RegisterStep4() {
         declaration_accepted: allData.declarationAccepted || false,
         passport_photo_url: allData.passportPhotoUrl || null,
         signature_data: allData.signatureData || null,
+        membership_fee_paid: false,
         payment_status: "pending",
         test_completed: false,
         certificate_issued: false,
@@ -69,10 +100,10 @@ export default function RegisterStep4() {
 
       console.log("[v0] Inserting profile data:", profileData)
 
-      // Insert the profile
+      // Insert or update the profile
       const { data, error: insertError } = await supabase
         .from("profiles")
-        .insert(profileData)
+        .upsert(profileData)
         .select()
 
       if (insertError) {
@@ -169,6 +200,9 @@ export default function RegisterStep4() {
                   </div>
                   <div>
                     <span className="font-medium">Gender:</span> {allData.gender}
+                  </div>
+                  <div className="col-span-2">
+                    <span className="font-medium">Password:</span> ********
                   </div>
                 </div>
               </div>
