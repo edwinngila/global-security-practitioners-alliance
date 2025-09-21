@@ -2,8 +2,8 @@
 
 *Automatically synced with your [v0.app](https://v0.app) deployments*
 
-[![Deployed on Vercel](https://img.shields.io/badge/Deployed%20on-Vercel-black?style=for-the-badge&logo=vercel)](https://vercel.com/edwinngilas-projects/v0-globalsecuritypractitionersalli)
-[![Built with v0](https://img.shields.io/badge/Built%20with-v0.app-black?style=for-the-badge)](https://v0.app/chat/projects/F5ohdpeEMp2)
+[![Deployed on Vercel](https://img.shields.io/badge/Deployed%20on-Vercel-black?style=for-the-badge&logo=vercel)](https://vercel.com/edwin-ngilas-projects/v0-globalsecuritypractitionersalli)
+[![Built with v0](https://img.shields.io/badge/Built%20with-v0.app-black?style=for-the-badge)](https://v0.app/chat/projects/6J5DVNZMq6e)
 
 ## Overview
 
@@ -14,13 +14,13 @@ Any changes you make to your deployed app will be automatically pushed to this r
 
 Your project is live at:
 
-**[https://vercel.com/edwinngilas-projects/v0-globalsecuritypractitionersalli](https://vercel.com/edwinngilas-projects/v0-globalsecuritypractitionersalli)**
+**[https://vercel.com/edwin-ngilas-projects/v0-globalsecuritypractitionersalli](https://vercel.com/edwin-ngilas-projects/v0-globalsecuritypractitionersalli)**
 
 ## Build your app
 
 Continue building your app on:
 
-**[https://v0.app/chat/projects/F5ohdpeEMp2](https://v0.app/chat/projects/F5ohdpeEMp2)**
+**[https://v0.app/chat/projects/6J5DVNZMq6e](https://v0.app/chat/projects/6J5DVNZMq6e)**
 
 ## How It Works
 
