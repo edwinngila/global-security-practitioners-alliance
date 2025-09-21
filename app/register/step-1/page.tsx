@@ -1,13 +1,14 @@
 "use client"
 
 import { useEffect } from "react"
-import { useForm } from "react-hook-form"
+import { useForm, Controller } from "react-hook-form"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { RegistrationProgress } from "@/components/registration-progress"
+import { PhoneInput } from "@/components/ui/phone-input"
 
 interface Step1Form {
   firstName: string
@@ -24,6 +25,7 @@ export default function RegisterStep1() {
   const {
     register,
     handleSubmit,
+    control,
     formState: { errors },
     watch,
     reset,
@@ -61,22 +63,22 @@ export default function RegisterStep1() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+    <div className="min-h-screen bg-background">
       <RegistrationProgress currentStep={1} totalSteps={4} stepTitles={stepTitles} />
 
-      <div className="py-8 px-4">
+      <div className="py-12 px-4">
         <div className="max-w-2xl mx-auto">
-          <Card>
-            <CardHeader className="text-center">
-              <CardTitle className="text-2xl font-bold text-gray-900">Personal Information</CardTitle>
-              <CardDescription>Let's start with your basic details</CardDescription>
+          <Card className="shadow-lg">
+            <CardHeader className="text-center pb-8">
+              <CardTitle className="text-3xl font-bold">Personal Information</CardTitle>
+              <CardDescription className="text-lg">Let's start with your basic details</CardDescription>
             </CardHeader>
 
-            <CardContent>
-              <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+            <CardContent className="pt-0">
+              <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="firstName">First Name *</Label>
+                  <div className="space-y-3">
+                    <Label htmlFor="firstName" className="text-sm font-medium">First Name *</Label>
                     <Input
                       id="firstName"
                       {...register("firstName", {
@@ -84,13 +86,13 @@ export default function RegisterStep1() {
                         minLength: { value: 2, message: "Must be at least 2 characters" },
                       })}
                       placeholder="John"
-                      className={errors.firstName ? "border-red-500" : ""}
+                      className={`h-12 ${errors.firstName ? "border-destructive" : ""}`}
                     />
-                    {errors.firstName && <p className="text-sm text-red-600">{errors.firstName.message}</p>}
+                    {errors.firstName && <p className="text-sm text-destructive">{errors.firstName.message}</p>}
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="lastName">Last Name *</Label>
+                  <div className="space-y-3">
+                    <Label htmlFor="lastName" className="text-sm font-medium">Last Name *</Label>
                     <Input
                       id="lastName"
                       {...register("lastName", {
@@ -98,14 +100,14 @@ export default function RegisterStep1() {
                         minLength: { value: 2, message: "Must be at least 2 characters" },
                       })}
                       placeholder="Doe"
-                      className={errors.lastName ? "border-red-500" : ""}
+                      className={`h-12 ${errors.lastName ? "border-destructive" : ""}`}
                     />
-                    {errors.lastName && <p className="text-sm text-red-600">{errors.lastName.message}</p>}
+                    {errors.lastName && <p className="text-sm text-destructive">{errors.lastName.message}</p>}
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email Address *</Label>
+                <div className="space-y-3">
+                  <Label htmlFor="email" className="text-sm font-medium">Email Address *</Label>
                   <Input
                     id="email"
                     type="email"
@@ -117,31 +119,38 @@ export default function RegisterStep1() {
                       },
                     })}
                     placeholder="john.doe@example.com"
-                    className={errors.email ? "border-red-500" : ""}
+                    className={`h-12 ${errors.email ? "border-destructive" : ""}`}
                   />
-
-                  {errors.email && <p className="text-sm text-red-600">{errors.email.message}</p>}
+                  {errors.email && <p className="text-sm text-destructive">{errors.email.message}</p>}
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="phone">Phone Number *</Label>
-                  <Input
-                    id="phone"
-                    type="tel"
-                    {...register("phone", {
+                <div className="space-y-3">
+                  <Label className="text-sm font-medium">Phone Number *</Label>
+                  <Controller
+                    name="phone"
+                    control={control}
+                    rules={{
                       required: "Phone number is required",
-                      pattern: {
-                        value: /^\+?[1-9]\d{1,14}$/,
-                        message: "Enter a valid phone number",
-                      },
-                    })}
-                    placeholder="+254712345678"
-                    className={errors.phone ? "border-red-500" : ""}
+                      validate: (value) => {
+                        if (!value || value.trim().length < 5) {
+                          return "Please enter a valid phone number"
+                        }
+                        return true
+                      }
+                    }}
+                    render={({ field }) => (
+                      <PhoneInput
+                        value={field.value || ""}
+                        onChange={field.onChange}
+                        placeholder="Enter phone number"
+                        className={errors.phone ? "border-destructive" : ""}
+                      />
+                    )}
                   />
-                  {errors.phone && <p className="text-sm text-red-600">{errors.phone.message}</p>}
+                  {errors.phone && <p className="text-sm text-destructive">{errors.phone.message}</p>}
                 </div>
 
-                <Button type="submit" className="w-full">Next</Button>
+                <Button type="submit" className="w-full h-12 text-base font-medium">Continue to Professional Info</Button>
               </form>
             </CardContent>
           </Card>

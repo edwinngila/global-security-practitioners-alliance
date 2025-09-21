@@ -42,6 +42,7 @@ export default function TestPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [timeLeft, setTimeLeft] = useState(3600) // 60 minutes in seconds
   const [testStarted, setTestStarted] = useState(false)
+  const [isOnline, setIsOnline] = useState(true)
   const router = useRouter()
   const supabase = createClient()
 
@@ -49,6 +50,57 @@ export default function TestPage() {
     const shuffled = [...allQuestions].sort(() => 0.5 - Math.random())
     return shuffled.slice(0, Math.min(count, allQuestions.length))
   }
+
+  // Internet connection monitoring
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true)
+    const handleOffline = () => setIsOnline(false)
+
+    window.addEventListener('online', handleOnline)
+    window.addEventListener('offline', handleOffline)
+
+    setIsOnline(navigator.onLine)
+
+    return () => {
+      window.removeEventListener('online', handleOnline)
+      window.removeEventListener('offline', handleOffline)
+    }
+  }, [])
+
+  // Load saved test progress
+  useEffect(() => {
+    const savedProgress = localStorage.getItem('test-progress')
+    if (savedProgress) {
+      try {
+        const progress = JSON.parse(savedProgress)
+        if (progress.userId === user?.id && progress.questions?.length === questions.length) {
+          setAnswers(progress.answers || {})
+          setCurrentQuestion(progress.currentQuestion || 0)
+          setTimeLeft(progress.timeLeft || 3600)
+          setTestStarted(progress.testStarted || false)
+        }
+      } catch (error) {
+        console.warn('Failed to load saved test progress:', error)
+      }
+    }
+  }, [user?.id, questions.length])
+
+  // Save test progress periodically
+  useEffect(() => {
+    if (testStarted && user && questions.length > 0) {
+      const progressData = {
+        userId: user.id,
+        answers,
+        currentQuestion,
+        timeLeft,
+        testStarted,
+        questionsCount: questions.length,
+        timestamp: Date.now()
+      }
+
+      localStorage.setItem('test-progress', JSON.stringify(progressData))
+    }
+  }, [answers, currentQuestion, timeLeft, testStarted, user, questions.length])
 
   useEffect(() => {
     const getUserAndQuestions = async () => {
@@ -198,10 +250,20 @@ export default function TestPage() {
         question_id: q.id,
         selected_answer: answers[q.id] || "",
         correct_answer: q.correct_answer,
-        is_correct: answers[q.id] === q.correct_answer,
+        is_correct: (answers[q.id] || "").toLowerCase() === q.correct_answer.toLowerCase(),
       }))
 
       correctAnswers = answersData.filter((a) => a.is_correct).length
+
+      // Debug logging
+      console.log("Test Results:", {
+        totalQuestions: questions.length,
+        answersProvided: Object.keys(answers).length,
+        correctAnswers,
+        score: Math.round((correctAnswers / questions.length) * 100),
+        passed: Math.round((correctAnswers / questions.length) * 100) >= 70,
+        sampleAnswers: answersData.slice(0, 3)
+      })
       const score = Math.round((correctAnswers / questions.length) * 100)
       const passed = score >= 70 // 70% passing score
 
@@ -240,6 +302,7 @@ export default function TestPage() {
         }),
       )
       localStorage.removeItem("paid-user-id")
+      localStorage.removeItem("test-progress") // Clear saved progress
 
       // Redirect to results
       router.push("/results")
@@ -367,6 +430,16 @@ export default function TestPage() {
               </div>
             </div>
             <Progress value={progress} className="mt-4 bg-primary-foreground/20" />
+
+            {/* Internet Connection Warning */}
+            {!isOnline && (
+              <Alert className="mt-4 border-orange-500 bg-orange-50 text-orange-800">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  <strong>Connection Lost:</strong> Your internet connection is offline. Your progress is being saved locally and will be submitted when connection is restored.
+                </AlertDescription>
+              </Alert>
+            )}
           </div>
         </div>
 

@@ -193,7 +193,7 @@ export default function AdminPage() {
             option_b: formData.option_b,
             option_c: formData.option_c,
             option_d: formData.option_d,
-            correct_answer: formData.correct_answer,
+            correct_answer: formData.correct_answer.toLowerCase(), // Convert to lowercase for database
             category: formData.category,
             difficulty: formData.difficulty,
             is_active: formData.is_active,
@@ -209,7 +209,7 @@ export default function AdminPage() {
           option_b: formData.option_b,
           option_c: formData.option_c,
           option_d: formData.option_d,
-          correct_answer: formData.correct_answer,
+          correct_answer: formData.correct_answer.toLowerCase(), // Convert to lowercase for database
           category: formData.category,
           difficulty: formData.difficulty,
           is_active: formData.is_active,
@@ -237,7 +237,7 @@ export default function AdminPage() {
       option_b: question.option_b,
       option_c: question.option_c,
       option_d: question.option_d,
-      correct_answer: question.correct_answer,
+      correct_answer: question.correct_answer.toUpperCase(), // Convert to uppercase for form display
       category: question.category,
       difficulty: question.difficulty,
       is_active: question.is_active,
