@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useEffect } from "react"
 import { useForm } from "react-hook-form"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -20,29 +20,33 @@ const stepTitles = ["Personal Info", "Professional Info", "Documents", "Review"]
 
 export default function RegisterStep1() {
   const router = useRouter()
-  const [savedData, setSavedData] = useState<Step1Form | null>(null)
 
   const {
     register,
     handleSubmit,
     formState: { errors },
-    setValue,
     watch,
+    reset,
   } = useForm<Step1Form>({
     mode: "onSubmit",
+    defaultValues: {
+      firstName: "",
+      lastName: "",
+      email: "",
+      phone: "",
+    },
   })
 
+  // Load saved data from localStorage
   useEffect(() => {
     const saved = localStorage.getItem("registration-step-1")
     if (saved) {
       const data = JSON.parse(saved)
-      setSavedData(data)
-      Object.keys(data).forEach((key) => {
-        setValue(key as keyof Step1Form, data[key])
-      })
+      reset(data)
     }
-  }, [setValue])
+  }, [reset])
 
+  // Auto-save form data
   const formData = watch()
   useEffect(() => {
     const timeoutId = setTimeout(() => {
@@ -77,7 +81,7 @@ export default function RegisterStep1() {
                       id="firstName"
                       {...register("firstName", {
                         required: "First name is required",
-                        minLength: { value: 2, message: "First name must be at least 2 characters" },
+                        minLength: { value: 2, message: "Must be at least 2 characters" },
                       })}
                       placeholder="John"
                       className={errors.firstName ? "border-red-500" : ""}
@@ -91,7 +95,7 @@ export default function RegisterStep1() {
                       id="lastName"
                       {...register("lastName", {
                         required: "Last name is required",
-                        minLength: { value: 2, message: "Last name must be at least 2 characters" },
+                        minLength: { value: 2, message: "Must be at least 2 characters" },
                       })}
                       placeholder="Doe"
                       className={errors.lastName ? "border-red-500" : ""}
@@ -109,36 +113,27 @@ export default function RegisterStep1() {
                       required: "Email is required",
                       pattern: {
                         value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
-                        message: "Please enter a valid email address",
+                        message: "Enter a valid email address",
                       },
                     })}
                     placeholder="john.doe@example.com"
                     className={errors.email ? "border-red-500" : ""}
                   />
+
                   {errors.email && <p className="text-sm text-red-600">{errors.email.message}</p>}
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="phone">Phone Number *</Label>
+                  <Label htmlFor="phone">Phone Number</Label>
                   <Input
                     id="phone"
                     type="tel"
-                    {...register("phone", {
-                      required: "Phone number is required",
-                      minLength: { value: 10, message: "Phone number must be at least 10 digits" },
-                    })}
-                    placeholder="+1234567890"
-                    className={errors.phone ? "border-red-500" : ""}
+                    {...register("phone")}
+                    placeholder="+254712345678"
                   />
-                  {errors.phone && <p className="text-sm text-red-600">{errors.phone.message}</p>}
                 </div>
 
-                <div className="flex justify-between pt-6">
-                  <Button type="button" variant="outline" disabled>
-                    Previous
-                  </Button>
-                  <Button type="submit">Next Step</Button>
-                </div>
+                <Button type="submit" className="w-full">Next</Button>
               </form>
             </CardContent>
           </Card>
