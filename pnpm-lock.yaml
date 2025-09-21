@@ -190,7 +190,11 @@ importers:
         specifier: ^8.5
         version: 8.5.0
       tailwindcss:
+<<<<<<< HEAD
         specifier: ^3.4.1
+=======
+        specifier: ^3.4.17
+>>>>>>> c94caa3e1e16b923bf4ee7642c7d40c951abb9aa
         version: 3.4.17
       typescript:
         specifier: ^5

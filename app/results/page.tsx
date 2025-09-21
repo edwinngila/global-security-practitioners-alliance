@@ -9,6 +9,8 @@ import { Badge } from "@/components/ui/badge"
 import { CheckCircle, XCircle, Download, Award, User } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
+import jsPDF from "jspdf"
+import html2canvas from "html2canvas"
 
 interface TestResults {
   score: number
