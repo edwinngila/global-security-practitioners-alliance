@@ -10,14 +10,26 @@ export default function AboutPage() {
 
       <main className="flex-1">
         {/* Hero Section */}
-        <section className="py-20 lg:py-32 bg-gradient-to-br from-background via-background to-muted/30">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="text-center max-w-4xl mx-auto">
-              <h1 className="text-4xl lg:text-6xl font-bold text-balance mb-6">About GSPA</h1>
-              <p className="text-xl text-muted-foreground text-pretty mb-8 leading-relaxed">
-                The Global Security Practitioners Alliance is dedicated to advancing security excellence through
-                professional certification, training, and community building.
-              </p>
+        <section className="relative py-20 lg:py-32 bg-gradient-to-br from-background via-background to-muted/30 overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-r from-primary/5 to-accent/5"></div>
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+              <div className="text-center lg:text-left">
+                <h1 className="text-4xl lg:text-6xl font-bold text-balance mb-6">About GSPA</h1>
+                <p className="text-xl text-muted-foreground text-pretty mb-8 leading-relaxed">
+                  The Global Security Practitioners Alliance is dedicated to advancing security excellence through
+                  professional certification, training, and community building.
+                </p>
+              </div>
+              <div className="flex justify-center lg:justify-end">
+                <div className="relative w-full max-w-md h-80 bg-gradient-to-br from-muted to-muted-foreground/20 rounded-2xl flex items-center justify-center border border-border/50">
+                  <div className="text-center p-8">
+                    <Shield className="h-20 w-20 text-primary/60 mx-auto mb-4" />
+                    <p className="text-muted-foreground font-medium">About GSPA Image</p>
+                    <p className="text-sm text-muted-foreground/70 mt-2">Replace with actual about image</p>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </section>

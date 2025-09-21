@@ -9,6 +9,8 @@ import { Badge } from "@/components/ui/badge"
 import { CheckCircle, XCircle, Download, Award, User } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
+import jsPDF from "jspdf"
+import html2canvas from "html2canvas"
 
 interface TestResults {
   score: number
@@ -104,210 +106,197 @@ export default function ResultsPage() {
   const downloadCertificate = async () => {
     if (!user || !results?.passed) return
 
-    // Create certificate HTML
+    // Create certificate HTML for landscape using project color palette
     const certificateHTML = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="UTF-8">
-        <title>GSPA Security Professional Certificate</title>
-        <style>
-          @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Inter:wght@400;500;600&display=swap');
-          
-          body {
-            margin: 0;
-            padding: 40px;
-            font-family: 'Inter', sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-          }
-          
-          .certificate {
-            width: 800px;
-            height: 600px;
-            background: white;
-            border: 8px solid #2563eb;
-            border-radius: 20px;
-            padding: 60px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-            text-align: center;
-            position: relative;
-            overflow: hidden;
-          }
-          
-          .certificate::before {
-            content: '';
-            position: absolute;
-            top: -50%;
-            left: -50%;
-            width: 200%;
-            height: 200%;
-            background: radial-gradient(circle, rgba(37,99,235,0.05) 0%, transparent 70%);
-            z-index: 0;
-          }
-          
-          .content {
-            position: relative;
-            z-index: 1;
-          }
-          
-          .header {
-            margin-bottom: 40px;
-          }
-          
-          .logo {
-            width: 80px;
-            height: 80px;
-            background: #2563eb;
-            border-radius: 50%;
-            margin: 0 auto 20px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 32px;
-            font-weight: bold;
-          }
-          
-          .org-name {
-            font-size: 24px;
-            font-weight: 600;
-            color: #1e40af;
-            margin-bottom: 10px;
-          }
-          
-          .cert-title {
+      <div style="
+        width: 1100px;
+        height: 800px;
+        background: white;
+        border: 8px solid #17375f;
+        border-radius: 20px;
+        padding: 60px;
+        box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        text-align: center;
+        position: relative;
+        overflow: hidden;
+        font-family: 'Inter', sans-serif;
+        margin: 0 auto;
+      ">
+        <div style="
+          position: absolute;
+          top: -50%;
+          left: -50%;
+          width: 200%;
+          height: 200%;
+          background: radial-gradient(circle, rgba(229,208,129,0.08) 0%, transparent 70%);
+          z-index: 0;
+        "></div>
+
+        <div style="position: relative; z-index: 1;">
+          <div style="margin-bottom: 40px;">
+            <div style="
+              width: 80px;
+              height: 80px;
+              background: #17375f;
+              border-radius: 50%;
+              margin: 0 auto 20px;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              color: #e5d081;
+              font-size: 32px;
+              font-weight: bold;
+            ">G</div>
+            <div style="
+              font-size: 28px;
+              font-weight: 600;
+              color: #4d4937;
+              margin-bottom: 10px;
+            ">Global Security Practitioners Alliance</div>
+          </div>
+
+          <h1 style="
+            font-family: 'Playfair Display', serif;
+            font-size: 42px;
+            font-weight: 700;
+            color: #17375f;
+            margin-bottom: 30px;
+            line-height: 1.2;
+          ">Certificate of Achievement</h1>
+
+          <p style="
+            font-size: 20px;
+            color: #4d4937;
+            margin-bottom: 15px;
+          ">This is to certify that</p>
+          <div style="
             font-family: 'Playfair Display', serif;
             font-size: 36px;
             font-weight: 700;
-            color: #1e3a8a;
+            color: #17375f;
             margin-bottom: 30px;
-            line-height: 1.2;
-          }
-          
-          .recipient {
-            font-size: 18px;
-            color: #374151;
-            margin-bottom: 10px;
-          }
-          
-          .name {
-            font-family: 'Playfair Display', serif;
-            font-size: 32px;
-            font-weight: 700;
-            color: #1e40af;
-            margin-bottom: 30px;
-            border-bottom: 2px solid #e5e7eb;
+            border-bottom: 2px solid #c9aa68;
             padding-bottom: 10px;
             display: inline-block;
-            min-width: 300px;
-          }
-          
-          .achievement {
-            font-size: 16px;
-            color: #4b5563;
+            min-width: 400px;
+          ">${user.first_name} ${user.last_name}</div>
+
+          <p style="
+            font-size: 18px;
+            color: #4d4937;
             line-height: 1.6;
-            margin-bottom: 40px;
-            max-width: 500px;
+            margin-bottom: 50px;
+            max-width: 700px;
             margin-left: auto;
             margin-right: auto;
-          }
-          
-          .details {
+          ">
+            has successfully completed the Security Aptitude Test and demonstrated
+            proficiency in cybersecurity, physical security, risk management,
+            compliance, and emergency response principles.
+          </p>
+
+          <div style="
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-top: 40px;
+            margin-top: 50px;
             padding-top: 30px;
-            border-top: 1px solid #e5e7eb;
-          }
-          
-          .detail-item {
-            text-align: center;
-          }
-          
-          .detail-label {
-            font-size: 12px;
-            color: #6b7280;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            margin-bottom: 5px;
-          }
-          
-          .detail-value {
-            font-size: 14px;
-            font-weight: 600;
-            color: #374151;
-          }
-          
-          .score-badge {
-            background: #10b981;
-            color: white;
-            padding: 8px 16px;
-            border-radius: 20px;
-            font-weight: 600;
-            font-size: 14px;
-          }
-        </style>
-      </head>
-      <body>
-        <div class="certificate">
-          <div class="content">
-            <div class="header">
-              <div class="logo">G</div>
-              <div class="org-name">Global Security Practitioners Alliance</div>
+            border-top: 1px solid #c9aa68;
+          ">
+            <div style="text-align: center;">
+              <div style="
+                font-size: 12px;
+                color: #724e0f;
+                text-transform: uppercase;
+                letter-spacing: 1px;
+                margin-bottom: 5px;
+              ">Date Issued</div>
+              <div style="
+                font-size: 16px;
+                font-weight: 600;
+                color: #4d4937;
+              ">${new Date().toLocaleDateString("en-US", {
+                year: "numeric",
+                month: "long",
+                day: "numeric",
+              })}</div>
             </div>
-            
-            <h1 class="cert-title">Certificate of Achievement</h1>
-            
-            <p class="recipient">This is to certify that</p>
-            <div class="name">${user.first_name} ${user.last_name}</div>
-            
-            <p class="achievement">
-              has successfully completed the Security Aptitude Test and demonstrated 
-              proficiency in cybersecurity, physical security, risk management, 
-              compliance, and emergency response principles.
-            </p>
-            
-            <div class="details">
-              <div class="detail-item">
-                <div class="detail-label">Date Issued</div>
-                <div class="detail-value">${new Date().toLocaleDateString("en-US", {
-                  year: "numeric",
-                  month: "long",
-                  day: "numeric",
-                })}</div>
-              </div>
-              
-              <div class="detail-item">
-                <div class="detail-label">Test Score</div>
-                <div class="score-badge">${results.score}%</div>
-              </div>
-              
-              <div class="detail-item">
-                <div class="detail-label">Certificate ID</div>
-                <div class="detail-value">GSPA-${user.id.slice(0, 8).toUpperCase()}</div>
-              </div>
+
+            <div style="text-align: center;">
+              <div style="
+                font-size: 12px;
+                color: #724e0f;
+                text-transform: uppercase;
+                letter-spacing: 1px;
+                margin-bottom: 5px;
+              ">Test Score</div>
+              <div style="
+                background: #d3b051;
+                color: #0d203a;
+                padding: 10px 20px;
+                border-radius: 20px;
+                font-weight: 600;
+                font-size: 16px;
+                display: inline-block;
+              ">${results.score}%</div>
+            </div>
+
+            <div style="text-align: center;">
+              <div style="
+                font-size: 12px;
+                color: #724e0f;
+                text-transform: uppercase;
+                letter-spacing: 1px;
+                margin-bottom: 5px;
+              ">Certificate ID</div>
+              <div style="
+                font-size: 16px;
+                font-weight: 600;
+                color: #4d4937;
+              ">GSPA-${user.id.slice(0, 8).toUpperCase()}</div>
             </div>
           </div>
         </div>
-      </body>
-      </html>
+      </div>
     `
 
-    // Create and download the certificate
-    const blob = new Blob([certificateHTML], { type: "text/html" })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement("a")
-    a.href = url
-    a.download = `GSPA-Certificate-${user.first_name}-${user.last_name}.html`
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
+    // Create temporary element
+    const tempDiv = document.createElement('div')
+    tempDiv.innerHTML = certificateHTML
+    tempDiv.style.position = 'absolute'
+    tempDiv.style.left = '-9999px'
+    tempDiv.style.top = '-9999px'
+    document.body.appendChild(tempDiv)
+
+    try {
+      // Use html2canvas to capture the certificate
+      const canvas = await html2canvas(tempDiv.firstElementChild as HTMLElement, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#f8fafc'
+      })
+
+      // Create PDF in landscape
+      const pdf = new jsPDF({
+        orientation: 'landscape',
+        unit: 'px',
+        format: [canvas.width, canvas.height]
+      })
+
+      // Add the canvas image to PDF
+      const imgData = canvas.toDataURL('image/png')
+      pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height)
+
+      // Download the PDF
+      pdf.save(`GSPA-Certificate-${user.first_name}-${user.last_name}.pdf`)
+    } catch (error) {
+      console.error('Error generating certificate PDF:', error)
+      alert('Error generating certificate. Please try again.')
+    } finally {
+      // Clean up
+      document.body.removeChild(tempDiv)
+    }
   }
 
   if (isLoading) {
@@ -459,8 +448,7 @@ export default function ResultsPage() {
                     </Button>
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    Your certificate will be downloaded as an HTML file that you can open in any browser and print or
-                    save as PDF.
+                    Your certificate will be downloaded as a professional PDF file in landscape orientation.
                   </p>
                 </div>
               </CardContent>
