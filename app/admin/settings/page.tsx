@@ -30,6 +30,7 @@ export default function AdminSettingsPage() {
     privacyPolicy: "",
     termsOfService: ""
   })
+  const [isSaving, setIsSaving] = useState(false)
   const router = useRouter()
   const supabase = createClient()
 
@@ -54,10 +55,42 @@ export default function AdminSettingsPage() {
       setUserName(`${authUser.user_metadata?.first_name || ''} ${authUser.user_metadata?.last_name || ''}`.trim() || 'Admin')
       setUserEmail(authUser.email || '')
 
-      // Load settings from localStorage or defaults
-      const savedSettings = localStorage.getItem('adminSettings')
-      if (savedSettings) {
-        setSettings(JSON.parse(savedSettings))
+      // Load settings from database
+      const { data: siteSettings } = await supabase
+        .from("site_settings")
+        .select("*")
+        .single()
+
+      if (siteSettings) {
+        setSettings({
+          siteName: siteSettings.site_name || "GSPA Certification Platform",
+          adminEmail: siteSettings.admin_email || "admin@gspa.com",
+          emailNotifications: siteSettings.email_notifications ?? true,
+          maintenanceMode: siteSettings.maintenance_mode ?? false,
+          registrationEnabled: siteSettings.registration_enabled ?? true,
+          testFee: siteSettings.test_fee || 50,
+          membershipFee: siteSettings.membership_fee || 50,
+          supportEmail: siteSettings.support_email || "support@gspa.com",
+          privacyPolicy: "",
+          termsOfService: ""
+        })
+      }
+
+      // Load legal documents
+      const { data: legalDocs } = await supabase
+        .from("legal_documents")
+        .select("document_type, content")
+        .eq("is_active", true)
+
+      if (legalDocs) {
+        const privacyDoc = legalDocs.find(doc => doc.document_type === 'privacy_policy')
+        const termsDoc = legalDocs.find(doc => doc.document_type === 'terms_of_service')
+
+        setSettings(prev => ({
+          ...prev,
+          privacyPolicy: privacyDoc?.content || "",
+          termsOfService: termsDoc?.content || ""
+        }))
       }
 
       setIsLoading(false)
@@ -66,10 +99,63 @@ export default function AdminSettingsPage() {
     checkAdmin()
   }, [supabase, router])
 
-  const handleSaveSettings = () => {
-    localStorage.setItem('adminSettings', JSON.stringify(settings))
-    // In a real app, you'd save to database
-    alert('Settings saved successfully!')
+  const handleSaveSettings = async () => {
+    setIsSaving(true)
+    try {
+      // Save site settings
+      const { error: settingsError } = await supabase
+        .from("site_settings")
+        .upsert({
+          id: 1, // Assuming single row
+          site_name: settings.siteName,
+          admin_email: settings.adminEmail,
+          support_email: settings.supportEmail,
+          email_notifications: settings.emailNotifications,
+          maintenance_mode: settings.maintenanceMode,
+          registration_enabled: settings.registrationEnabled,
+          test_fee: settings.testFee,
+          membership_fee: settings.membershipFee,
+          updated_at: new Date().toISOString()
+        })
+
+      if (settingsError) throw settingsError
+
+      // Save legal documents
+      if (settings.privacyPolicy) {
+        const { error: privacyError } = await supabase
+          .from("legal_documents")
+          .upsert({
+            document_type: 'privacy_policy',
+            title: 'Privacy Policy',
+            content: settings.privacyPolicy,
+            is_active: true,
+            updated_at: new Date().toISOString()
+          })
+
+        if (privacyError) throw privacyError
+      }
+
+      if (settings.termsOfService) {
+        const { error: termsError } = await supabase
+          .from("legal_documents")
+          .upsert({
+            document_type: 'terms_of_service',
+            title: 'Terms of Service',
+            content: settings.termsOfService,
+            is_active: true,
+            updated_at: new Date().toISOString()
+          })
+
+        if (termsError) throw termsError
+      }
+
+      alert('Settings saved successfully!')
+    } catch (error) {
+      console.error('Error saving settings:', error)
+      alert('Error saving settings. Please try again.')
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   const handleSettingChange = (key: string, value: any) => {
@@ -149,9 +235,9 @@ export default function AdminSettingsPage() {
                   Configure platform settings and preferences.
                 </p>
               </div>
-              <Button onClick={handleSaveSettings} className="hidden md:flex">
+              <Button onClick={handleSaveSettings} disabled={isSaving} className="hidden md:flex">
                 <Save className="h-4 w-4 mr-2" />
-                Save Changes
+                {isSaving ? 'Saving...' : 'Save Changes'}
               </Button>
             </div>
 
@@ -308,9 +394,9 @@ export default function AdminSettingsPage() {
 
             {/* Save Button for Mobile */}
             <div className="md:hidden mt-6">
-              <Button onClick={handleSaveSettings} className="w-full">
+              <Button onClick={handleSaveSettings} disabled={isSaving} className="w-full">
                 <Save className="h-4 w-4 mr-2" />
-                Save Changes
+                {isSaving ? 'Saving...' : 'Save Changes'}
               </Button>
             </div>
           </div>

@@ -67,6 +67,11 @@ const adminMenuItems = [
     icon: LayoutDashboard,
   },
   {
+    title: "Profile",
+    href: "/admin/profile",
+    icon: User,
+  },
+  {
     title: "User Management",
     href: "/admin/users",
     icon: Users,
