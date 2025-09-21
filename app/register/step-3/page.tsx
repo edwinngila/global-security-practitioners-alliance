@@ -14,12 +14,14 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { RegistrationProgress } from "@/components/registration-progress"
 import { SignaturePad } from "@/components/signature-pad"
 import { PhotoUpload } from "@/components/photo-upload"
+import { createClient } from "@/lib/supabase/client"
+import { Loader2 } from "lucide-react"
 
 interface Step3Form {
   documentType: string
   documentNumber: string
-  passportPhoto: File | null
-  signature: string | null
+  passportPhoto?: File | null
+  signature?: string | null
   declarationAccepted: boolean
 }
 
@@ -28,6 +30,8 @@ const stepTitles = ["Personal Info", "Professional Info", "Documents", "Review"]
 export default function RegisterStep3() {
   const router = useRouter()
   const [photoFile, setPhotoFile] = useState<File | null>(null)
+  const [isUploading, setIsUploading] = useState(false)
+  const supabase = createClient()
 
   const {
     register,
@@ -62,18 +66,67 @@ export default function RegisterStep3() {
     return () => clearTimeout(timeoutId)
   }, [formData])
 
-  const onSubmit = (data: Step3Form) => {
-    const dataToSave = { ...data }
-    delete dataToSave.passportPhoto // Don't save file to localStorage
-    localStorage.setItem("registration-step-3", JSON.stringify(dataToSave))
+  const onSubmit = async (data: Step3Form) => {
+    setIsUploading(true)
 
-    // Store photo file separately if needed
-    if (photoFile) {
-      // In a real app, you'd upload this to your server
-      console.log("Photo file:", photoFile)
+    try {
+      let passportPhotoUrl = null
+      let signatureUrl = null
+
+      // Upload passport photo
+      if (photoFile) {
+        const fileExt = photoFile.name.split('.').pop()
+        const fileName = `passport-${Date.now()}.${fileExt}`
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('documents')
+          .upload(`passports/${fileName}`, photoFile)
+
+        if (uploadError) throw uploadError
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('documents')
+          .getPublicUrl(`passports/${fileName}`)
+
+        passportPhotoUrl = publicUrl
+      }
+
+      // Upload signature
+      if (data.signature) {
+        // Convert base64 to blob
+        const signatureBlob = await fetch(data.signature).then(res => res.blob())
+        const signatureFile = new File([signatureBlob], `signature-${Date.now()}.png`, { type: 'image/png' })
+
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('documents')
+          .upload(`signatures/${signatureFile.name}`, signatureFile)
+
+        if (uploadError) throw uploadError
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('documents')
+          .getPublicUrl(`signatures/${signatureFile.name}`)
+
+        signatureUrl = publicUrl
+      }
+
+      // Save data with URLs to localStorage
+      const dataToSave = {
+        ...data,
+        passportPhotoUrl,
+        signatureData: signatureUrl,
+      }
+      delete dataToSave.passportPhoto // Remove file reference
+      delete dataToSave.signature // Remove base64
+
+      localStorage.setItem("registration-step-3", JSON.stringify(dataToSave))
+
+      router.push("/register/step-4")
+    } catch (error) {
+      console.error("Upload error:", error)
+      alert("Failed to upload documents. Please try again.")
+    } finally {
+      setIsUploading(false)
     }
-
-    router.push("/register/step-4")
   }
 
   const goBack = () => {
@@ -233,9 +286,17 @@ export default function RegisterStep3() {
                   </Button>
                   <Button
                     type="submit"
+                    disabled={isUploading}
                     className="px-8 py-3 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
                   >
-                    Review & Submit
+                    {isUploading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Uploading...
+                      </>
+                    ) : (
+                      "Review & Submit"
+                    )}
                   </Button>
                 </div>
               </form>

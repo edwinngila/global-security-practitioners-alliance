@@ -155,7 +155,7 @@ export default function AdminPage() {
       total_registrations: profiles?.length || 0,
       completed_payments: profiles?.filter((p) => p.payment_status === "completed").length || 0,
       pending_payments: profiles?.filter((p) => p.payment_status === "pending").length || 0,
-      total_revenue: (profiles?.filter((p) => p.payment_status === "completed").length || 0) * 500, // ₦500 per certification
+      total_revenue: (profiles?.filter((p) => p.payment_status === "completed").length || 0) * 5000, // KSh 5,000 per certification
       completed_tests: profiles?.filter((p) => p.test_completed).length || 0,
       certificates_issued: profiles?.filter((p) => p.certificate_issued).length || 0,
     }
@@ -281,7 +281,7 @@ export default function AdminPage() {
       ["Total Registrations", paymentReport.total_registrations],
       ["Completed Payments", paymentReport.completed_payments],
       ["Pending Payments", paymentReport.pending_payments],
-      ["Total Revenue (₦)", paymentReport.total_revenue],
+      ["Total Revenue (KSh)", paymentReport.total_revenue],
       ["Completed Tests", paymentReport.completed_tests],
       ["Certificates Issued", paymentReport.certificates_issued],
     ]
@@ -693,7 +693,7 @@ export default function AdminPage() {
                       </CardHeader>
                       <CardContent>
                         <div className="text-3xl font-bold text-primary">
-                          ₦{paymentReport.total_revenue.toLocaleString()}
+                          KSh {paymentReport.total_revenue.toLocaleString()}
                         </div>
                       </CardContent>
                     </Card>

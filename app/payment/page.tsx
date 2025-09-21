@@ -29,7 +29,7 @@ export default function PaymentPage() {
   const supabase = createClient()
 
   const PAYSTACK_PUBLIC_KEY = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || "pk_test_your_key_here"
-  const CERTIFICATION_FEE = 50000 // ₦50,000 in kobo
+  const CERTIFICATION_FEE = 500000 // KSh 5,000 in cents
 
   useEffect(() => {
     const getUserProfile = async () => {
@@ -120,7 +120,7 @@ export default function PaymentPage() {
     email: user?.email || "",
     amount: CERTIFICATION_FEE,
     publicKey: PAYSTACK_PUBLIC_KEY,
-    currency: "NGN",
+    currency: "KES",
     metadata: {
       user_id: user?.id,
       custom_fields: [
@@ -229,17 +229,17 @@ export default function PaymentPage() {
                 <div className="border rounded-lg p-6">
                   <div className="flex justify-between items-center mb-4">
                     <span className="text-lg font-semibold">Certification Fee</span>
-                    <span className="text-2xl font-bold">₦{CERTIFICATION_FEE / 100}</span>
+                    <span className="text-2xl font-bold">KSh {CERTIFICATION_FEE / 100}</span>
                   </div>
                   <p className="text-sm text-muted-foreground mb-4">
-                    This fee covers the security aptitude test (50 questions), certificate issuance upon passing, and
+                    This fee covers the security aptitude test (30 questions), certificate issuance upon passing, and
                     lifetime access to GSPA resources.
                   </p>
 
                   <Alert>
                     <AlertCircle className="h-4 w-4" />
                     <AlertDescription>
-                      Payment is processed securely through Paystack. We accept Visa, Mastercard, and other major cards.
+                      Payment is processed securely through Paystack. We accept Visa, Mastercard, and other major cards. All amounts in Kenyan Shillings (KES).
                     </AlertDescription>
                   </Alert>
                 </div>
@@ -251,14 +251,14 @@ export default function PaymentPage() {
                     onClose={handlePaymentClose}
                     className="w-full bg-primary text-primary-foreground hover:bg-primary/90 h-12 px-4 py-2 rounded-md font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none"
                   >
-                    Pay ₦{CERTIFICATION_FEE / 100} with Paystack
+                    Pay KSh {CERTIFICATION_FEE / 100} with Paystack
                   </PaystackButton>
                 </div>
 
                 <div className="text-center text-sm text-muted-foreground">
                   <p>By proceeding with payment, you agree to our terms and conditions.</p>
                   <p className="mt-2">
-                    After payment, you'll have access to take the 50-question security aptitude test.
+                    After payment, you'll have access to take the 30-question security aptitude test. All payments are processed in Kenyan Shillings.
                   </p>
                 </div>
               </CardContent>

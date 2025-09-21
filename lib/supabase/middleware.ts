@@ -39,8 +39,6 @@ export async function updateSession(request: NextRequest) {
 
     if (
       request.nextUrl.pathname.startsWith("/dashboard") ||
-      request.nextUrl.pathname.startsWith("/test") ||
-      request.nextUrl.pathname.startsWith("/payment") ||
       request.nextUrl.pathname.startsWith("/admin")
     ) {
       if (!user) {

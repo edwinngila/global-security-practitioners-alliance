@@ -45,7 +45,7 @@ export default function TestPage() {
   const router = useRouter()
   const supabase = createClient()
 
-  const getRandomQuestions = (allQuestions: Question[], count = 50): Question[] => {
+  const getRandomQuestions = (allQuestions: Question[], count = 30): Question[] => {
     const shuffled = [...allQuestions].sort(() => 0.5 - Math.random())
     return shuffled.slice(0, Math.min(count, allQuestions.length))
   }
@@ -80,7 +80,7 @@ export default function TestPage() {
             return
           }
 
-          const randomQuestions = getRandomQuestions(questionsData || [], 50)
+          const randomQuestions = getRandomQuestions(questionsData || [], 30)
           setQuestions(randomQuestions)
           setIsLoading(false)
           return
@@ -130,7 +130,7 @@ export default function TestPage() {
         return
       }
 
-      const randomQuestions = getRandomQuestions(questionsData || [], 50)
+      const randomQuestions = getRandomQuestions(questionsData || [], 30)
       setQuestions(randomQuestions)
       setIsLoading(false)
     }
@@ -317,7 +317,7 @@ export default function TestPage() {
               <Alert>
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription>
-                  <strong>Important:</strong> You will receive 50 randomly selected questions from our question bank.
+                  <strong>Important:</strong> You will receive 30 randomly selected questions from our question bank.
                   Once you start the test, the timer will begin and you cannot pause. Make sure you have a stable
                   internet connection and sufficient time to complete the assessment.
                 </AlertDescription>

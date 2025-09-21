@@ -124,13 +124,21 @@ export default function RegisterStep1() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="phone">Phone Number</Label>
+                  <Label htmlFor="phone">Phone Number *</Label>
                   <Input
                     id="phone"
                     type="tel"
-                    {...register("phone")}
+                    {...register("phone", {
+                      required: "Phone number is required",
+                      pattern: {
+                        value: /^\+?[1-9]\d{1,14}$/,
+                        message: "Enter a valid phone number",
+                      },
+                    })}
                     placeholder="+254712345678"
+                    className={errors.phone ? "border-red-500" : ""}
                   />
+                  {errors.phone && <p className="text-sm text-red-600">{errors.phone.message}</p>}
                 </div>
 
                 <Button type="submit" className="w-full">Next</Button>

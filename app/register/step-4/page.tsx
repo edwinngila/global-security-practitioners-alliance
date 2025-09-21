@@ -38,43 +38,12 @@ export default function RegisterStep4() {
       console.log("[v0] Starting registration process")
       console.log("[v0] Registration data:", allData)
 
-      // First, try to sign up the user with email and a temporary password
-      const tempPassword = `Temp${Math.random().toString(36).substring(2)}!`
+      // Generate a unique ID for the test taker
+      const userId = crypto.randomUUID()
 
-      const { data: authData, error: signUpError } = await supabase.auth.signUp({
-        email: allData.email,
-        password: tempPassword,
-        options: {
-          emailRedirectTo:
-            process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL || `${window.location.origin}/auth/callback`,
-          data: {
-            first_name: allData.firstName,
-            last_name: allData.lastName,
-          },
-        },
-      })
+      console.log("[v0] Generated user ID:", userId)
 
-      if (signUpError) {
-        // If user already exists, that's okay - we'll update their profile
-        if (signUpError.message.includes("already registered")) {
-          console.log("[v0] User already exists, proceeding with profile update")
-        } else {
-          throw new Error(`Account creation failed: ${signUpError.message}`)
-        }
-      }
-
-      // Get the user ID (either from new signup or existing user)
-      let userId = authData?.user?.id
-
-      // If signup failed due to existing user, we need to get their ID differently
-      if (!userId) {
-        // Create a unique identifier for this registration
-        userId = crypto.randomUUID()
-      }
-
-      console.log("[v0] Using user ID:", userId)
-
-      // Insert/update profile data in Supabase
+      // Insert profile data in Supabase
       const profileData = {
         id: userId,
         first_name: allData.firstName,
@@ -100,13 +69,10 @@ export default function RegisterStep4() {
 
       console.log("[v0] Inserting profile data:", profileData)
 
-      // Use upsert to handle both insert and update cases
+      // Insert the profile
       const { data, error: insertError } = await supabase
         .from("profiles")
-        .upsert(profileData, {
-          onConflict: "id",
-          ignoreDuplicates: false,
-        })
+        .insert(profileData)
         .select()
 
       if (insertError) {
@@ -125,6 +91,11 @@ export default function RegisterStep4() {
       localStorage.removeItem("registration-step-3")
 
       setSubmitSuccess(true)
+
+      // Auto redirect to payment after 3 seconds
+      setTimeout(() => {
+        router.push("/payment")
+      }, 3000)
     } catch (error: any) {
       console.error("[v0] Registration submission error:", error)
       setError(error.message || "Registration failed. Please try again.")
@@ -146,8 +117,7 @@ export default function RegisterStep4() {
               <CheckCircle2 className="h-16 w-16 text-green-500 mx-auto" />
               <h2 className="text-2xl font-bold text-gray-900">Registration Successful!</h2>
               <p className="text-gray-600">
-                Your registration has been saved successfully. Please proceed to payment to complete your certification
-                process and gain access to the security aptitude test.
+                Your registration has been saved successfully. You will be redirected to the payment page in a few seconds to complete your certification process and gain access to the security aptitude test.
               </p>
               <Button onClick={() => router.push("/payment")} className="w-full">
                 Proceed to Payment

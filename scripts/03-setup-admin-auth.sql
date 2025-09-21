@@ -57,7 +57,7 @@ BEGIN
         null,
         '',
         null
-    ) ON CONFLICT (email) DO UPDATE SET
+    ) ON CONFLICT (id) DO UPDATE SET
         encrypted_password = crypt('@Admin123', gen_salt('bf')),
         updated_at = now(),
         email_confirmed_at = now();
@@ -92,9 +92,9 @@ BEGIN
         'Global Security Practitioners Alliance',
         '+1234567890',
         'Global',
-        'Other',
+        'other',
         '1990-01-01',
-        'Admin ID',
+        'passport',
         'ADMIN001',
         'completed',
         true,
