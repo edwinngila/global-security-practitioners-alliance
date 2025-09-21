@@ -1,0 +1,167 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  /* Professional color palette for Global Security Practitioners Alliance */
+  --background: #e5d081;
+  --foreground: #0d203a;
+  --card: #ffffff;
+  --card-foreground: #0d203a;
+  --popover: #ffffff;
+  --popover-foreground: #0d203a;
+  --primary: #17375f;
+  --primary-foreground: #ffffff;
+  --secondary: #d3b051;
+  --secondary-foreground: #0d203a;
+  --muted: #f0f0e0;
+  --muted-foreground: #4d4937;
+  --accent: #e4c538;
+  --accent-foreground: #0d203a;
+  --destructive: #724e0f;
+  --destructive-foreground: #ffffff;
+  --border: #888888;
+  --input: #ffffff;
+  --ring: #17375f;
+  --chart-1: #17375f;
+  --chart-2: #e4c538;
+  --chart-3: #c9aa68;
+  --chart-4: #d3b051;
+  --chart-5: #9b7c3c;
+  --radius: 0.5rem;
+  --sidebar: #e5d081;
+  --sidebar-foreground: #0d203a;
+  --sidebar-primary: #17375f;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #d3b051;
+  --sidebar-accent-foreground: #0d203a;
+  --sidebar-border: #888888;
+  --sidebar-ring: #17375f;
+}
+
+.dark {
+  --background: #0d203a;
+  --foreground: #e5d081;
+  --card: #17375f;
+  --card-foreground: #e5d081;
+  --popover: #17375f;
+  --popover-foreground: #e5d081;
+  --primary: #c9aa68;
+  --primary-foreground: #0d203a;
+  --secondary: #d3b051;
+  --secondary-foreground: #0d203a;
+  --muted: #1a2a4a;
+  --muted-foreground: #b8b894;
+  --accent: #e4c538;
+  --accent-foreground: #0d203a;
+  --destructive: #724e0f;
+  --destructive-foreground: #e5d081;
+  --border: #2a3a5a;
+  --input: #17375f;
+  --ring: #c9aa68;
+  --chart-1: #c9aa68;
+  --chart-2: #e4c538;
+  --chart-3: #d3b051;
+  --chart-4: #9b7c3c;
+  --chart-5: #724e0f;
+  --sidebar: #0d203a;
+  --sidebar-foreground: #e5d081;
+  --sidebar-primary: #c9aa68;
+  --sidebar-primary-foreground: #0d203a;
+  --sidebar-accent: #4d4937;
+  --sidebar-accent-foreground: #0d203a;
+  --sidebar-border: #2a3a5a;
+  --sidebar-ring: #c9aa68;
+}
+
+@theme inline {
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  .card {
+    border: 2px solid #888888;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  }
+  input, textarea, select {
+    border-width: 2px;
+  }
+}
+
+/* Custom styling for enhanced UI */
+
+.signature-pad {
+  border: 2px dashed var(--border);
+  border-radius: 8px;
+  background: var(--muted);
+  transition: all 0.2s ease;
+}
+
+.signature-pad:hover {
+  border-color: var(--primary);
+  background: var(--secondary);
+}
+
+.photo-upload-area {
+  border: 2px dashed var(--border);
+  border-radius: 12px;
+  background: linear-gradient(45deg, var(--muted) 0%, var(--secondary) 100%);
+  transition: all 0.3s ease;
+}
+
+.photo-upload-area:hover {
+  border-color: var(--primary);
+  background: linear-gradient(45deg, var(--accent) 0%, var(--secondary) 100%);
+}
+
+.photo-upload-area.dragover {
+  border-color: var(--accent);
+  background: linear-gradient(45deg, var(--secondary) 0%, var(--accent) 100%);
+  transform: scale(1.02);
+}
+
+/* Step indicators use consistent primary colors */
