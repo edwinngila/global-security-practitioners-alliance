@@ -267,11 +267,11 @@ export default function AdminDashboardPage() {
                       <div className="font-medium">Certificates</div>
                       <div className="text-sm text-muted-foreground">Issue and manage certificates</div>
                     </button>
-                    <button className="p-4 border rounded-lg hover:bg-muted/50 transition-colors text-left">
-                      <TrendingUp className="h-6 w-6 mb-2" />
-                      <div className="font-medium">Reports</div>
-                      <div className="text-sm text-muted-foreground">View analytics and reports</div>
-                    </button>
+                     <a href="/admin/reports" className="p-4 border rounded-lg hover:bg-muted/50 transition-colors text-left block">
+                       <TrendingUp className="h-6 w-6 mb-2" />
+                       <div className="font-medium">Reports</div>
+                       <div className="text-sm text-muted-foreground">View analytics and reports</div>
+                     </a>
                   </div>
                 </CardContent>
               </Card>
