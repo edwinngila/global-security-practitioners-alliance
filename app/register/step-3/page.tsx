@@ -2,8 +2,6 @@
 
 import { useEffect } from "react"
 import { useForm, Controller } from "react-hook-form"
-import { zodResolver } from "@hookform/resolvers/zod"
-import { z } from "zod"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -13,15 +11,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox"
 import { RegistrationProgress } from "@/components/registration-progress"
 
-const step3Schema = z.object({
-  documentType: z.string().min(1, "Please select a document type"),
-  documentNumber: z.string().min(1, "Document number is required"),
-  declarationAccepted: z.boolean().refine((val) => val === true, {
-    message: "You must accept the declaration",
-  }),
-})
-
-type Step3Form = z.infer<typeof step3Schema>
+interface Step3Form {
+  documentType: string
+  documentNumber: string
+  declarationAccepted: boolean
+}
 
 const stepTitles = ["Personal Info", "Professional Info", "Documents", "Review"]
 
@@ -36,7 +30,6 @@ export default function RegisterStep3() {
     setValue,
     watch,
   } = useForm<Step3Form>({
-    resolver: zodResolver(step3Schema),
     mode: "onSubmit",
   })
 
@@ -87,6 +80,7 @@ export default function RegisterStep3() {
                     <Controller
                       name="documentType"
                       control={control}
+                      rules={{ required: "Please select a document type" }}
                       render={({ field }) => (
                         <Select onValueChange={field.onChange} value={field.value}>
                           <SelectTrigger className={errors.documentType ? "border-red-500" : ""}>
@@ -107,7 +101,10 @@ export default function RegisterStep3() {
                     <Label htmlFor="documentNumber">Document Number *</Label>
                     <Input
                       id="documentNumber"
-                      {...register("documentNumber")}
+                      {...register("documentNumber", {
+                        required: "Document number is required",
+                        minLength: { value: 3, message: "Document number must be at least 3 characters" },
+                      })}
                       placeholder="Enter document number"
                       className={errors.documentNumber ? "border-red-500" : ""}
                     />
@@ -120,6 +117,10 @@ export default function RegisterStep3() {
                     <Controller
                       name="declarationAccepted"
                       control={control}
+                      rules={{
+                        required: "You must accept the declaration",
+                        validate: (value) => value === true || "You must accept the declaration",
+                      }}
                       render={({ field }) => (
                         <Checkbox
                           id="declaration"

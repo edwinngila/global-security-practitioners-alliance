@@ -2,8 +2,6 @@
 
 import { useEffect } from "react"
 import { useForm, Controller } from "react-hook-form"
-import { zodResolver } from "@hookform/resolvers/zod"
-import { z } from "zod"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -12,15 +10,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { RegistrationProgress } from "@/components/registration-progress"
 
-const step2Schema = z.object({
-  nationality: z.string().min(1, "Please select your nationality"),
-  gender: z.string().min(1, "Please select your gender"),
-  dateOfBirth: z.string().min(1, "Date of birth is required"),
-  designation: z.string().min(1, "Designation is required"),
-  organization: z.string().min(1, "Organization is required"),
-})
-
-type Step2Form = z.infer<typeof step2Schema>
+interface Step2Form {
+  nationality: string
+  gender: string
+  dateOfBirth: string
+  designation: string
+  organization: string
+}
 
 const stepTitles = ["Personal Info", "Professional Info", "Documents", "Review"]
 
@@ -35,7 +31,6 @@ export default function RegisterStep2() {
     setValue,
     watch,
   } = useForm<Step2Form>({
-    resolver: zodResolver(step2Schema),
     mode: "onSubmit",
   })
 
@@ -86,6 +81,7 @@ export default function RegisterStep2() {
                     <Controller
                       name="nationality"
                       control={control}
+                      rules={{ required: "Please select your nationality" }}
                       render={({ field }) => (
                         <Select onValueChange={field.onChange} value={field.value}>
                           <SelectTrigger className={errors.nationality ? "border-red-500" : ""}>
@@ -112,6 +108,7 @@ export default function RegisterStep2() {
                     <Controller
                       name="gender"
                       control={control}
+                      rules={{ required: "Please select your gender" }}
                       render={({ field }) => (
                         <Select onValueChange={field.onChange} value={field.value}>
                           <SelectTrigger className={errors.gender ? "border-red-500" : ""}>
@@ -134,7 +131,9 @@ export default function RegisterStep2() {
                   <Input
                     id="dateOfBirth"
                     type="date"
-                    {...register("dateOfBirth")}
+                    {...register("dateOfBirth", {
+                      required: "Date of birth is required",
+                    })}
                     className={errors.dateOfBirth ? "border-red-500" : ""}
                     max={new Date(new Date().setFullYear(new Date().getFullYear() - 18)).toISOString().split("T")[0]}
                   />
@@ -145,7 +144,10 @@ export default function RegisterStep2() {
                   <Label htmlFor="designation">Designation/Role *</Label>
                   <Input
                     id="designation"
-                    {...register("designation")}
+                    {...register("designation", {
+                      required: "Designation is required",
+                      minLength: { value: 2, message: "Designation must be at least 2 characters" },
+                    })}
                     placeholder="Security Manager"
                     className={errors.designation ? "border-red-500" : ""}
                   />
@@ -156,7 +158,10 @@ export default function RegisterStep2() {
                   <Label htmlFor="organization">Organization *</Label>
                   <Input
                     id="organization"
-                    {...register("organization")}
+                    {...register("organization", {
+                      required: "Organization is required",
+                      minLength: { value: 2, message: "Organization must be at least 2 characters" },
+                    })}
                     placeholder="ABC Corporation"
                     className={errors.organization ? "border-red-500" : ""}
                   />

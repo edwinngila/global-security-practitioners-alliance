@@ -2,8 +2,6 @@
 
 import { useState, useEffect } from "react"
 import { useForm } from "react-hook-form"
-import { zodResolver } from "@hookform/resolvers/zod"
-import { z } from "zod"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -11,14 +9,12 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { RegistrationProgress } from "@/components/registration-progress"
 
-const step1Schema = z.object({
-  firstName: z.string().min(1, "First name is required"),
-  lastName: z.string().min(1, "Last name is required"),
-  email: z.string().email("Please enter a valid email"),
-  phone: z.string().min(1, "Phone number is required"),
-})
-
-type Step1Form = z.infer<typeof step1Schema>
+interface Step1Form {
+  firstName: string
+  lastName: string
+  email: string
+  phone: string
+}
 
 const stepTitles = ["Personal Info", "Professional Info", "Documents", "Review"]
 
@@ -33,8 +29,7 @@ export default function RegisterStep1() {
     setValue,
     watch,
   } = useForm<Step1Form>({
-    resolver: zodResolver(step1Schema),
-    mode: "onSubmit", // Only validate on submit to reduce errors
+    mode: "onSubmit",
   })
 
   useEffect(() => {
@@ -80,7 +75,10 @@ export default function RegisterStep1() {
                     <Label htmlFor="firstName">First Name *</Label>
                     <Input
                       id="firstName"
-                      {...register("firstName")}
+                      {...register("firstName", {
+                        required: "First name is required",
+                        minLength: { value: 2, message: "First name must be at least 2 characters" },
+                      })}
                       placeholder="John"
                       className={errors.firstName ? "border-red-500" : ""}
                     />
@@ -91,7 +89,10 @@ export default function RegisterStep1() {
                     <Label htmlFor="lastName">Last Name *</Label>
                     <Input
                       id="lastName"
-                      {...register("lastName")}
+                      {...register("lastName", {
+                        required: "Last name is required",
+                        minLength: { value: 2, message: "Last name must be at least 2 characters" },
+                      })}
                       placeholder="Doe"
                       className={errors.lastName ? "border-red-500" : ""}
                     />
@@ -104,7 +105,13 @@ export default function RegisterStep1() {
                   <Input
                     id="email"
                     type="email"
-                    {...register("email")}
+                    {...register("email", {
+                      required: "Email is required",
+                      pattern: {
+                        value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+                        message: "Please enter a valid email address",
+                      },
+                    })}
                     placeholder="john.doe@example.com"
                     className={errors.email ? "border-red-500" : ""}
                   />
@@ -116,7 +123,10 @@ export default function RegisterStep1() {
                   <Input
                     id="phone"
                     type="tel"
-                    {...register("phone")}
+                    {...register("phone", {
+                      required: "Phone number is required",
+                      minLength: { value: 10, message: "Phone number must be at least 10 digits" },
+                    })}
                     placeholder="+1234567890"
                     className={errors.phone ? "border-red-500" : ""}
                   />
