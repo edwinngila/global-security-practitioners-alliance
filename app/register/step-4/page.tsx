@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { RegistrationProgress } from "@/components/registration-progress"
 import { CheckCircle2, Loader2 } from "lucide-react"
+import { createClient } from "@/lib/supabase/client"
 
 const stepTitles = ["Personal Info", "Professional Info", "Documents", "Review"]
 
@@ -14,6 +15,8 @@ export default function RegisterStep4() {
   const [allData, setAllData] = useState<any>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitSuccess, setSubmitSuccess] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const supabase = createClient()
 
   useEffect(() => {
     const step1Data = JSON.parse(localStorage.getItem("registration-step-1") || "{}")
@@ -29,10 +32,63 @@ export default function RegisterStep4() {
 
   const handleSubmit = async () => {
     setIsSubmitting(true)
+    setError(null)
+
     try {
-      console.log("Submitting registration:", allData)
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 2000))
+      // Get the current authenticated user
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser()
+
+      if (userError || !user) {
+        throw new Error("You must be logged in to complete registration. Please sign in first.")
+      }
+
+      console.log("[v0] Submitting registration for user:", user.id)
+      console.log("[v0] Registration data:", allData)
+
+      // Insert/update profile data in Supabase
+      const profileData = {
+        id: user.id,
+        first_name: allData.firstName,
+        last_name: allData.lastName,
+        email: allData.email || user.email,
+        phone_number: allData.phone,
+        date_of_birth: allData.dateOfBirth,
+        nationality: allData.nationality,
+        gender: allData.gender,
+        designation: allData.designation,
+        organization_name: allData.organization,
+        document_type: allData.documentType,
+        document_number: allData.documentNumber,
+        declaration_accepted: allData.declarationAccepted || false,
+        passport_photo_url: allData.passportPhotoUrl || null,
+        signature_data: allData.signatureData || null,
+        payment_status: "pending",
+        test_completed: false,
+        certificate_issued: false,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }
+
+      console.log("[v0] Inserting profile data:", profileData)
+
+      // Use upsert to handle both insert and update cases
+      const { data, error: insertError } = await supabase
+        .from("profiles")
+        .upsert(profileData, {
+          onConflict: "id",
+          ignoreDuplicates: false,
+        })
+        .select()
+
+      if (insertError) {
+        console.error("[v0] Database insert error:", insertError)
+        throw new Error(`Failed to save registration: ${insertError.message}`)
+      }
+
+      console.log("[v0] Registration saved successfully:", data)
 
       // Clear localStorage after successful submission
       localStorage.removeItem("registration-step-1")
@@ -40,8 +96,9 @@ export default function RegisterStep4() {
       localStorage.removeItem("registration-step-3")
 
       setSubmitSuccess(true)
-    } catch (error) {
-      console.error("Registration failed:", error)
+    } catch (error: any) {
+      console.error("[v0] Registration submission error:", error)
+      setError(error.message || "Registration failed. Please try again.")
     } finally {
       setIsSubmitting(false)
     }
@@ -59,9 +116,12 @@ export default function RegisterStep4() {
             <div className="text-center space-y-4">
               <CheckCircle2 className="h-16 w-16 text-green-500 mx-auto" />
               <h2 className="text-2xl font-bold text-gray-900">Registration Successful!</h2>
-              <p className="text-gray-600">Thank you for registering. You will receive a confirmation email shortly.</p>
-              <Button onClick={() => router.push("/")} className="w-full">
-                Go to Homepage
+              <p className="text-gray-600">
+                Your registration has been saved successfully. You can now proceed to payment to complete your
+                certification process.
+              </p>
+              <Button onClick={() => router.push("/payment")} className="w-full">
+                Proceed to Payment
               </Button>
             </div>
           </CardContent>
@@ -83,6 +143,12 @@ export default function RegisterStep4() {
             </CardHeader>
 
             <CardContent className="space-y-6">
+              {error && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                  <p className="text-red-800 text-sm">{error}</p>
+                </div>
+              )}
+
               {/* Personal Information */}
               <div className="bg-blue-50 rounded-lg p-4">
                 <h3 className="font-semibold text-blue-900 mb-3">Personal Information</h3>
@@ -135,6 +201,16 @@ export default function RegisterStep4() {
                     <span className="font-medium">Declaration:</span>{" "}
                     {allData.declarationAccepted ? "Accepted" : "Not Accepted"}
                   </div>
+                  {allData.signatureData && (
+                    <div>
+                      <span className="font-medium">Signature:</span> ✓ Provided
+                    </div>
+                  )}
+                  {allData.passportPhotoUrl && (
+                    <div>
+                      <span className="font-medium">Passport Photo:</span> ✓ Uploaded
+                    </div>
+                  )}
                 </div>
               </div>
 
