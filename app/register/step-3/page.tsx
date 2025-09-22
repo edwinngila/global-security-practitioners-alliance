@@ -70,60 +70,37 @@ export default function RegisterStep3() {
     setIsUploading(true)
 
     try {
-      let passportPhotoUrl = null
-      let signatureUrl = null
-
-      // Upload passport photo
-      if (photoFile) {
-        const fileExt = photoFile.name.split(".").pop()
-        const fileName = `passport-${Date.now()}.${fileExt}`
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from("documents")
-          .upload(`passports/${fileName}`, photoFile)
-
-        if (uploadError) throw uploadError
-
-        const {
-          data: { publicUrl },
-        } = supabase.storage.from("documents").getPublicUrl(`passports/${fileName}`)
-
-        passportPhotoUrl = publicUrl
-      }
-
-      // Upload signature
-      if (data.signature) {
-        // Convert base64 to blob
-        const signatureBlob = await fetch(data.signature).then((res) => res.blob())
-        const signatureFile = new File([signatureBlob], `signature-${Date.now()}.png`, { type: "image/png" })
-
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from("documents")
-          .upload(`signatures/${signatureFile.name}`, signatureFile)
-
-        if (uploadError) throw uploadError
-
-        const {
-          data: { publicUrl },
-        } = supabase.storage.from("documents").getPublicUrl(`signatures/${signatureFile.name}`)
-
-        signatureUrl = publicUrl
-      }
-
-      // Save data with URLs to localStorage
+      // Store files locally for upload after authentication in step 4
       const dataToSave = {
         ...data,
-        passportPhotoUrl,
-        signatureData: signatureUrl,
+        passportPhotoFile: photoFile, // Store the actual file
+        signatureData: data.signature, // Keep base64 signature
       }
-      delete dataToSave.passportPhoto // Remove file reference
-      delete dataToSave.signature // Remove base64
 
-      localStorage.setItem("registration-step-3", JSON.stringify(dataToSave))
+      // Remove non-serializable data for localStorage
+      const localStorageData = { ...dataToSave }
+      delete localStorageData.passportPhotoFile // Files can't be stored in localStorage
+
+      localStorage.setItem("registration-step-3", JSON.stringify(localStorageData))
+
+      // Store files separately (in memory for now, will be uploaded in step 4)
+      if (photoFile) {
+        // Convert file to base64 for temporary storage
+        const reader = new FileReader()
+        reader.onload = () => {
+          localStorage.setItem("temp-passport-photo", reader.result as string)
+        }
+        reader.readAsDataURL(photoFile)
+      }
+
+      if (data.signature) {
+        localStorage.setItem("temp-signature", data.signature)
+      }
 
       router.push("/register/step-4")
-    } catch (error) {
-      console.error("Upload error:", error)
-      alert("Failed to upload documents. Please try again.")
+    } catch (error: any) {
+      console.error("Error saving documents:", error)
+      alert("Failed to save documents. Please try again.")
     } finally {
       setIsUploading(false)
     }
@@ -140,17 +117,17 @@ export default function RegisterStep3() {
       <div className="py-8 px-4">
         <div className="max-w-3xl mx-auto">
           <Card className="form-card shadow-2xl border-0">
-            <CardHeader className="text-center pb-8">
-              <CardTitle className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
+            <CardHeader className="text-center pb-6 md:pb-8">
+              <CardTitle className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
                 Documents & Verification
               </CardTitle>
-              <CardDescription className="text-lg text-gray-600">
+              <CardDescription className="text-base md:text-lg text-gray-600">
                 Upload your documents and provide your digital signature
               </CardDescription>
             </CardHeader>
 
-            <CardContent className="space-y-8">
-              <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
+            <CardContent className="space-y-6 md:space-y-8">
+              <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 md:space-y-8">
                 {/* Document Information */}
                 <div className="bg-gray-50 rounded-xl p-6 space-y-6">
                   <h3 className="text-lg font-semibold text-gray-800 border-b border-gray-200 pb-2">
@@ -166,7 +143,7 @@ export default function RegisterStep3() {
                         rules={{ required: "Please select a document type" }}
                         render={({ field }) => (
                           <Select onValueChange={field.onChange} value={field.value}>
-                            <SelectTrigger className={cn("h-12", errors.documentType ? "border-red-500" : "")}>
+                            <SelectTrigger className={cn("h-12 bg-black/5", errors.documentType ? "border-red-500" : "")}>
                               <SelectValue placeholder="Select document type" />
                             </SelectTrigger>
                             <SelectContent>
@@ -189,7 +166,7 @@ export default function RegisterStep3() {
                           minLength: { value: 3, message: "Document number must be at least 3 characters" },
                         })}
                         placeholder="Enter document number"
-                        className={cn("h-12", errors.documentNumber ? "border-red-500" : "")}
+                        className={cn("h-12 bg-black/5 text-black ", errors.documentNumber ? "border-red-500" : "")}
                       />
                       {errors.documentNumber && <p className="text-sm text-red-600">{errors.documentNumber.message}</p>}
                     </div>
@@ -250,8 +227,8 @@ export default function RegisterStep3() {
                 </div>
 
                 {/* Declaration */}
-                <div className="bg-amber-50 border border-amber-200 rounded-xl p-6">
-                  <div className="flex items-start gap-4">
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 md:p-6">
+                  <div className="flex flex-col sm:flex-row sm:items-start gap-4">
                     <Controller
                       name="declarationAccepted"
                       control={control}
@@ -268,11 +245,11 @@ export default function RegisterStep3() {
                         />
                       )}
                     />
-                    <div className="space-y-3">
-                      <Label htmlFor="declaration" className="text-base font-semibold text-amber-800">
+                    <div className="space-y-2 md:space-y-3">
+                      <Label htmlFor="declaration" className="text-sm md:text-base font-semibold text-amber-800">
                         Declaration & Agreement *
                       </Label>
-                      <div className="text-sm text-amber-700 space-y-2">
+                      <div className="text-xs md:text-sm text-amber-700 space-y-2">
                         <p>
                           I hereby declare that all information provided is true and accurate to the best of my
                           knowledge. I understand that any false information may result in disqualification from the
@@ -290,14 +267,14 @@ export default function RegisterStep3() {
                   </div>
                 </div>
 
-                <div className="flex justify-between pt-6">
-                  <Button type="button" variant="outline" onClick={goBack} className="px-8 py-3 bg-transparent">
+                <div className="flex flex-col sm:flex-row justify-between gap-4 pt-6">
+                  <Button type="button" variant="outline" onClick={goBack} className="px-6 md:px-8 py-3 bg-transparent">
                     Previous
                   </Button>
                   <Button
                     type="submit"
                     disabled={isUploading}
-                    className="px-8 py-3 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
+                    className="px-6 md:px-8 py-3 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
                   >
                     {isUploading ? (
                       <>

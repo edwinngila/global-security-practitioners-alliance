@@ -11,7 +11,7 @@ interface RegistrationProgressProps {
 
 export function RegistrationProgress({ currentStep, totalSteps, stepTitles }: RegistrationProgressProps) {
   return (
-    <div className="w-full bg-gradient-to-r from-primary via-secondary to-accent py-6 shadow-2xl">
+    <div className="w-full bg-gradient-to-r from-primary via-secondary to-accent py-4 md:py-6 shadow-2xl">
       <div className="max-w-4xl mx-auto px-4">
         <div className="flex items-center justify-between">
           {stepTitles.map((title, index) => {
@@ -24,7 +24,7 @@ export function RegistrationProgress({ currentStep, totalSteps, stepTitles }: Re
                 <div className="flex flex-col items-center">
                   <div
                     className={cn(
-                      "w-14 h-14 rounded-full flex items-center justify-center text-base font-bold border-2 transition-all duration-300 shadow-md",
+                      "w-10 h-10 md:w-14 md:h-14 rounded-full flex items-center justify-center text-sm md:text-base font-bold border-2 transition-all duration-300 shadow-md",
                       isCompleted
                         ? "bg-green-500 text-white border-green-500 shadow-green-200"
                         : isCurrent
@@ -32,11 +32,11 @@ export function RegistrationProgress({ currentStep, totalSteps, stepTitles }: Re
                           : "bg-muted text-muted-foreground border-border",
                     )}
                   >
-                    {isCompleted ? <Check className="w-6 h-6" /> : stepNumber}
+                    {isCompleted ? <Check className="w-4 h-4 md:w-6 md:h-6" /> : stepNumber}
                   </div>
                   <span
                     className={cn(
-                      "mt-3 text-sm font-medium text-center max-w-24 leading-tight",
+                      "mt-2 md:mt-3 text-xs md:text-sm font-medium text-center max-w-20 md:max-w-24 leading-tight",
                       isCurrent ? "text-primary font-semibold" : isCompleted ? "text-green-600" : "text-muted-foreground",
                     )}
                   >
@@ -46,7 +46,7 @@ export function RegistrationProgress({ currentStep, totalSteps, stepTitles }: Re
                 {index < stepTitles.length - 1 && (
                   <div
                     className={cn(
-                      "flex-1 h-1 mx-6 rounded-full transition-all duration-500",
+                      "flex-1 h-1 mx-2 md:mx-6 rounded-full transition-all duration-500",
                       isCompleted ? "bg-green-500" : "bg-border",
                     )}
                   />

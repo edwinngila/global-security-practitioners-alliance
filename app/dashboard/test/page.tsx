@@ -57,6 +57,7 @@ export default function DashboardTestPage() {
   const [testStarted, setTestStarted] = useState(false)
   const [isOnline, setIsOnline] = useState(true)
   const [isAdmin, setIsAdmin] = useState(false)
+  const [testInfo, setTestInfo] = useState({ passingScore: 70, timeLimit: 60, isAssignedExam: false })
   const router = useRouter()
   const supabase = createClient()
 
@@ -163,43 +164,109 @@ export default function DashboardTestPage() {
             return
           }
 
-          // Check for ongoing test
-          const { data: ongoing, error: ongoingError } = await supabase
-            .from("ongoing_tests")
-            .select("*")
+          // Check for assigned exam first
+          const { data: assignedExam, error: examError } = await supabase
+            .from("user_exams")
+            .select(`
+              *,
+              exam_configurations (*)
+            `)
             .eq("user_id", paidUserId)
+            .eq("is_completed", false)
             .single()
 
-          if (!ongoingError && ongoing) {
-            // Load ongoing test
-            setOngoingTest(ongoing)
-            setQuestions(ongoing.questions_data)
-            setAnswers(ongoing.answers_data)
-            setCurrentQuestion(ongoing.current_question)
-            setTestStarted(ongoing.test_started)
+          if (!examError && assignedExam && assignedExam.exam_configurations) {
+            const examConfig = assignedExam.exam_configurations
 
-            // Calculate remaining time
-            if (ongoing.test_started) {
-              const elapsed = Math.floor((Date.now() - new Date(ongoing.started_at).getTime()) / 1000)
-              const remaining = Math.max(0, ongoing.time_left - elapsed)
-              setTimeLeft(remaining)
-            } else {
-              setTimeLeft(ongoing.time_left)
-            }
-          } else {
-            // Get all questions and select random ones
-            const { data: questionsData, error: questionsError } = await supabase
-              .from("test_questions")
-              .select("*")
-              .eq("is_active", true)
+            // Check availability time window
+            const now = new Date()
+            const availableFrom = assignedExam.available_from ? new Date(assignedExam.available_from) : null
+            const availableUntil = assignedExam.available_until ? new Date(assignedExam.available_until) : null
 
-            if (questionsError) {
-              console.error("Error fetching questions:", questionsError)
+            if ((availableFrom && now < availableFrom) || (availableUntil && now > availableUntil)) {
+              alert("This exam is not currently available. Please check the availability time window.")
+              router.push("/dashboard")
               return
             }
 
-            const randomQuestions = getRandomQuestions(questionsData || [], 30)
-            setQuestions(randomQuestions)
+            // Check for ongoing test
+            const { data: ongoing, error: ongoingError } = await supabase
+              .from("ongoing_tests")
+              .select("*")
+              .eq("user_id", paidUserId)
+              .single()
+
+            if (!ongoingError && ongoing) {
+              // Load ongoing test
+              setOngoingTest(ongoing)
+              setQuestions(ongoing.questions_data)
+              setAnswers(ongoing.answers_data)
+              setCurrentQuestion(ongoing.current_question)
+              setTestStarted(ongoing.test_started)
+
+              // Calculate remaining time
+              if (ongoing.test_started) {
+                const elapsed = Math.floor((Date.now() - new Date(ongoing.started_at).getTime()) / 1000)
+                const remaining = Math.max(0, ongoing.time_left - elapsed)
+                setTimeLeft(remaining)
+              } else {
+                setTimeLeft(ongoing.time_left)
+              }
+            } else {
+              // Load questions from assigned exam
+              const { data: questionsData, error: questionsError } = await supabase
+                .from("test_questions")
+                .select("*")
+                .in("id", examConfig.questions)
+
+              if (questionsError) {
+                console.error("Error fetching assigned questions:", questionsError)
+                return
+              }
+
+              setQuestions(questionsData || [])
+              setTimeLeft(examConfig.time_limit)
+            }
+          } else {
+            // Fallback to random questions if no assigned exam
+            // Check for ongoing test
+            const { data: ongoing, error: ongoingError } = await supabase
+              .from("ongoing_tests")
+              .select("*")
+              .eq("user_id", paidUserId)
+              .single()
+
+            if (!ongoingError && ongoing) {
+              // Load ongoing test
+              setOngoingTest(ongoing)
+              setQuestions(ongoing.questions_data)
+              setAnswers(ongoing.answers_data)
+              setCurrentQuestion(ongoing.current_question)
+              setTestStarted(ongoing.test_started)
+
+              // Calculate remaining time
+              if (ongoing.test_started) {
+                const elapsed = Math.floor((Date.now() - new Date(ongoing.started_at).getTime()) / 1000)
+                const remaining = Math.max(0, ongoing.time_left - elapsed)
+                setTimeLeft(remaining)
+              } else {
+                setTimeLeft(ongoing.time_left)
+              }
+            } else {
+              // Get all questions and select random ones
+              const { data: questionsData, error: questionsError } = await supabase
+                .from("test_questions")
+                .select("*")
+                .eq("is_active", true)
+
+              if (questionsError) {
+                console.error("Error fetching questions:", questionsError)
+                return
+              }
+
+              const randomQuestions = getRandomQuestions(questionsData || [], 30)
+              setQuestions(randomQuestions)
+            }
           }
           setIsLoading(false)
           return
@@ -242,49 +309,147 @@ export default function DashboardTestPage() {
         return
       }
 
-      // Check for ongoing test
-      const { data: ongoing, error: ongoingError } = await supabase
-        .from("ongoing_tests")
-        .select("*")
+      // Check for assigned exam first
+      const { data: assignedExam, error: examError } = await supabase
+        .from("user_exams")
+        .select(`
+          *,
+          exam_configurations (*)
+        `)
         .eq("user_id", authUser.id)
+        .eq("is_completed", false)
         .single()
 
-      if (!ongoingError && ongoing) {
-        // Load ongoing test
-        setOngoingTest(ongoing)
-        setQuestions(ongoing.questions_data)
-        setAnswers(ongoing.answers_data)
-        setCurrentQuestion(ongoing.current_question)
-        setTestStarted(ongoing.test_started)
+      if (!examError && assignedExam && assignedExam.exam_configurations) {
+        const examConfig = assignedExam.exam_configurations
 
-        // Calculate remaining time
-        if (ongoing.test_started) {
-          const elapsed = Math.floor((Date.now() - new Date(ongoing.started_at).getTime()) / 1000)
-          const remaining = Math.max(0, ongoing.time_left - elapsed)
-          setTimeLeft(remaining)
-        } else {
-          setTimeLeft(ongoing.time_left)
-        }
-      } else {
-        // Get all questions and select random ones
-        const { data: questionsData, error: questionsError } = await supabase
-          .from("test_questions")
-          .select("*")
-          .eq("is_active", true)
+        // Check availability time window
+        const now = new Date()
+        const availableFrom = assignedExam.available_from ? new Date(assignedExam.available_from) : null
+        const availableUntil = assignedExam.available_until ? new Date(assignedExam.available_until) : null
 
-        if (questionsError) {
-          console.error("Error fetching questions:", questionsError)
+        if ((availableFrom && now < availableFrom) || (availableUntil && now > availableUntil)) {
+          alert("This exam is not currently available. Please check the availability time window.")
+          router.push("/dashboard")
           return
         }
 
-        const randomQuestions = getRandomQuestions(questionsData || [], 30)
-        setQuestions(randomQuestions)
+        // Check for ongoing test
+        const { data: ongoing, error: ongoingError } = await supabase
+          .from("ongoing_tests")
+          .select("*")
+          .eq("user_id", authUser.id)
+          .single()
+
+        if (!ongoingError && ongoing) {
+          // Load ongoing test
+          setOngoingTest(ongoing)
+          setQuestions(ongoing.questions_data)
+          setAnswers(ongoing.answers_data)
+          setCurrentQuestion(ongoing.current_question)
+          setTestStarted(ongoing.test_started)
+
+          // Calculate remaining time
+          if (ongoing.test_started) {
+            const elapsed = Math.floor((Date.now() - new Date(ongoing.started_at).getTime()) / 1000)
+            const remaining = Math.max(0, ongoing.time_left - elapsed)
+            setTimeLeft(remaining)
+          } else {
+            setTimeLeft(ongoing.time_left)
+          }
+        } else {
+          // Load questions from assigned exam
+          const { data: questionsData, error: questionsError } = await supabase
+            .from("test_questions")
+            .select("*")
+            .in("id", examConfig.questions)
+
+          if (questionsError) {
+            console.error("Error fetching assigned questions:", questionsError)
+            return
+          }
+
+          setQuestions(questionsData || [])
+          setTimeLeft(examConfig.time_limit)
+        }
+      } else {
+        // Fallback to random questions if no assigned exam
+        // Check for ongoing test
+        const { data: ongoing, error: ongoingError } = await supabase
+          .from("ongoing_tests")
+          .select("*")
+          .eq("user_id", authUser.id)
+          .single()
+
+        if (!ongoingError && ongoing) {
+          // Load ongoing test
+          setOngoingTest(ongoing)
+          setQuestions(ongoing.questions_data)
+          setAnswers(ongoing.answers_data)
+          setCurrentQuestion(ongoing.current_question)
+          setTestStarted(ongoing.test_started)
+
+          // Calculate remaining time
+          if (ongoing.test_started) {
+            const elapsed = Math.floor((Date.now() - new Date(ongoing.started_at).getTime()) / 1000)
+            const remaining = Math.max(0, ongoing.time_left - elapsed)
+            setTimeLeft(remaining)
+          } else {
+            setTimeLeft(ongoing.time_left)
+          }
+        } else {
+          // Get all questions and select random ones
+          const { data: questionsData, error: questionsError } = await supabase
+            .from("test_questions")
+            .select("*")
+            .eq("is_active", true)
+
+          if (questionsError) {
+            console.error("Error fetching questions:", questionsError)
+            return
+          }
+
+          const randomQuestions = getRandomQuestions(questionsData || [], 30)
+          setQuestions(randomQuestions)
+        }
       }
       setIsLoading(false)
     }
 
     getUserAndQuestions()
   }, [supabase, router])
+
+  // Load test info after questions are loaded
+  useEffect(() => {
+    const loadTestInfo = async () => {
+      if (!user || questions.length === 0) return
+
+      const userId = localStorage.getItem("paid-user-id") || user.id
+      const { data: assignedExam, error: examError } = await supabase
+        .from("user_exams")
+        .select(`
+          *,
+          exam_configurations (*)
+        `)
+        .eq("user_id", userId)
+        .eq("is_completed", false)
+        .single()
+
+      let passingScore = 70 // default
+      let timeLimit = 60 // default
+      let isAssignedExam = false
+
+      if (!examError && assignedExam && assignedExam.exam_configurations) {
+        passingScore = assignedExam.exam_configurations.passing_score
+        timeLimit = Math.floor(assignedExam.exam_configurations.time_limit / 60)
+        isAssignedExam = true
+      }
+
+      setTestInfo({ passingScore, timeLimit, isAssignedExam })
+    }
+
+    loadTestInfo()
+  }, [user, questions.length, supabase])
 
   // Timer effect
   useEffect(() => {
@@ -351,32 +516,72 @@ export default function DashboardTestPage() {
 
       correctAnswers = answersData.filter((a) => a.is_correct).length
 
+      // Calculate score with safeguards
+      const rawScore = (correctAnswers / questions.length) * 100
+      const score = Math.min(100, Math.max(0, Math.round(rawScore)))
+      const passed = score >= 70 // 70% passing score
+
       // Debug logging
       console.log("Test Results:", {
         totalQuestions: questions.length,
         answersProvided: Object.keys(answers).length,
         correctAnswers,
-        score: Math.round((correctAnswers / questions.length) * 100),
-        passed: Math.round((correctAnswers / questions.length) * 100) >= 70,
+        rawScore,
+        finalScore: score,
+        passed,
         sampleAnswers: answersData.slice(0, 3)
       })
-      const score = Math.round((correctAnswers / questions.length) * 100)
-      const passed = score >= 70 // 70% passing score
+
+      // Check if this is an assigned exam
+      const userId = localStorage.getItem("paid-user-id") || user.id
+      const { data: assignedExam, error: examError } = await supabase
+        .from("user_exams")
+        .select(`
+          *,
+          exam_configurations (*)
+        `)
+        .eq("user_id", userId)
+        .eq("is_completed", false)
+        .single()
+
+      let passingScore = 70 // default
+      if (!examError && assignedExam && assignedExam.exam_configurations) {
+        passingScore = assignedExam.exam_configurations.passing_score
+      }
+
+      const finalPassed = score >= passingScore
 
       // Save test attempt
       const { error: attemptError } = await supabase.from("test_attempts").insert({
-        user_id: user.id,
+        user_id: userId,
         questions_data: questionsData,
         answers_data: answersData,
         score: score,
         total_questions: questions.length,
-        passed: passed,
+        passed: finalPassed,
       })
 
       if (attemptError) throw attemptError
 
+      // Update assigned exam if exists
+      if (!examError && assignedExam) {
+        const { error: updateExamError } = await supabase
+          .from("user_exams")
+          .update({
+            is_completed: true,
+            completed_at: new Date().toISOString(),
+            score: score,
+            passed: finalPassed,
+          })
+          .eq("id", assignedExam.id)
+
+        if (updateExamError) {
+          console.error("Error updating assigned exam:", updateExamError)
+        }
+      }
+
       // Update profile
-      const certificateAvailableAt = passed ? new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString() : null
+      const certificateAvailableAt = finalPassed ? new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString() : null
       const { error: profileError } = await supabase
         .from("profiles")
         .update({
@@ -385,7 +590,7 @@ export default function DashboardTestPage() {
           certificate_issued: false, // Will be issued after 48 hours
           certificate_available_at: certificateAvailableAt,
         })
-        .eq("id", user.id)
+        .eq("id", userId)
 
       if (profileError) throw profileError
 
@@ -401,10 +606,10 @@ export default function DashboardTestPage() {
         "test-results",
         JSON.stringify({
           score,
-          passed,
+          passed: finalPassed,
           correctAnswers,
           totalQuestions: questions.length,
-          userId: user.id,
+          userId: userId,
         }),
       )
       localStorage.removeItem("paid-user-id")
@@ -469,12 +674,12 @@ export default function DashboardTestPage() {
                           <strong>Total Questions:</strong> {questions.length}
                         </p>
                         <p>
-                          <strong>Time Limit:</strong> 60 minutes
+                          <strong>Time Limit:</strong> {testInfo.timeLimit} minutes
                         </p>
                       </div>
                       <div>
                         <p>
-                          <strong>Passing Score:</strong> 70%
+                          <strong>Passing Score:</strong> {testInfo.passingScore}%
                         </p>
                         <p>
                           <strong>Format:</strong> Multiple Choice
@@ -486,8 +691,10 @@ export default function DashboardTestPage() {
                   <Alert>
                     <AlertCircle className="h-4 w-4" />
                     <AlertDescription>
-                      <strong>Important:</strong> You will receive 30 randomly selected questions from our question bank.
-                      Once you start the test, the timer will begin and you cannot pause. Make sure you have a stable
+                      <strong>Important:</strong> {testInfo.isAssignedExam
+                        ? "You have been assigned a specific exam configuration."
+                        : "You will receive randomly selected questions from our question bank."
+                      } Once you start the test, the timer will begin and you cannot pause. Make sure you have a stable
                       internet connection and sufficient time to complete the assessment.
                     </AlertDescription>
                   </Alert>

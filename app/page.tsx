@@ -5,12 +5,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Shield, Award, Users, BookOpen, ArrowRight, CreditCard } from "lucide-react"
 import Link from "next/link"
 import { AdminSetupNotice } from "@/components/admin-setup-notice"
+import { UserAdvertisement } from "@/components/user-advertisement"
 
 export default function HomePage() {
   return (
     <div className="min-h-screen flex flex-col">
       <Navigation />
       <AdminSetupNotice />
+      <UserAdvertisement />
 
       <main className="flex-1">
         {/* Hero Section */}
@@ -77,15 +79,22 @@ export default function HomePage() {
           <div className="absolute inset-0 bg-gradient-to-r from-primary/5 to-accent/5"></div>
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
             <div className="text-center space-y-8">
+              <div className="flex justify-center mb-6">
+                <img
+                  src="/Global-Security-Practitioners-Alliance.png"
+                  alt="GSPA Logo"
+                  className="h-24 w-auto"
+                />
+              </div>
               <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-6 py-3 rounded-full text-sm font-semibold shadow-lg">
                 <Shield className="h-5 w-5" />
                 Global Accreditation
               </div>
               <div className="space-y-6">
-                <h2 className="text-3xl lg:text-5xl font-bold text-balance">
+                <h2 className="text-3xl lg:text-5xl font-bold text-balance px-4">
                   Get Accredited Globally – Take the Security Aptitude Exam
                 </h2>
-                <p className="text-xl text-muted-foreground text-pretty max-w-4xl mx-auto leading-relaxed">
+                <p className="text-lg lg:text-xl text-muted-foreground text-pretty max-w-3xl mx-auto leading-relaxed px-4">
                   Join thousands of professionals worldwide who have earned their GSPA certification. Demonstrate your security expertise and stand out in the industry.
                 </p>
               </div>
@@ -348,15 +357,22 @@ export default function HomePage() {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
               <div className="space-y-8">
+                <div className="flex justify-center lg:justify-start mb-6">
+                  <img
+                    src="/Global-Security-Practitioners-Alliance.png"
+                    alt="GSPA Logo"
+                    className="h-24 w-auto brightness-0 invert"
+                  />
+                </div>
                 <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm text-white px-4 py-2 rounded-full text-sm font-medium border border-white/20">
                   <Award className="h-4 w-4" />
                   Start Your Journey
                 </div>
                 <div className="space-y-6">
-                  <h2 className="text-4xl lg:text-6xl font-bold text-balance leading-tight">
+                  <h2 className="text-3xl lg:text-5xl font-bold text-balance leading-tight px-4">
                     Ready to Advance Your Security Career?
                   </h2>
-                  <p className="text-xl opacity-90 text-pretty leading-relaxed max-w-lg">
+                  <p className="text-lg lg:text-xl opacity-90 text-pretty leading-relaxed max-w-2xl px-4">
                     Join the global community of certified security professionals and take your career to the next level.
                   </p>
                 </div>
@@ -376,8 +392,8 @@ export default function HomePage() {
                         <Award className="relative h-24 w-24 text-white mx-auto" />
                       </div>
                       <div className="space-y-2">
-                        <p className="text-white font-bold text-xl">Your Certification Awaits</p>
-                        <p className="text-white/80 text-lg">Join the elite ranks of certified security professionals</p>
+                        <p className="text-white font-bold text-xl px-2">Your Certification Awaits</p>
+                        <p className="text-white/80 text-base lg:text-lg px-2">Join the elite ranks of certified security professionals</p>
                       </div>
                     </div>
                   </div>

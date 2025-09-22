@@ -38,39 +38,86 @@ export default function RegisterStep4() {
       console.log("[v0] Starting registration process")
       console.log("[v0] Registration data:", allData)
 
-      // Check if user is already authenticated
-      const { data: { user: currentUser } } = await supabase.auth.getUser()
-
-      let userId: string
-
-      if (currentUser) {
-        // User is already authenticated, use existing user ID
-        userId = currentUser.id
-        console.log("[v0] Using existing auth user ID:", userId)
-      } else {
-        // Create new auth user
-        const { data: authData, error: authError } = await supabase.auth.signUp({
-          email: allData.email,
-          password: allData.password,
-          options: {
-            data: {
-              first_name: allData.firstName,
-              last_name: allData.lastName,
-            }
+      // Create new auth user first
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: allData.email,
+        password: allData.password,
+        options: {
+          data: {
+            first_name: allData.firstName,
+            last_name: allData.lastName,
           }
-        })
-
-        if (authError) {
-          console.error("[v0] Auth signup error:", authError)
-          throw new Error(`Failed to create account: ${authError.message}`)
         }
+      })
 
-        if (!authData.user) {
-          throw new Error("Failed to create user account")
+      if (authError) {
+        console.error("[v0] Auth signup error:", authError)
+        throw new Error(`Failed to create account: ${authError.message}`)
+      }
+
+      if (!authData.user) {
+        throw new Error("Failed to create user account")
+      }
+
+      const userId = authData.user.id
+      console.log("[v0] Created auth user ID:", userId)
+
+      // Upload documents now that user is authenticated
+      let passportPhotoUrl = null
+      let signatureUrl = null
+
+      // Upload passport photo
+      const tempPhoto = localStorage.getItem("temp-passport-photo")
+      if (tempPhoto) {
+        try {
+          // Convert base64 to blob
+          const photoBlob = await fetch(tempPhoto).then(res => res.blob())
+          const photoFile = new File([photoBlob], `passport-${userId}.jpg`, { type: "image/jpeg" })
+
+          const fileName = `passports/${photoFile.name}`
+          const { data: uploadData, error: uploadError } = await supabase.storage
+            .from("documents")
+            .upload(fileName, photoFile)
+
+          if (uploadError) {
+            console.error("Photo upload error:", uploadError)
+            // Don't throw error, continue without photo
+          } else {
+            const { data: { publicUrl } } = supabase.storage
+              .from("documents")
+              .getPublicUrl(fileName)
+            passportPhotoUrl = publicUrl
+          }
+        } catch (photoError) {
+          console.error("Photo processing error:", photoError)
         }
+      }
 
-        userId = authData.user.id
-        console.log("[v0] Created auth user ID:", userId)
+      // Upload signature
+      const tempSignature = localStorage.getItem("temp-signature")
+      if (tempSignature) {
+        try {
+          // Convert base64 to blob
+          const signatureBlob = await fetch(tempSignature).then(res => res.blob())
+          const signatureFile = new File([signatureBlob], `signature-${userId}.png`, { type: "image/png" })
+
+          const fileName = `signatures/${signatureFile.name}`
+          const { data: uploadData, error: uploadError } = await supabase.storage
+            .from("documents")
+            .upload(fileName, signatureFile)
+
+          if (uploadError) {
+            console.error("Signature upload error:", uploadError)
+            // Don't throw error, continue without signature
+          } else {
+            const { data: { publicUrl } } = supabase.storage
+              .from("documents")
+              .getPublicUrl(fileName)
+            signatureUrl = publicUrl
+          }
+        } catch (sigError) {
+          console.error("Signature processing error:", sigError)
+        }
       }
 
       // Insert profile data in Supabase
@@ -88,8 +135,8 @@ export default function RegisterStep4() {
         document_type: allData.documentType,
         document_number: allData.documentNumber,
         declaration_accepted: allData.declarationAccepted || false,
-        passport_photo_url: allData.passportPhotoUrl || null,
-        signature_data: allData.signatureData || null,
+        passport_photo_url: passportPhotoUrl || null,
+        signature_data: signatureUrl || null,
         membership_fee_paid: false,
         payment_status: "pending",
         test_completed: false,
@@ -120,6 +167,8 @@ export default function RegisterStep4() {
       localStorage.removeItem("registration-step-1")
       localStorage.removeItem("registration-step-2")
       localStorage.removeItem("registration-step-3")
+      localStorage.removeItem("temp-passport-photo")
+      localStorage.removeItem("temp-signature")
 
       setSubmitSuccess(true)
 
@@ -160,6 +209,25 @@ export default function RegisterStep4() {
     )
   }
 
+  if (isSubmitting) {
+    return (
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center">
+        <div className="bg-white rounded-lg p-8 shadow-2xl max-w-sm w-full mx-4">
+          <div className="text-center space-y-4">
+            <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto" />
+            <h3 className="text-xl font-semibold text-gray-900">Submitting Registration</h3>
+            <p className="text-gray-600">
+              Please wait while we process your information and create your account...
+            </p>
+            <div className="w-full bg-gray-200 rounded-full h-2">
+              <div className="bg-primary h-2 rounded-full animate-pulse" style={{ width: '60%' }}></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       <RegistrationProgress currentStep={4} totalSteps={4} stepTitles={stepTitles} />
@@ -168,8 +236,8 @@ export default function RegisterStep4() {
         <div className="max-w-2xl mx-auto">
           <Card>
             <CardHeader className="text-center">
-              <CardTitle className="text-2xl font-bold text-gray-900">Review Your Information</CardTitle>
-              <CardDescription>Please review all details before submitting</CardDescription>
+              <CardTitle className="text-xl md:text-2xl font-bold text-gray-900">Review Your Information</CardTitle>
+              <CardDescription className="text-sm md:text-base">Please review all details before submitting</CardDescription>
             </CardHeader>
 
             <CardContent className="space-y-6">
@@ -181,8 +249,8 @@ export default function RegisterStep4() {
 
               {/* Personal Information */}
               <div className="bg-blue-50 rounded-lg p-4">
-                <h3 className="font-semibold text-blue-900 mb-3">Personal Information</h3>
-                <div className="grid grid-cols-2 gap-4 text-sm">
+                <h3 className="font-semibold text-blue-900 mb-3 text-sm md:text-base">Personal Information</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs md:text-sm">
                   <div>
                     <span className="font-medium">Name:</span> {allData.firstName} {allData.lastName}
                   </div>
@@ -209,8 +277,8 @@ export default function RegisterStep4() {
 
               {/* Professional Information */}
               <div className="bg-green-50 rounded-lg p-4">
-                <h3 className="font-semibold text-green-900 mb-3">Professional Information</h3>
-                <div className="grid grid-cols-1 gap-2 text-sm">
+                <h3 className="font-semibold text-green-900 mb-3 text-sm md:text-base">Professional Information</h3>
+                <div className="grid grid-cols-1 gap-2 text-xs md:text-sm">
                   <div>
                     <span className="font-medium">Designation:</span> {allData.designation}
                   </div>
@@ -222,8 +290,8 @@ export default function RegisterStep4() {
 
               {/* Document Information */}
               <div className="bg-amber-50 rounded-lg p-4">
-                <h3 className="font-semibold text-amber-900 mb-3">Document Information</h3>
-                <div className="grid grid-cols-1 gap-2 text-sm">
+                <h3 className="font-semibold text-amber-900 mb-3 text-sm md:text-base">Document Information</h3>
+                <div className="grid grid-cols-1 gap-2 text-xs md:text-sm">
                   <div>
                     <span className="font-medium">Document Type:</span> {allData.documentType}
                   </div>
@@ -247,11 +315,11 @@ export default function RegisterStep4() {
                 </div>
               </div>
 
-              <div className="flex justify-between pt-6">
-                <Button type="button" variant="outline" onClick={goBack}>
+              <div className="flex flex-col sm:flex-row justify-between gap-4 pt-6">
+                <Button type="button" variant="outline" onClick={goBack} className="px-6 md:px-8">
                   Previous
                 </Button>
-                <Button onClick={handleSubmit} disabled={isSubmitting}>
+                <Button onClick={handleSubmit} disabled={isSubmitting} className="px-6 md:px-8">
                   {isSubmitting ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />

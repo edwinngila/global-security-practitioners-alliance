@@ -105,17 +105,22 @@ export default function LoginPage() {
       if (authData.user?.email === "admin@gmail.com") {
         router.push("/admin")
       } else {
-        // Check if user has completed registration
-        const { data: userProfile } = await supabase
-          .from("users")
-          .select("registration_completed")
+        // Check if user has completed registration by checking profiles table
+        const { data: userProfile, error: profileError } = await supabase
+          .from("profiles")
+          .select("id, membership_fee_paid")
           .eq("id", authData.user.id)
           .single()
 
-        if (userProfile?.registration_completed) {
+        if (profileError || !userProfile) {
+          // No profile found, redirect to continue registration
+          router.push("/register/step-1")
+        } else if (userProfile.membership_fee_paid) {
+          // Registration completed and payment made, go to dashboard
           router.push("/dashboard")
         } else {
-          router.push("/register/step-2") // Continue registration
+          // Profile exists but payment not made, go to payment
+          router.push("/payment")
         }
       }
     } catch (error: any) {
@@ -143,7 +148,11 @@ export default function LoginPage() {
                 <div className="relative">
                   <div className="absolute -inset-4 bg-gradient-to-r from-primary/20 to-accent/20 rounded-2xl blur-lg"></div>
                   <div className="relative bg-background border border-border/50 rounded-2xl p-4 shadow-xl">
-                    <Shield className="h-16 w-16 text-primary" />
+                    <img
+                      src="/Global-Security-Practitioners-Alliance.png"
+                      alt="GSPA Logo"
+                      className="h-20 w-auto"
+                    />
                   </div>
                 </div>
               </div>

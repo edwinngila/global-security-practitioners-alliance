@@ -173,7 +173,7 @@ export function DashboardSidebar({ isAdmin, userName, userEmail }: DashboardSide
                 <Button
                   variant={isActive ? "secondary" : "ghost"}
                   className={cn(
-                    "w-full justify-start h-10 text-[var(--sidebar-foreground)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]",
+                    "w-full mt-2 justify-start h-10 text-[var(--sidebar-foreground)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]",
                     collapsed ? "px-2" : "px-3",
                     isActive && "bg-[var(--sidebar-primary)] text-[var(--sidebar-primary-foreground)]"
                   )}

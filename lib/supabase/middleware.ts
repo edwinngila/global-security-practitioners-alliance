@@ -37,11 +37,46 @@ export async function updateSession(request: NextRequest) {
       data: { user },
     } = await supabase.auth.getUser()
 
+    // Redirect unauthenticated users away from protected pages
     if (request.nextUrl.pathname.startsWith("/dashboard") || request.nextUrl.pathname.startsWith("/admin")) {
       if (!user) {
         const url = request.nextUrl.clone()
         url.pathname = "/auth/login"
         return NextResponse.redirect(url)
+      }
+    }
+
+    // Redirect authenticated users away from auth pages
+    if (request.nextUrl.pathname.startsWith("/auth/") && user) {
+      // Check user role and redirect accordingly
+      if (user.email === "admin@gmail.com") {
+        const url = request.nextUrl.clone()
+        url.pathname = "/admin"
+        return NextResponse.redirect(url)
+      } else {
+        // For regular users, check if they have completed registration
+        try {
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("membership_fee_paid")
+            .eq("id", user.id)
+            .single()
+
+          const url = request.nextUrl.clone()
+          if (!profile) {
+            url.pathname = "/register/step-1"
+          } else if (!profile.membership_fee_paid) {
+            url.pathname = "/payment"
+          } else {
+            url.pathname = "/dashboard"
+          }
+          return NextResponse.redirect(url)
+        } catch (error) {
+          // If profile check fails, redirect to dashboard as fallback
+          const url = request.nextUrl.clone()
+          url.pathname = "/dashboard"
+          return NextResponse.redirect(url)
+        }
       }
     }
   } catch (error) {

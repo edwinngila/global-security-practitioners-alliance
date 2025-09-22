@@ -80,13 +80,13 @@ export default function RegisterStep1() {
       <div className="py-12 px-4">
         <div className="max-w-2xl mx-auto">
           <Card className="shadow-lg">
-            <CardHeader className="text-center pb-8">
-              <CardTitle className="text-3xl font-bold">Personal Information</CardTitle>
-              <CardDescription className="text-lg">Let's start with your basic details</CardDescription>
+            <CardHeader className="text-center pb-6 md:pb-8">
+              <CardTitle className="text-2xl md:text-3xl font-bold">Personal Information</CardTitle>
+              <CardDescription className="text-base md:text-lg">Let's start with your basic details</CardDescription>
             </CardHeader>
 
             <CardContent className="pt-0">
-              <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
+              <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 md:space-y-8">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-3">
                     <Label htmlFor="firstName" className="text-sm font-medium">First Name *</Label>
@@ -204,7 +204,7 @@ export default function RegisterStep1() {
                 <Button
                   type="submit"
                   disabled={isLoading}
-                  className="w-full h-12 text-base font-medium flex items-center justify-center gap-2"
+                  className="w-full h-12 text-sm md:text-base font-medium flex items-center justify-center gap-2"
                 >
                   {isLoading ? (
                     <>

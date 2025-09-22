@@ -27,6 +27,7 @@ interface UserProfile {
   test_completed: boolean
   certificate_issued: boolean
   certificate_available_at: string | null
+  signature_data: string | null
   created_at: string
 }
 
@@ -92,10 +93,13 @@ export default function DashboardResultsPage() {
         .single()
 
       if (attempt) {
+        const correctAnswers = attempt.answers_data.filter((a: any) => a.is_correct).length
+        const calculatedScore = Math.min(100, Math.max(0, Math.round((correctAnswers / attempt.total_questions) * 100)))
+
         setResults({
-          score: attempt.score,
+          score: calculatedScore,
           passed: attempt.passed,
-          correctAnswers: attempt.answers_data.filter((a: any) => a.is_correct).length,
+          correctAnswers: correctAnswers,
           totalQuestions: attempt.total_questions,
           userId: authUser.id,
         })
@@ -157,149 +161,155 @@ export default function DashboardResultsPage() {
     const { default: jsPDF } = await import("jspdf")
     const { default: html2canvas } = await import("html2canvas")
 
+    // Get certificate template (for now using default, later can be configurable)
+    const { data: template } = await supabase
+      .from("certificate_templates")
+      .select("*")
+      .eq("is_active", true)
+      .single()
+
+    const certificateTemplate = template || {
+      organization_name: 'Global Security Practitioners Alliance',
+      certificate_title: 'Certificate of Excellence',
+      certificate_subtitle: 'Professional Security Certification',
+      main_title: 'Certificate of Excellence',
+      recipient_title: 'This certifies that',
+      achievement_description: 'has demonstrated exceptional mastery and professional excellence in the field of Cybersecurity and Risk Management, successfully completing the comprehensive Security Aptitude Assessment with distinction. This achievement represents a commitment to the highest standards of professional competency in security protocols, threat analysis, compliance frameworks, and emergency response procedures.',
+      date_label: 'Date of Achievement',
+      score_label: 'Excellence Score',
+      certificate_id_label: 'Certification ID',
+      signature_name: 'Dr. Alexandra Sterling',
+      signature_title: 'Director of Professional Certification',
+      signature_organization: 'Global Security Institute',
+      background_color: '#fefefe',
+      primary_color: '#1a2332',
+      accent_color: '#c9aa68',
+      font_family: 'Cormorant Garamond, Times New Roman, serif',
+      watermark_text: 'CERTIFIED'
+    }
+
     const certificateHTML = `
       <div style="
         width: 1400px;
         height: 1000px;
-        background: linear-gradient(135deg, #fefefe 0%, #f8f9fb 50%, #ffffff 100%);
-        border: none;
+        background: linear-gradient(135deg, ${certificateTemplate.background_color} 0%, #f8fafc 50%, #ffffff 100%);
+        border: 20px solid #1e40af;
         border-radius: 0;
         padding: 0;
-        box-shadow: none;
+        box-shadow: 0 25px 50px rgba(0,0,0,0.15);
         text-align: center;
         position: relative;
         overflow: hidden;
-        font-family: 'Cormorant Garamond', 'Times New Roman', serif;
+        font-family: ${certificateTemplate.font_family};
         margin: 0 auto;
       ">
-        <!-- Elegant border frame -->
+        <!-- Logo at the top -->
+        <div style="
+          position: absolute;
+          top: 60px;
+          left: 50%;
+          transform: translateX(-50%);
+          z-index: 20;
+        ">
+          <img src="/Global-Security-Practitioners-Alliance.png" alt="GSPA Logo" style="height: 100px; width: auto;" />
+        </div>
+
+        <!-- Decorative border -->
         <div style="
           position: absolute;
           top: 40px;
           left: 40px;
           right: 40px;
           bottom: 40px;
-          border: 8px solid #1a2332;
-          border-radius: 12px;
+          border: 4px solid #d97706;
+          border-radius: 0;
+          pointer-events: none;
+        "></div>
+
+        <!-- Decorative corner circles -->
+        <div style="
+          position: absolute;
+          top: 60px;
+          left: 60px;
+          width: 80px;
+          height: 80px;
+          border: 6px solid #eab308;
+          border-radius: 50%;
+          opacity: 0.3;
         "></div>
 
         <div style="
           position: absolute;
           top: 60px;
-          left: 60px;
           right: 60px;
+          width: 80px;
+          height: 80px;
+          border: 6px solid #1e40af;
+          border-radius: 50%;
+          opacity: 0.3;
+        "></div>
+
+        <div style="
+          position: absolute;
           bottom: 60px;
-          border: 2px solid #c9aa68;
-          border-radius: 8px;
-        "></div>
-
-        <!-- Decorative corner flourishes -->
-        <div style="
-          position: absolute;
-          top: 80px;
-          left: 80px;
-          width: 120px;
-          height: 120px;
-          background: radial-gradient(circle, #c9aa68 0%, transparent 70%);
-          opacity: 0.3;
+          left: 60px;
+          width: 80px;
+          height: 80px;
+          border: 6px solid #eab308;
           border-radius: 50%;
+          opacity: 0.3;
         "></div>
 
         <div style="
           position: absolute;
-          top: 80px;
-          right: 80px;
-          width: 120px;
-          height: 120px;
-          background: radial-gradient(circle, #c9aa68 0%, transparent 70%);
-          opacity: 0.3;
+          bottom: 60px;
+          right: 60px;
+          width: 80px;
+          height: 80px;
+          border: 6px solid #1e40af;
           border-radius: 50%;
-        "></div>
-
-        <div style="
-          position: absolute;
-          bottom: 80px;
-          left: 80px;
-          width: 120px;
-          height: 120px;
-          background: radial-gradient(circle, #c9aa68 0%, transparent 70%);
           opacity: 0.3;
-          border-radius: 50%;
-        "></div>
-
-        <div style="
-          position: absolute;
-          bottom: 80px;
-          right: 80px;
-          width: 120px;
-          height: 120px;
-          background: radial-gradient(circle, #c9aa68 0%, transparent 70%);
-          opacity: 0.3;
-          border-radius: 50%;
         "></div>
 
         <!-- Main content container -->
         <div style="
           position: relative;
           z-index: 10;
-          padding: 100px 120px;
+          padding: 140px 120px 100px;
           height: 100%;
           display: flex;
           flex-direction: column;
           justify-content: center;
         ">
 
-          <!-- Premium header with seal -->
+          <!-- Header -->
           <div style="margin-bottom: 60px;">
             <div style="
-              width: 140px;
-              height: 140px;
-              background: linear-gradient(135deg, #1a2332 0%, #2c3e50 100%);
-              border-radius: 50%;
-              margin: 0 auto 30px;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              color: #c9aa68;
-              font-size: 64px;
-              font-weight: 700;
-              box-shadow: 0 15px 40px rgba(26, 35, 50, 0.4);
-              border: 6px solid #c9aa68;
-              position: relative;
-            ">
-              <div style="
-                position: absolute;
-                inset: -3px;
-                border: 2px solid #1a2332;
-                border-radius: 50%;
-              "></div>
-              ⚡
-            </div>
+              font-size: 48px;
+              font-weight: 900;
+              color: #1e40af;
+              margin-bottom: 16px;
+              letter-spacing: 3px;
+              text-transform: uppercase;
+              text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            ">${certificateTemplate.organization_name}</div>
 
             <div style="
-              font-family: 'Playfair Display', serif;
-              font-size: 42px;
-              font-weight: 800;
-              color: #1a2332;
-              margin-bottom: 12px;
+              font-size: 32px;
+              font-weight: 700;
+              color: #d97706;
               letter-spacing: 2px;
               text-transform: uppercase;
-            ">GLOBAL SECURITY INSTITUTE</div>
+              margin-bottom: 20px;
+            ">${certificateTemplate.certificate_subtitle}</div>
 
             <div style="
-              font-size: 28px;
-              font-weight: 600;
-              color: #5a6c7d;
-              letter-spacing: 4px;
-              text-transform: uppercase;
-            ">PROFESSIONAL CERTIFICATION</div>
-
-            <div style="
-              width: 200px;
-              height: 4px;
-              background: linear-gradient(90deg, #c9aa68 0%, #d4af37 50%, #c9aa68 100%);
+              width: 300px;
+              height: 6px;
+              background: linear-gradient(90deg, #1e40af 0%, #eab308 50%, #d97706 100%);
               margin: 30px auto;
-              border-radius: 2px;
+              border-radius: 3px;
+              box-shadow: 0 2px 8px rgba(0,0,0,0.2);
             "></div>
           </div>
 
@@ -308,22 +318,23 @@ export default function DashboardResultsPage() {
             font-family: 'Playfair Display', serif;
             font-size: 72px;
             font-weight: 700;
-            color: #1a2332;
+            color: ${certificateTemplate.primary_color};
             margin-bottom: 50px;
             line-height: 1.1;
             text-shadow: 0 3px 6px rgba(0,0,0,0.1);
             font-style: italic;
-          ">Certificate of Excellence</h1>
+          ">${certificateTemplate.main_title}</h1>
 
           <!-- Certification text with premium styling -->
           <div style="margin-bottom: 55px;">
             <p style="
-              font-size: 26px;
+              font-size: 28px;
               color: #5a6c7d;
               margin-bottom: 25px;
-              font-weight: 500;
+              font-weight: 600;
               font-style: italic;
-            ">This certifies that</p>
+              text-align: center;
+            ">${certificateTemplate.recipient_title}</p>
 
             <div style="
               font-family: 'Playfair Display', serif;
@@ -351,25 +362,6 @@ export default function DashboardResultsPage() {
             </div>
           </div>
 
-          <!-- Achievement description with elegant formatting -->
-          <p style="
-            font-size: 24px;
-            color: #5a6c7d;
-            line-height: 1.8;
-            margin-bottom: 60px;
-            max-width: 900px;
-            margin-left: auto;
-            margin-right: auto;
-            font-weight: 400;
-            text-align: justify;
-            text-justify: inter-word;
-          ">
-            has demonstrated exceptional mastery and professional excellence in the field of
-            <strong style="color: #1a2332;">Cybersecurity and Risk Management</strong>, successfully completing
-            the comprehensive Security Aptitude Assessment with distinction. This achievement represents
-            a commitment to the highest standards of professional competency in security protocols,
-            threat analysis, compliance frameworks, and emergency response procedures.
-          </p>
 
           <!-- Premium bottom section with enhanced styling -->
           <div style="
@@ -402,7 +394,7 @@ export default function DashboardResultsPage() {
                 letter-spacing: 2px;
                 margin-bottom: 12px;
                 font-weight: 600;
-              ">Date of Achievement</div>
+              ">${certificateTemplate.date_label}</div>
               <div style="
                 font-family: 'Playfair Display', serif;
                 font-size: 22px;
@@ -424,7 +416,7 @@ export default function DashboardResultsPage() {
                 letter-spacing: 2px;
                 margin-bottom: 12px;
                 font-weight: 600;
-              ">Excellence Score</div>
+              ">${certificateTemplate.score_label}</div>
               <div style="
                 background: linear-gradient(135deg, #c9aa68 0%, #d4af37 50%, #c9aa68 100%);
                 color: #1a2332;
@@ -448,7 +440,7 @@ export default function DashboardResultsPage() {
                 letter-spacing: 2px;
                 margin-bottom: 12px;
                 font-weight: 600;
-              ">Certification ID</div>
+              ">${certificateTemplate.certificate_id_label}</div>
               <div style="
                 font-size: 20px;
                 font-weight: 700;
@@ -465,48 +457,112 @@ export default function DashboardResultsPage() {
           <!-- Signature section with enhanced elegance -->
           <div style="
             margin-top: 60px;
-            text-align: center;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            padding: 0 60px;
           ">
+            <!-- Signatures on the left -->
+            <div style="display: flex; gap: 80px; align-items: flex-end;">
+              <!-- Director's Signature -->
+              <div style="text-align: center;">
+                <div style="
+                  width: 300px;
+                  height: 3px;
+                  background: linear-gradient(90deg, transparent 0%, #1a2332 50%, transparent 100%);
+                  margin: 0 auto 15px;
+                "></div>
+                ${(certificateTemplate as any).director_signature ? `
+                <div style="margin-bottom: 15px;">
+                  <img src="${(certificateTemplate as any).director_signature}" alt="Director's Signature" style="height: 60px; width: auto; margin: 0 auto; display: block;" />
+                </div>
+                ` : ''}
+                <div style="
+                  font-family: 'Playfair Display', serif;
+                  font-size: 22px;
+                  font-weight: 600;
+                  color: ${certificateTemplate.primary_color};
+                  margin-bottom: 8px;
+                  font-style: italic;
+                ">${certificateTemplate.signature_name}</div>
+                <div style="
+                  font-size: 18px;
+                  color: #5a6c7d;
+                  font-weight: 500;
+                ">${certificateTemplate.signature_title}</div>
+                <div style="
+                  font-size: 16px;
+                  color: #8b7355;
+                  margin-top: 4px;
+                ">${certificateTemplate.signature_organization}</div>
+              </div>
+
+              <!-- User's Signature -->
+              ${user?.signature_data ? `
+              <div style="text-align: center;">
+                <div style="
+                  width: 200px;
+                  height: 2px;
+                  background: linear-gradient(90deg, transparent 0%, #666 50%, transparent 100%);
+                  margin: 0 auto 10px;
+                "></div>
+                <div style="margin-bottom: 10px;">
+                  <img src="${user.signature_data}" alt="Recipient's Signature" style="height: 40px; width: auto; margin: 0 auto; display: block;" />
+                </div>
+                <div style="
+                  font-size: 16px;
+                  color: #666;
+                  font-weight: 500;
+                  font-style: italic;
+                ">Recipient's Signature</div>
+                <div style="
+                  font-size: 14px;
+                  color: #888;
+                  margin-top: 2px;
+                ">${user.first_name} ${user.last_name}</div>
+              </div>
+              ` : ''}
+            </div>
+
+            <!-- Certificate Seal on the right -->
             <div style="
-              width: 300px;
-              height: 3px;
-              background: linear-gradient(90deg, transparent 0%, #1a2332 50%, transparent 100%);
-              margin: 0 auto 15px;
-            "></div>
-            <div style="
-              font-family: 'Playfair Display', serif;
-              font-size: 22px;
-              font-weight: 600;
-              color: #1a2332;
-              margin-bottom: 8px;
-              font-style: italic;
-            ">Dr. Alexandra Sterling</div>
-            <div style="
-              font-size: 18px;
-              color: #5a6c7d;
-              font-weight: 500;
-            ">Director of Professional Certification</div>
-            <div style="
-              font-size: 16px;
-              color: #8b7355;
-              margin-top: 4px;
-            ">Global Security Institute</div>
+              flex-shrink: 0;
+              margin-bottom: 20px;
+            ">
+              <svg width="140" height="140" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="60" cy="60" r="58" fill="#0d2340" stroke="#a37e37" strokeWidth="2" />
+                <circle cx="60" cy="60" r="50" fill="none" stroke="#a37e37" strokeWidth="1" strokeDasharray="2 2" />
+                <circle cx="60" cy="60" r="42" fill="#a37e37" />
+                <circle cx="60" cy="60" r="40" fill="#0d2340" />
+                <g fill="#a37e37">
+                  <polygon points="60,25 62,31 68,31 63,35 65,41 60,37 55,41 57,35 52,31 58,31" transform="translate(0, 5)" />
+                  <polygon points="60,25 62,31 68,31 63,35 65,41 60,37 55,41 57,35 52,31 58,31" transform="translate(0, 45) rotate(180 60 35)" />
+                  <polygon points="60,25 62,31 68,31 63,35 65,41 60,37 55,41 57,35 52,31 58,31" transform="translate(-25, 25) rotate(270 60 35)" />
+                  <polygon points="60,25 62,31 68,31 63,35 65,41 60,37 55,41 57,35 52,31 58,31" transform="translate(25, 25) rotate(90 60 35)" />
+                </g>
+                <text x="60" y="55" textAnchor="middle" fill="#a37e37" fontSize="11" fontWeight="bold" fontFamily="serif">GSPA</text>
+                <text x="60" y="70" textAnchor="middle" fill="#a37e37" fontSize="9" fontWeight="bold" fontFamily="serif">CERTIFIED</text>
+                <path d="M35 85 L45 80 L55 85 L45 90 Z" fill="#a37e37" />
+                <path d="M65 85 L75 80 L85 85 L75 90 Z" fill="#a37e37" />
+              </svg>
+            </div>
           </div>
         </div>
 
-        <!-- Subtle watermark -->
+        <!-- GSPA Certified Watermark -->
         <div style="
           position: absolute;
           top: 50%;
           left: 50%;
           transform: translate(-50%, -50%) rotate(-45deg);
           font-family: 'Playfair Display', serif;
-          font-size: 140px;
-          color: rgba(26, 35, 50, 0.02);
+          font-size: 120px;
+          color: rgba(30, 64, 175, 0.08);
           font-weight: 900;
           z-index: 1;
           pointer-events: none;
-        ">CERTIFIED</div>
+          letter-spacing: 8px;
+        ">GSPA CERTIFIED</div>
 
         <!-- Security pattern overlay -->
         <div style="
