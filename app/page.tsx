@@ -14,10 +14,8 @@ export default function HomePage() {
 
       <main className="flex-1">
         {/* Hero Section */}
-        <section className="relative py-24 lg:py-36 bg-gradient-to-br from-background via-background to-muted/30 overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-r from-primary/5 to-accent/5"></div>
-          <div className="absolute top-20 left-10 w-72 h-72 bg-primary/5 rounded-full blur-3xl"></div>
-          <div className="absolute bottom-20 right-10 w-96 h-96 bg-accent/5 rounded-full blur-3xl"></div>
+        <section className="relative py-24 lg:py-36 bg-gradient-to-br from-background to-muted/20 overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-r from-primary/3 to-accent/3"></div>
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
               <div className="text-center lg:text-left space-y-8">

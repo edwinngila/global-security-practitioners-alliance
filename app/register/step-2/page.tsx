@@ -135,7 +135,7 @@ export default function RegisterStep2() {
                     {...register("dateOfBirth", {
                       required: "Date of birth is required",
                     })}
-                    className={`h-12 ${errors.dateOfBirth ? "border-destructive" : ""}`}
+                    className={`h-12 bg-black/5 text-black ${errors.dateOfBirth ? "border-destructive" : ""}`}
                     max={new Date(new Date().setFullYear(new Date().getFullYear() - 18)).toISOString().split("T")[0]}
                   />
                   {errors.dateOfBirth && <p className="text-sm text-destructive">{errors.dateOfBirth.message}</p>}
@@ -150,7 +150,7 @@ export default function RegisterStep2() {
                       minLength: { value: 2, message: "Designation must be at least 2 characters" },
                     })}
                     placeholder="Security Manager"
-                    className={`h-12 ${errors.designation ? "border-destructive" : ""}`}
+                    className={`h-12 bg-black/5 text-black ${errors.designation ? "border-destructive" : ""}`}
                   />
                   {errors.designation && <p className="text-sm text-destructive">{errors.designation.message}</p>}
                 </div>
@@ -164,7 +164,7 @@ export default function RegisterStep2() {
                       minLength: { value: 2, message: "Organization must be at least 2 characters" },
                     })}
                     placeholder="ABC Corporation"
-                    className={`h-12 ${errors.organization ? "border-destructive" : ""}`}
+                    className={`h-12 bg-black/5 text-black ${errors.organization ? "border-destructive" : ""}`}
                   />
                   {errors.organization && <p className="text-sm text-destructive">{errors.organization.message}</p>}
                 </div>

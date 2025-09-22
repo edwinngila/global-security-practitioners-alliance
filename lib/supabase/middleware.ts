@@ -37,10 +37,7 @@ export async function updateSession(request: NextRequest) {
       data: { user },
     } = await supabase.auth.getUser()
 
-    if (
-      request.nextUrl.pathname.startsWith("/dashboard") ||
-      request.nextUrl.pathname.startsWith("/admin")
-    ) {
+    if (request.nextUrl.pathname.startsWith("/dashboard") || request.nextUrl.pathname.startsWith("/admin")) {
       if (!user) {
         const url = request.nextUrl.clone()
         url.pathname = "/auth/login"
@@ -51,5 +48,84 @@ export async function updateSession(request: NextRequest) {
     console.error("[v0] Error in middleware getUser:", error)
   }
 
-  return supabaseResponse
+  const response = supabaseResponse.clone()
+
+  // Security headers
+  const securityHeaders = {
+    // Prevent MIME type sniffing
+    "X-Content-Type-Options": "nosniff",
+
+    // Prevent clickjacking attacks
+    "X-Frame-Options": "DENY",
+
+    // Enable XSS protection
+    "X-XSS-Protection": "1; mode=block",
+
+    // Control referrer information
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+
+    // Restrict permissions for browser APIs
+    "Permissions-Policy":
+      "camera=(), microphone=(), geolocation=(), payment=(), usb=(), magnetometer=(), gyroscope=(), accelerometer=()",
+
+    // Force HTTPS connections
+    "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
+
+    // Content Security Policy
+    "Content-Security-Policy": [
+      "default-src 'self'",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.paystack.co https://checkout.paystack.com",
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+      "img-src 'self' data: https: blob:",
+      "font-src 'self' data: https://fonts.gstatic.com",
+      "connect-src 'self' https://quintjtreswyjxxogcjt.supabase.co wss://quintjtreswyjxxogcjt.supabase.co https://api.paystack.co",
+      "frame-src 'self' https://js.paystack.co https://checkout.paystack.com",
+      "object-src 'none'",
+      "base-uri 'self'",
+      "form-action 'self'",
+      "frame-ancestors 'none'",
+      "upgrade-insecure-requests",
+    ].join("; "),
+
+    // Prevent DNS prefetching
+    "X-DNS-Prefetch-Control": "off",
+
+    // Remove server information
+    Server: "",
+
+    // Cache control for sensitive pages
+    "Cache-Control":
+      request.nextUrl.pathname.startsWith("/dashboard") ||
+      request.nextUrl.pathname.startsWith("/admin") ||
+      request.nextUrl.pathname.startsWith("/auth")
+        ? "no-cache, no-store, must-revalidate, private"
+        : "public, max-age=3600",
+
+    // Prevent caching of sensitive content
+    Pragma:
+      request.nextUrl.pathname.startsWith("/dashboard") ||
+      request.nextUrl.pathname.startsWith("/admin") ||
+      request.nextUrl.pathname.startsWith("/auth")
+        ? "no-cache"
+        : "cache",
+  }
+
+  // Apply security headers
+  Object.entries(securityHeaders).forEach(([key, value]) => {
+    response.headers.set(key, value)
+  })
+
+  if (request.nextUrl.pathname.startsWith("/api/")) {
+    response.headers.set("X-RateLimit-Limit", "100")
+    response.headers.set("X-RateLimit-Remaining", "99")
+    response.headers.set("X-RateLimit-Reset", String(Date.now() + 3600000))
+  }
+
+  if (request.nextUrl.pathname.startsWith("/auth/")) {
+    response.headers.set("X-Robots-Tag", "noindex, nofollow")
+    response.headers.set("Cross-Origin-Embedder-Policy", "require-corp")
+    response.headers.set("Cross-Origin-Opener-Policy", "same-origin")
+  }
+
+  return response
 }

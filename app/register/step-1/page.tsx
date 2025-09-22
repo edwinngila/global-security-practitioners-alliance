@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import { useForm, Controller } from "react-hook-form"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { RegistrationProgress } from "@/components/registration-progress"
 import { PhoneInput } from "@/components/ui/phone-input"
+import { Loader2 } from "lucide-react"   // ✅ spinner icon
 
 interface Step1Form {
   firstName: string
@@ -23,6 +24,7 @@ const stepTitles = ["Personal Info", "Professional Info", "Documents", "Review"]
 
 export default function RegisterStep1() {
   const router = useRouter()
+  const [isLoading, setIsLoading] = useState(false)  // ✅ spinner state
 
   const {
     register,
@@ -62,8 +64,13 @@ export default function RegisterStep1() {
   }, [formData])
 
   const onSubmit = (data: Step1Form) => {
+    setIsLoading(true)   // ✅ show spinner
     localStorage.setItem("registration-step-1", JSON.stringify(data))
-    router.push("/register/step-2")
+
+    // simulate async work (e.g., API call) before navigating
+    setTimeout(() => {
+      router.push("/register/step-2")
+    }, 1500)
   }
 
   return (
@@ -90,7 +97,7 @@ export default function RegisterStep1() {
                         minLength: { value: 2, message: "Must be at least 2 characters" },
                       })}
                       placeholder="John"
-                      className={`h-12 ${errors.firstName ? "border-destructive" : ""}`}
+                      className={`h-12 bg-black/5 text-black ${errors.firstName ? "border-destructive" : ""}`}
                     />
                     {errors.firstName && <p className="text-sm text-destructive">{errors.firstName.message}</p>}
                   </div>
@@ -104,7 +111,7 @@ export default function RegisterStep1() {
                         minLength: { value: 2, message: "Must be at least 2 characters" },
                       })}
                       placeholder="Doe"
-                      className={`h-12 ${errors.lastName ? "border-destructive" : ""}`}
+                      className={`h-12 bg-black/5 text-black ${errors.lastName ? "border-destructive" : ""}`}
                     />
                     {errors.lastName && <p className="text-sm text-destructive">{errors.lastName.message}</p>}
                   </div>
@@ -123,7 +130,7 @@ export default function RegisterStep1() {
                       },
                     })}
                     placeholder="john.doe@example.com"
-                    className={`h-12 ${errors.email ? "border-destructive" : ""}`}
+                    className={`h-12 bg-black/5 text-black ${errors.email ? "border-destructive" : ""}`}
                   />
                   {errors.email && <p className="text-sm text-destructive">{errors.email.message}</p>}
                 </div>
@@ -168,7 +175,7 @@ export default function RegisterStep1() {
                       }
                     })}
                     placeholder="Create a strong password"
-                    className={`h-12 ${errors.password ? "border-destructive" : ""}`}
+                    className={`h-12 bg-black/5 text-black ${errors.password ? "border-destructive" : ""}`}
                   />
                   {errors.password && <p className="text-sm text-destructive">{errors.password.message}</p>}
                 </div>
@@ -188,12 +195,26 @@ export default function RegisterStep1() {
                       }
                     })}
                     placeholder="Confirm your password"
-                    className={`h-12 ${errors.confirmPassword ? "border-destructive" : ""}`}
+                    className={`h-12 bg-black/5 text-black ${errors.confirmPassword ? "border-destructive" : ""}`}
                   />
                   {errors.confirmPassword && <p className="text-sm text-destructive">{errors.confirmPassword.message}</p>}
                 </div>
 
-                <Button type="submit" className="w-full h-12 text-base font-medium">Continue to Professional Info</Button>
+                {/* ✅ Submit Button with Spinner */}
+                <Button
+                  type="submit"
+                  disabled={isLoading}
+                  className="w-full h-12 text-base font-medium flex items-center justify-center gap-2"
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    "Continue to Professional Info"
+                  )}
+                </Button>
               </form>
             </CardContent>
           </Card>

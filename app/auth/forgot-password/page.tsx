@@ -121,6 +121,7 @@ export default function ForgotPasswordPage() {
                   <Input
                     id="email"
                     type="email"
+                    className="bg-black/5"
                     {...register("email")}
                     placeholder="your.email@example.com"
                   />
