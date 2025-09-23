@@ -5,11 +5,69 @@ import { GeistMono } from "geist/font/mono"
 import { Analytics } from "@vercel/analytics/next"
 import { Suspense } from "react"
 import ExamPopupWrapper from "@/components/exam-popup-wrapper"
+import { ThemeProvider } from "@/components/theme-provider"
+import { SkipLinks } from "@/components/skip-links"
 import "./globals.css"
 
 export const metadata: Metadata = {
-  title: "Global Security Practitioners Alliance",
-  description: "Professional Security Certification and Training",
+  title: {
+    default: "Global Security Practitioners Alliance - Professional Security Certification",
+    template: "%s | GSPA"
+  },
+  description: "Elevate your security expertise with globally recognized certifications in Cybersecurity, Network Security, and Digital Forensics. Join 5,000+ professionals worldwide.",
+  keywords: ["security certification", "cybersecurity", "network security", "digital forensics", "professional certification", "security training"],
+  authors: [{ name: "Global Security Practitioners Alliance" }],
+  creator: "Global Security Practitioners Alliance",
+  publisher: "Global Security Practitioners Alliance",
+  formatDetection: {
+    email: false,
+    address: false,
+    telephone: false,
+  },
+  metadataBase: new URL('https://gspa.org'),
+  alternates: {
+    canonical: '/',
+  },
+  openGraph: {
+    type: 'website',
+    locale: 'en_US',
+    url: 'https://gspa.org',
+    title: 'Global Security Practitioners Alliance - Professional Security Certification',
+    description: 'Elevate your security expertise with globally recognized certifications in Cybersecurity, Network Security, and Digital Forensics.',
+    siteName: 'Global Security Practitioners Alliance',
+    images: [
+      {
+        url: '/Global-Security-Practitioners-Alliance.png',
+        width: 1200,
+        height: 630,
+        alt: 'GSPA Logo',
+      },
+    ],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Global Security Practitioners Alliance - Professional Security Certification',
+    description: 'Elevate your security expertise with globally recognized certifications in Cybersecurity, Network Security, and Digital Forensics.',
+    images: ['/Global-Security-Practitioners-Alliance.png'],
+    creator: '@gspa_org',
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-video-preview': -1,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+    },
+  },
+  verification: {
+    google: 'your-google-site-verification-code',
+    yandex: 'your-yandex-verification-code',
+    yahoo: 'your-yahoo-verification-code',
+  },
+  category: 'education',
   generator: "v0.app",
   manifest: "/manifest.json",
   other: {
@@ -36,14 +94,22 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body className={`font-sans ${GeistSans.variable} ${GeistMono.variable}`}>
-        <Suspense fallback={null}>
-          <ExamPopupWrapper>
-            {children}
-          </ExamPopupWrapper>
-        </Suspense>
-        <Analytics />
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <SkipLinks />
+          <Suspense fallback={null}>
+            <ExamPopupWrapper>
+              {children}
+            </ExamPopupWrapper>
+          </Suspense>
+          <Analytics />
+        </ThemeProvider>
       </body>
     </html>
   )

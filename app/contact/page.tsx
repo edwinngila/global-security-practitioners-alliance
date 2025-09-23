@@ -5,159 +5,289 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Mail, Phone, MapPin, Clock } from "lucide-react"
+import { Mail, Phone, MapPin, Clock, Facebook, Twitter, Linkedin, Youtube, Send, Zap, Users, Globe } from "lucide-react"
 
 export default function ContactPage() {
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col bg-gradient-to-br from-background via-muted/20 to-background">
       <Navigation />
 
       <main className="flex-1">
-        {/* Hero Section */}
-        <section className="py-20 lg:py-32 bg-gradient-to-br from-background via-background to-muted/30">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Enhanced Hero Section */}
+        <section className="relative py-24 lg:py-32 bg-gradient-to-br from-slate-900 via-blue-900 to-purple-900 overflow-hidden">
+          {/* Background decorative elements */}
+          <div className="absolute inset-0">
+            <div className="absolute top-0 left-0 w-72 h-72 bg-blue-500/10 rounded-full blur-3xl"></div>
+            <div className="absolute bottom-0 right-0 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl"></div>
+            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full h-64 bg-gradient-to-r from-transparent via-white/5 to-transparent"></div>
+          </div>
+
+          <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="text-center max-w-4xl mx-auto">
-              <h1 className="text-4xl lg:text-6xl font-bold text-balance mb-6">Contact Us</h1>
-              <p className="text-xl text-muted-foreground text-pretty mb-8 leading-relaxed">
-                Get in touch with our team for support, inquiries, or more information about our certification programs.
+              <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm border border-white/20 rounded-full px-4 py-2 mb-6">
+                <Zap className="h-4 w-4 text-yellow-400" />
+                <span className="text-sm text-white/80">We're here to help you succeed</span>
+              </div>
+
+              <h1 className="text-5xl lg:text-7xl font-bold text-white mb-6 bg-gradient-to-r from-white to-blue-200 bg-clip-text text-transparent">
+                Let's Talk
+              </h1>
+              <p className="text-xl text-blue-100 text-pretty mb-8 leading-relaxed max-w-3xl mx-auto">
+                Ready to advance your security career? Our team is here to guide you through certification,
+                answer your questions, and help you achieve global recognition.
               </p>
+
+              {/* Stats */}
+              <div className="grid grid-cols-3 gap-8 max-w-2xl mx-auto mt-12">
+                <div className="text-center">
+                  <div className="text-3xl font-bold text-white mb-2">24h</div>
+                  <div className="text-blue-200 text-sm">Response Time</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-3xl font-bold text-white mb-2">120+</div>
+                  <div className="text-blue-200 text-sm">Countries Served</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-3xl font-bold text-white mb-2">98%</div>
+                  <div className="text-blue-200 text-sm">Satisfaction Rate</div>
+                </div>
+              </div>
             </div>
           </div>
         </section>
 
-        {/* Contact Form & Info */}
-        <section className="py-20">
+        {/* Enhanced Contact Form & Info */}
+        <section className="relative py-20 -mt-16">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-              {/* Contact Form */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-2xl">Send us a Message</CardTitle>
-                  <CardDescription>Fill out the form below and we'll get back to you within 24 hours.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <form className="space-y-6">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <Label htmlFor="firstName">First Name</Label>
-                        <Input id="firstName" placeholder="John" />
-                      </div>
-                      <div>
-                        <Label htmlFor="lastName">Last Name</Label>
-                        <Input id="lastName" placeholder="Doe" />
-                      </div>
-                    </div>
-
-                    <div>
-                      <Label htmlFor="email">Email</Label>
-                      <Input id="email" type="email" placeholder="john@example.com" />
-                    </div>
-
-                    <div>
-                      <Label htmlFor="subject">Subject</Label>
-                      <Input id="subject" placeholder="How can we help you?" />
-                    </div>
-
-                    <div>
-                      <Label htmlFor="message">Message</Label>
-                      <Textarea id="message" placeholder="Tell us more about your inquiry..." rows={5} />
-                    </div>
-
-                    <Button type="submit" className="w-full">
-                      Send Message
-                    </Button>
-                  </form>
-                </CardContent>
-              </Card>
-
-              {/* Contact Information */}
-              <div className="space-y-8">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-2xl">Get in Touch</CardTitle>
-                    <CardDescription>Multiple ways to reach our support team.</CardDescription>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              {/* Enhanced Contact Form */}
+              <div className="relative">
+                <div className="absolute -inset-4 bg-gradient-to-r from-primary to-accent rounded-3xl blur-lg opacity-20"></div>
+                <Card className="relative bg-card/80 backdrop-blur-sm border-0 shadow-2xl rounded-2xl overflow-hidden">
+                  <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary to-accent"></div>
+                  <CardHeader className="pb-4">
+                    <CardTitle className="text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+                      Send us a Message
+                    </CardTitle>
+                    <CardDescription className="text-lg">We typically respond within 2-4 hours during business days.</CardDescription>
                   </CardHeader>
-                  <CardContent className="space-y-6">
-                    <div className="flex items-start gap-4">
-                      <Mail className="h-6 w-6 text-primary mt-1" />
-                      <div>
-                        <h3 className="font-semibold mb-1">Email</h3>
-                        <p className="text-muted-foreground">info@gspa.org</p>
-                        <p className="text-muted-foreground">support@gspa.org</p>
+                  <CardContent className="pt-4">
+                    <form className="space-y-6">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="firstName" className="text-sm font-semibold">First Name</Label>
+                          <Input
+                            id="firstName"
+                            placeholder="John"
+                            className="border border-border focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all duration-200 rounded-xl h-12"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="lastName" className="text-sm font-semibold">Last Name</Label>
+                          <Input
+                            id="lastName"
+                            placeholder="Doe"
+                            className="border border-border focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all duration-200 rounded-xl h-12"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="email" className="text-sm font-semibold">Email Address</Label>
+                        <Input
+                          id="email"
+                          type="email"
+                          placeholder="john@example.com"
+                          className="border border-border focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all duration-200 rounded-xl h-12"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="subject" className="text-sm font-semibold">Subject</Label>
+                        <Input
+                          id="subject"
+                          placeholder="How can we help you?"
+                          className="border border-border focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all duration-200 rounded-xl h-12"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="message" className="text-sm font-semibold">Message</Label>
+                        <Textarea
+                          id="message"
+                          placeholder="Tell us more about your inquiry, certification goals, or how we can assist you..."
+                          rows={5}
+                          className="border border-border focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all duration-200 rounded-xl min-h-32"
+                        />
+                      </div>
+
+                      <Button
+                        type="submit"
+                        className="w-full bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 text-primary-foreground font-semibold py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 group"
+                      >
+                        <Send className="h-4 w-4 mr-2 group-hover:translate-x-1 transition-transform" />
+                        Send Message
+                      </Button>
+                    </form>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Enhanced Contact Information */}
+              <div className="flex items-start">
+                {/* Contact Methods */}
+                <Card className="bg-gradient-to-br from-card to-muted border-0 shadow-2xl rounded-2xl overflow-hidden w-full">
+                  <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary to-accent"></div>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-lg lg:text-base text-foreground flex items-center gap-2">
+                      <Users className="h-4 w-4 text-primary" />
+                      Get in Touch
+                    </CardTitle>
+                    <CardDescription className="text-muted-foreground text-xs lg:text-xs">Multiple ways to reach our expert support team</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="flex items-start gap-3 p-2 rounded-lg bg-muted/50 hover:bg-muted transition-colors duration-200">
+                      <div className="bg-primary/20 p-2 rounded-lg flex-shrink-0">
+                        <Mail className="h-4 w-4 text-primary" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <h3 className="font-semibold text-sm mb-1 text-foreground">Email Support</h3>
+                        <p className="text-muted-foreground text-xs">info@gspa.org</p>
+                        <p className="text-muted-foreground text-xs">support@gspa.org</p>
+                        <p className="text-xs text-muted-foreground/80 mt-1">Typically responds within 2 hours</p>
                       </div>
                     </div>
 
-                    <div className="flex items-start gap-4">
-                      <Phone className="h-6 w-6 text-primary mt-1" />
-                      <div>
-                        <h3 className="font-semibold mb-1">Phone</h3>
-                        <p className="text-muted-foreground">+1 (555) 123-4567</p>
-                        <p className="text-muted-foreground">+1 (555) 123-4568</p>
+                    <div className="flex items-start gap-3 p-2 rounded-lg bg-muted/50 hover:bg-muted transition-colors duration-200">
+                      <div className="bg-accent/20 p-2 rounded-lg flex-shrink-0">
+                        <Phone className="h-4 w-4 text-accent" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <h3 className="font-semibold text-sm mb-1 text-foreground">Phone Support</h3>
+                        <p className="text-muted-foreground text-xs">+1 (555) 123-4567</p>
+                        <p className="text-muted-foreground text-xs">+1 (555) 123-4568</p>
+                        <p className="text-xs text-muted-foreground/80 mt-1">Mon-Fri: 9AM-6PM EST</p>
                       </div>
                     </div>
 
-                    <div className="flex items-start gap-4">
-                      <MapPin className="h-6 w-6 text-primary mt-1" />
-                      <div>
-                        <h3 className="font-semibold mb-1">Address</h3>
-                        <p className="text-muted-foreground">
-                          Global Security Practitioners Alliance
-                          <br />
-                          123 Security Boulevard
-                          <br />
-                          Professional District
-                          <br />
+                    <div className="flex items-start gap-3 p-2 rounded-lg bg-muted/50 hover:bg-muted transition-colors duration-200">
+                      <div className="bg-secondary/20 p-2 rounded-lg flex-shrink-0">
+                        <MapPin className="h-4 w-4 text-secondary" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <h3 className="font-semibold text-sm mb-1 text-foreground">Global Headquarters</h3>
+                        <p className="text-muted-foreground text-xs leading-tight">
+                          123 Security Boulevard<br />
+                          Professional District<br />
                           New York, NY 10001
                         </p>
                       </div>
                     </div>
 
-                    <div className="flex items-start gap-4">
-                      <Clock className="h-6 w-6 text-primary mt-1" />
-                      <div>
-                        <h3 className="font-semibold mb-1">Business Hours</h3>
-                        <p className="text-muted-foreground">
-                          Monday - Friday: 9:00 AM - 6:00 PM EST
-                          <br />
-                          Saturday: 10:00 AM - 4:00 PM EST
-                          <br />
-                          Sunday: Closed
-                        </p>
+                    <div className="flex items-start gap-3 p-2 rounded-lg bg-muted/50 hover:bg-muted transition-colors duration-200">
+                      <div className="bg-primary/20 p-2 rounded-lg flex-shrink-0">
+                        <Clock className="h-4 w-4 text-primary" />
                       </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Frequently Asked Questions</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      <div>
-                        <h4 className="font-semibold mb-2">How long does certification take?</h4>
-                        <p className="text-sm text-muted-foreground">
-                          The entire process typically takes 2-4 weeks from registration to certificate issuance.
-                        </p>
-                      </div>
-
-                      <div>
-                        <h4 className="font-semibold mb-2">What is the pass rate?</h4>
-                        <p className="text-sm text-muted-foreground">
-                          Our current pass rate is 78%, with comprehensive study materials provided.
-                        </p>
-                      </div>
-
-                      <div>
-                        <h4 className="font-semibold mb-2">Is the certification globally recognized?</h4>
-                        <p className="text-sm text-muted-foreground">
-                          Yes, GSPA certifications are recognized by organizations in over 120 countries.
+                      <div className="min-w-0 flex-1">
+                        <h3 className="font-semibold text-sm mb-1 text-foreground">Business Hours</h3>
+                        <p className="text-muted-foreground text-xs leading-tight">
+                          Mon-Fri: 9AM-6PM EST<br />
+                          Sat: 10AM-4PM EST<br />
+                          Sun: Closed
                         </p>
                       </div>
                     </div>
                   </CardContent>
                 </Card>
               </div>
+            </div>
+
+            {/* Connect with Us & FAQ Side by Side - Full Width */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-12">
+              {/* Social Media */}
+              <Card className="border-0 shadow-xl rounded-2xl overflow-hidden">
+                <CardHeader className="bg-gradient-to-r from-primary/10 to-accent/10">
+                  <CardTitle className="flex items-center gap-2">
+                    <Globe className="h-5 w-5 text-primary" />
+                    Connect With Us
+                  </CardTitle>
+                  <CardDescription>Follow for updates and security insights</CardDescription>
+                </CardHeader>
+                <CardContent className="p-6">
+                  <div className="grid grid-cols-2 gap-3">
+                    {[
+                      { icon: Facebook, label: "Facebook", color: "text-primary", bg: "bg-primary/10" },
+                      { icon: Twitter, label: "Twitter", color: "text-accent", bg: "bg-accent/10" },
+                      { icon: Linkedin, label: "LinkedIn", color: "text-primary", bg: "bg-primary/10" },
+                      { icon: Youtube, label: "YouTube", color: "text-secondary", bg: "bg-secondary/10" }
+                    ].map((social, index) => (
+                      <a key={index} href="#" target="_blank" rel="noopener noreferrer"
+                        className="flex items-center gap-3 p-3 rounded-xl border hover:shadow-md transition-all duration-200 hover:scale-105 group">
+                        <div className={`p-2 rounded-lg ${social.bg} group-hover:scale-110 transition-transform`}>
+                          <social.icon className={`h-4 w-4 ${social.color}`} />
+                        </div>
+                        <span className="font-medium text-sm">{social.label}</span>
+                      </a>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* FAQ Preview */}
+              <Card className="border-0 shadow-xl rounded-2xl overflow-hidden">
+                <CardHeader className="bg-gradient-to-r from-accent/10 to-secondary/10">
+                  <CardTitle>Quick Answers</CardTitle>
+                  <CardDescription>Frequently asked questions</CardDescription>
+                </CardHeader>
+                <CardContent className="p-6">
+                  <div className="space-y-4">
+                    {[
+                      {
+                        question: "How long does certification take?",
+                        answer: "Typically 2-4 weeks with our accelerated process."
+                      },
+                      {
+                        question: "What is the pass rate?",
+                        answer: "78% success rate with comprehensive materials."
+                      },
+                      {
+                        question: "Global recognition?",
+                        answer: "Recognized in 120+ countries worldwide."
+                      }
+                    ].map((faq, index) => (
+                      <div key={index} className="group cursor-pointer">
+                        <h4 className="font-semibold text-sm mb-1 group-hover:text-primary transition-colors">
+                          {faq.question}
+                        </h4>
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                          {faq.answer}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                  <Button variant="link" className="p-0 h-auto text-primary mt-3 text-sm">
+                    View all FAQs →
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </section>
+
+        {/* Additional CTA Section */}
+        <section className="py-16 bg-gradient-to-r from-primary to-accent">
+          <div className="max-w-4xl mx-auto text-center px-4 sm:px-6 lg:px-8">
+            <h2 className="text-3xl font-bold text-primary-foreground mb-4">Ready to Start Your Certification Journey?</h2>
+            <p className="text-primary-foreground/90 text-lg mb-8">
+              Join thousands of security professionals who have advanced their careers with GSPA certification.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Button size="lg" className="bg-background text-foreground hover:bg-muted font-semibold rounded-xl px-8">
+                Explore Certifications
+              </Button>
+              <Button size="lg" variant="outline" className="border-primary-foreground text-primary-foreground hover:bg-primary-foreground/10 rounded-xl px-8">
+                Schedule a Call
+              </Button>
             </div>
           </div>
         </section>

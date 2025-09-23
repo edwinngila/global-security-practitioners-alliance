@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Shield, Menu, X } from "lucide-react"
 import { useState, useEffect } from "react"
+import { ThemeToggle } from "@/components/theme-toggle"
 
 export default function Navigation() {
   const pathname = usePathname()
@@ -73,6 +74,7 @@ export default function Navigation() {
             </div>
 
             <div className="flex items-center gap-4">
+              <ThemeToggle />
               <Button
                 variant="ghost"
                 asChild
@@ -95,6 +97,8 @@ export default function Navigation() {
             className={`md:hidden transition-colors duration-200 ${isScrolled ? "hover:bg-muted" : "hover:bg-primary-foreground/10"}`}
             onClick={() => setIsMenuOpen(!isMenuOpen)}
             aria-label={isMenuOpen ? "Close menu" : "Open menu"}
+            aria-expanded={isMenuOpen}
+            aria-controls="mobile-menu"
           >
             <div className="relative w-5 h-5">
               <Menu
@@ -108,6 +112,7 @@ export default function Navigation() {
         </div>
 
         <div
+          id="mobile-menu"
           className={`md:hidden transition-all duration-300 ease-in-out ${
             isMenuOpen
               ? "max-h-96 opacity-100 py-4 border-t border-primary-600"

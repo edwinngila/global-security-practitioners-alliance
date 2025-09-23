@@ -11,49 +11,108 @@ interface RegistrationProgressProps {
 
 export function RegistrationProgress({ currentStep, totalSteps, stepTitles }: RegistrationProgressProps) {
   return (
-    <div className="w-full bg-gradient-to-r from-primary via-secondary to-accent py-4 md:py-6 shadow-2xl">
+    <div className="w-full bg-gradient-to-br from-slate-50 via-white to-slate-100 py-6 md:py-8 shadow-lg border-b">
       <div className="max-w-4xl mx-auto px-4">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between relative">
+          {/* Background progress line */}
+          <div
+            className="absolute top-6 left-10 right-10 h-0.5 bg-gradient-to-r from-primary/20 via-primary/30 to-primary/20 rounded-full"
+            style={{
+              width: `calc(100% - 80px)`,
+              left: '40px',
+              right: '40px'
+            }}
+          />
+
+          {/* Progress fill */}
+          <div
+            className="absolute top-6 h-0.5 bg-gradient-to-r from-primary via-accent to-primary rounded-full transition-all duration-700 ease-out shadow-sm"
+            style={{
+              width: `${((currentStep - 1) / (totalSteps - 1)) * 100}%`,
+              left: '40px',
+              maxWidth: 'calc(100% - 80px)'
+            }}
+          />
+
           {stepTitles.map((title, index) => {
             const stepNumber = index + 1
             const isCompleted = stepNumber < currentStep
             const isCurrent = stepNumber === currentStep
+            const isUpcoming = stepNumber > currentStep
 
             return (
-              <div key={stepNumber} className="flex items-center">
+              <div key={stepNumber} className="flex items-center z-10">
                 <div className="flex flex-col items-center">
+                  {/* Step circle */}
                   <div
                     className={cn(
-                      "w-10 h-10 md:w-14 md:h-14 rounded-full flex items-center justify-center text-sm md:text-base font-bold border-2 transition-all duration-300 shadow-md",
+                      "relative w-12 h-12 md:w-16 md:h-16 rounded-full flex items-center justify-center text-base md:text-lg font-semibold border-4 transition-all duration-500 shadow-lg",
+                      "group cursor-pointer hover:scale-105 hover:shadow-xl",
                       isCompleted
-                        ? "bg-green-500 text-white border-green-500 shadow-green-200"
+                        ? "bg-gradient-to-br from-green-500 to-green-600 text-white border-green-500 shadow-green-200/50"
                         : isCurrent
-                          ? "bg-primary text-primary-foreground border-primary shadow-primary/20 scale-110"
-                          : "bg-muted text-muted-foreground border-border",
+                          ? "bg-gradient-to-br from-primary to-primary/90 text-white border-primary shadow-primary/30 scale-110 ring-4 ring-primary/20"
+                          : "bg-white text-muted-foreground border-slate-200 shadow-slate-200/50"
                     )}
                   >
-                    {isCompleted ? <Check className="w-4 h-4 md:w-6 md:h-6" /> : stepNumber}
+                    {isCompleted ? (
+                      <Check className="w-5 h-5 md:w-6 md:h-6" />
+                    ) : (
+                      stepNumber
+                    )}
+                    
+                    {/* Pulse animation for current step */}
+                    {isCurrent && (
+                      <div className="absolute inset-0 rounded-full bg-primary/20 animate-ping scale-125" />
+                    )}
+                    
+                    {/* Tooltip effect */}
+                    <div className="absolute -bottom-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                      <div className="bg-slate-800 text-white text-xs px-2 py-1 rounded-md whitespace-nowrap">
+                        Step {stepNumber}: {title}
+                      </div>
+                    </div>
                   </div>
+                  
+                  {/* Step title */}
                   <span
                     className={cn(
-                      "mt-2 md:mt-3 text-xs md:text-sm font-medium text-center max-w-20 md:max-w-24 leading-tight",
-                      isCurrent ? "text-primary font-semibold" : isCompleted ? "text-green-600" : "text-muted-foreground",
+                      "mt-3 md:mt-4 text-sm md:text-base font-medium text-center max-w-24 md:max-w-28 leading-tight transition-all duration-300",
+                      isCurrent 
+                        ? "text-primary font-semibold scale-105" 
+                        : isCompleted 
+                          ? "text-green-600 font-medium" 
+                          : "text-muted-foreground"
                     )}
                   >
                     {title}
                   </span>
-                </div>
-                {index < stepTitles.length - 1 && (
-                  <div
+                  
+                  {/* Step status */}
+                  <span
                     className={cn(
-                      "flex-1 h-1 mx-2 md:mx-6 rounded-full transition-all duration-500",
-                      isCompleted ? "bg-green-500" : "bg-border",
+                      "text-xs mt-1 font-medium transition-all duration-300",
+                      isCurrent 
+                        ? "text-primary opacity-100" 
+                        : "opacity-0"
                     )}
-                  />
-                )}
+                  >
+                    Current
+                  </span>
+                </div>
               </div>
             )
           })}
+        </div>
+        
+        {/* Progress percentage */}
+        <div className="text-center mt-6 md:mt-8">
+          <div className="inline-flex items-center bg-white/80 backdrop-blur-sm px-4 py-2 rounded-full shadow-sm border">
+            <span className="text-sm text-muted-foreground mr-2">Progress:</span>
+            <span className="font-semibold text-primary">
+              {Math.round(((currentStep - 1) / totalSteps) * 100)}%
+            </span>
+          </div>
         </div>
       </div>
     </div>
