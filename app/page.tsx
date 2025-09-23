@@ -13,7 +13,7 @@ import { motion } from "framer-motion"
 
 export default function HomePage() {
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-100/20">
+    <div className="min-h-screen flex flex-col bg-gradient-to-br from-background via-muted/20 to-background">
       <Navigation />
       <AdminSetupNotice />
       <UserAdvertisement />
@@ -124,7 +124,7 @@ export default function HomePage() {
               >
                 <div className="relative group">
                   <div className="absolute -inset-6 bg-gradient-to-r from-blue-500 to-purple-500 rounded-3xl blur-3xl group-hover:blur-4xl transition-all duration-500 opacity-20"></div>
-                  <div className="relative w-full max-w-lg h-[32rem] bg-gradient-to-br from-slate-800 to-slate-900 rounded-3xl flex items-center justify-center border border-slate-700/50 shadow-2xl backdrop-blur-sm overflow-hidden">
+                  <div className="relative w-full max-w-lg h-[24rem] md:h-[32rem] bg-gradient-to-br from-slate-800 to-slate-900 rounded-3xl flex items-center justify-center border border-slate-700/50 shadow-2xl backdrop-blur-sm overflow-hidden">
                     <div className="text-center p-12 space-y-8">
                       <div className="relative">
                         <div className="absolute -inset-4 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full blur-2xl opacity-50"></div>
@@ -136,10 +136,10 @@ export default function HomePage() {
                       </div>
                       
                       {/* Floating elements */}
-                      <Star className="absolute top-6 left-6 h-6 w-6 text-yellow-400 animate-bounce" />
-                      <Award className="absolute top-6 right-6 h-6 w-6 text-blue-400 animate-bounce delay-300" />
-                      <Globe className="absolute bottom-6 left-6 h-6 w-6 text-purple-400 animate-bounce delay-700" />
-                      <Target className="absolute bottom-6 right-6 h-6 w-6 text-green-400 animate-bounce delay-1000" />
+                      <Star className="absolute top-6 left-6 h-6 w-6 text-yellow-400" />
+                      <Award className="absolute top-6 right-6 h-6 w-6 text-blue-400" />
+                      <Globe className="absolute bottom-6 left-6 h-6 w-6 text-purple-400" />
+                      <Target className="absolute bottom-6 right-6 h-6 w-6 text-green-400" />
                     </div>
                   </div>
                 </div>
@@ -191,14 +191,14 @@ export default function HomePage() {
         </section>
 
         {/* Enhanced Features Section */}
-        <section className="py-24 bg-gradient-to-b from-slate-50 to-blue-50/30 relative overflow-hidden">
+        <section className="py-24 bg-gradient-to-b from-background to-muted/20 relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 via-transparent to-purple-500/5"></div>
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
             <div className="text-center mb-20">
               <div className="inline-block bg-gradient-to-r from-blue-600 to-purple-600 text-white text-sm font-semibold px-4 py-2 rounded-full mb-4">
                 Why Choose GSPA?
               </div>
-              <h2 className="text-4xl lg:text-5xl font-bold text-balance mb-6 bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-transparent">
+              <h2 className="text-4xl lg:text-5xl font-bold text-balance mb-6 bg-gradient-to-r from-foreground to-muted-foreground bg-clip-text text-transparent">
                 Transform Your Security Career
               </h2>
               <p className="text-xl text-muted-foreground text-pretty max-w-3xl mx-auto leading-relaxed">
@@ -250,7 +250,7 @@ export default function HomePage() {
                   transition={{ duration: 0.6, delay: index * 0.1 }}
                   viewport={{ once: true }}
                 >
-                  <Card className="text-center group hover:shadow-2xl hover:-translate-y-2 transition-all duration-300 border-0 bg-white/80 backdrop-blur-sm overflow-hidden">
+                  <Card className="text-center group hover:shadow-2xl hover:-translate-y-2 transition-all duration-300 border-0 bg-card/80 backdrop-blur-sm overflow-hidden">
                     <div className={`absolute inset-0 bg-gradient-to-br ${feature.color} opacity-5 group-hover:opacity-10 transition-opacity duration-300`}></div>
                     <CardHeader className="pb-6 relative z-10">
                       <div className="relative mx-auto mb-6">
@@ -259,12 +259,12 @@ export default function HomePage() {
                           <feature.icon className={`h-10 w-10 bg-gradient-to-r ${feature.color} bg-clip-text text-transparent`} />
                         </div>
                       </div>
-                      <CardTitle className="text-xl font-bold bg-gradient-to-r from-slate-800 to-slate-600 bg-clip-text text-transparent">
+                      <CardTitle className="text-xl font-bold bg-gradient-to-r from-foreground to-muted-foreground bg-clip-text text-transparent">
                         {feature.title}
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="relative z-10">
-                      <CardDescription className="text-base leading-relaxed text-slate-700">
+                      <CardDescription className="text-base leading-relaxed text-muted-foreground">
                         {feature.description}
                       </CardDescription>
                     </CardContent>
@@ -276,13 +276,13 @@ export default function HomePage() {
         </section>
 
         {/* Enhanced Process Section */}
-        <section className="py-24 bg-white relative overflow-hidden">
+        <section className="py-24 bg-background relative overflow-hidden">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
             <div className="text-center mb-20">
               <div className="inline-block bg-gradient-to-r from-green-600 to-blue-600 text-white text-sm font-semibold px-4 py-2 rounded-full mb-4">
                 Simple 4-Step Process
               </div>
-              <h2 className="text-4xl lg:text-5xl font-bold text-balance mb-6 bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-transparent">
+              <h2 className="text-4xl lg:text-5xl font-bold text-balance mb-6 bg-gradient-to-r from-foreground to-muted-foreground bg-clip-text text-transparent">
                 Get Certified in 4 Easy Steps
               </h2>
               <p className="text-xl text-muted-foreground text-pretty max-w-3xl mx-auto leading-relaxed">
@@ -307,11 +307,11 @@ export default function HomePage() {
                         {item.step}
                       </div>
                     </div>
-                    <div className="bg-gradient-to-br from-slate-50 to-slate-100 rounded-2xl p-8 border border-slate-200 shadow-lg group-hover:shadow-xl transition-all duration-300 group-hover:border-slate-300">
+                    <div className="bg-gradient-to-br from-muted to-background rounded-2xl p-8 border border-border shadow-lg group-hover:shadow-xl transition-all duration-300 group-hover:border-border">
                       <div className={`w-16 h-16 bg-gradient-to-br ${item.color} rounded-xl flex items-center justify-center mx-auto mb-6 shadow-lg`}>
                         <item.icon className="h-8 w-8 text-white" />
                       </div>
-                      <h3 className="text-xl font-bold mb-3 text-slate-800">{item.title}</h3>
+                      <h3 className="text-xl font-bold mb-3 text-foreground">{item.title}</h3>
                       <p className="text-muted-foreground leading-relaxed">{item.description}</p>
                     </div>
                   </div>
@@ -327,7 +327,7 @@ export default function HomePage() {
                 { step: 3, icon: BookOpen, title: "Take Test", description: "Complete the security aptitude assessment", color: "from-green-500 to-green-600" },
                 { step: 4, icon: Award, title: "Get Certified", description: "Receive your official certificate upon passing", color: "from-orange-500 to-orange-600" }
               ].map((item, index) => (
-                <div key={index} className="flex items-center gap-6 p-6 bg-gradient-to-r from-slate-50 to-slate-100 rounded-2xl border border-slate-200 shadow-lg">
+                <div key={index} className="flex items-center gap-6 p-6 bg-gradient-to-r from-muted to-background rounded-2xl border border-border shadow-lg">
                   <div className="flex-shrink-0">
                     <div className={`w-16 h-16 bg-gradient-to-br ${item.color} text-white rounded-full flex items-center justify-center text-lg font-bold shadow-lg`}>
                       {item.step}
@@ -338,7 +338,7 @@ export default function HomePage() {
                       <div className={`w-10 h-10 bg-gradient-to-br ${item.color} rounded-lg flex items-center justify-center`}>
                         <item.icon className="h-5 w-5 text-white" />
                       </div>
-                      <h3 className="font-bold text-lg text-slate-800">{item.title}</h3>
+                      <h3 className="font-bold text-lg text-foreground">{item.title}</h3>
                     </div>
                     <p className="text-muted-foreground text-sm">{item.description}</p>
                   </div>
