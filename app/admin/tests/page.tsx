@@ -312,31 +312,33 @@ export default function AdminTestsPage() {
       {mobileMenuOpen && (
         <div className="fixed inset-0 z-50 md:hidden">
           <div className="absolute inset-0 bg-black/50" onClick={() => setMobileMenuOpen(false)} />
-          <div className="absolute left-0 top-0 h-full w-64">
+          <div className="absolute left-0 top-0 h-full">
             <DashboardSidebar
               isAdmin={isAdmin}
               userName={userName}
               userEmail={userEmail}
+              isMobileOpen={mobileMenuOpen}
+              onMobileClose={() => setMobileMenuOpen(false)}
             />
           </div>
         </div>
       )}
 
       {/* Desktop Sidebar */}
-      <DashboardSidebar
-        isAdmin={isAdmin}
-        userName={userName}
-        userEmail={userEmail}
-      />
+        <DashboardSidebar
+          isAdmin={isAdmin}
+          userName={userName}
+          userEmail={userEmail}
+        />
 
       <main className="flex-1 overflow-y-auto md:ml-64">
         {/* Mobile Header */}
-        <div className="md:hidden bg-white border-b p-4 flex items-center justify-between">
+        <div className="md:hidden bg-background border-b border-border p-4 flex items-center justify-between">
           <Button
-            variant="ghost"
+            variant="outline"
             size="sm"
             onClick={() => setMobileMenuOpen(true)}
-            className="md:hidden"
+            className="border-border hover:bg-muted"
           >
             <Menu className="h-5 w-5" />
           </Button>

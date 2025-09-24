@@ -217,15 +217,6 @@ export default function AdminCertificatesPage() {
     }))
   }
 
-  // Auto-save template changes (optional - could be enabled with a toggle)
-  // useEffect(() => {
-  //   const timeoutId = setTimeout(() => {
-  //     handleSaveTemplate()
-  //   }, 2000) // Auto-save after 2 seconds of inactivity
-
-  //   return () => clearTimeout(timeoutId)
-  // }, [templateForm])
-
   if (isLoading) {
     return (
       <div className="min-h-screen flex">
@@ -250,60 +241,76 @@ export default function AdminCertificatesPage() {
 
   return (
     <div className="min-h-screen flex">
-      {/* Mobile Sidebar */}
+      {/* Mobile Sidebar Overlay */}
       {mobileMenuOpen && (
-        <div className="fixed inset-0 z-50 md:hidden">
-          <div className="absolute inset-0 bg-black/50" onClick={() => setMobileMenuOpen(false)} />
-          <div className="absolute left-0 top-0 h-full w-64">
-            <DashboardSidebar
-              isAdmin={isAdmin}
-              userName={userName}
-              userEmail={userEmail}
-            />
-          </div>
-        </div>
+        <div className="fixed inset-0 z-40 bg-black/50 md:hidden" onClick={() => setMobileMenuOpen(false)} />
       )}
 
       {/* Desktop Sidebar */}
-      <DashboardSidebar
-        isAdmin={isAdmin}
-        userName={userName}
-        userEmail={userEmail}
-      />
+      <div className="hidden md:block">
+        <DashboardSidebar
+          isAdmin={isAdmin}
+          userName={userName}
+          userEmail={userEmail}
+        />
+      </div>
 
-      <main className="flex-1 overflow-y-auto md:ml-64">
+      {/* Mobile Sidebar */}
+      <div className={`
+        fixed inset-y-0 left-0 z-50 w-64 transform transition-transform duration-300 md:hidden
+        ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
+      `}>
+        <DashboardSidebar
+          isAdmin={isAdmin}
+          userName={userName}
+          userEmail={userEmail}
+          isMobileOpen={mobileMenuOpen}
+          onMobileClose={() => setMobileMenuOpen(false)}
+        />
+      </div>
+
+      <main className="flex-1 min-h-screen overflow-y-auto md:ml-64">
         {/* Mobile Header */}
-        <div className="md:hidden bg-white border-b p-4 flex items-center justify-between">
+        <header className="md:hidden bg-background border-b border-border p-4 flex items-center justify-between sticky top-0 z-30">
           <Button
-            variant="ghost"
+            variant="outline"
             size="sm"
             onClick={() => setMobileMenuOpen(true)}
-            className="md:hidden"
+            className="border-border hover:bg-muted"
           >
             <Menu className="h-5 w-5" />
           </Button>
-          <h1 className="text-lg font-semibold">Certificates</h1>
-          <div className="w-8" />
-        </div>
+          <h1 className="text-lg font-semibold">Certificate Management</h1>
+          <div className="w-8" /> {/* Spacer for balance */}
+        </header>
 
-        <div className="p-4 md:p-8">
+        <div className="p-4 md:p-6 lg:p-8">
           <div className="max-w-7xl mx-auto">
-            <div className="mb-8">
+            {/* Page Header */}
+            <div className="mb-6 md:mb-8">
               <h1 className="text-2xl md:text-3xl font-bold mb-2">Certificate Management</h1>
-              <p className="text-muted-foreground">
+              <p className="text-muted-foreground text-sm md:text-base">
                 Manage issued certificates and customize certificate templates.
               </p>
             </div>
 
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
               <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="certificates" className="flex items-center gap-2">
+                <TabsTrigger
+                  value="certificates"
+                  className="flex items-center gap-2"
+                >
                   <Award className="h-4 w-4" />
-                  Issued Certificates
+                  <span className="hidden sm:inline">Issued Certificates</span>
+                  <span className="sm:hidden">Certificates</span>
                 </TabsTrigger>
-                <TabsTrigger value="templates" className="flex items-center gap-2">
+                <TabsTrigger
+                  value="templates"
+                  className="flex items-center gap-2"
+                >
                   <Settings className="h-4 w-4" />
-                  Certificate Templates
+                  <span className="hidden sm:inline">Certificate Templates</span>
+                  <span className="sm:hidden">Templates</span>
                 </TabsTrigger>
               </TabsList>
 
@@ -331,7 +338,7 @@ export default function AdminCertificatesPage() {
                           const certDate = new Date(u.certificate_available_at || u.created_at)
                           const now = new Date()
                           return certDate.getMonth() === now.getMonth() &&
-                                certDate.getFullYear() === now.getFullYear()
+                            certDate.getFullYear() === now.getFullYear()
                         }).length}
                       </div>
                     </CardContent>
@@ -386,12 +393,12 @@ export default function AdminCertificatesPage() {
                         <Table>
                           <TableHeader>
                             <TableRow>
-                              <TableHead className="min-w-[150px]">Name</TableHead>
-                              <TableHead className="min-w-[200px]">Email</TableHead>
-                              <TableHead className="min-w-[100px]">Score</TableHead>
-                              <TableHead className="min-w-[120px]">Issued Date</TableHead>
-                              <TableHead className="min-w-[120px]">Certificate ID</TableHead>
-                              <TableHead className="min-w-[120px]">Actions</TableHead>
+                              <TableHead>Name</TableHead>
+                              <TableHead>Email</TableHead>
+                              <TableHead>Score</TableHead>
+                              <TableHead>Issued Date</TableHead>
+                              <TableHead>Certificate ID</TableHead>
+                              <TableHead>Actions</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
@@ -402,7 +409,7 @@ export default function AdminCertificatesPage() {
                                 </TableCell>
                                 <TableCell>{user.email}</TableCell>
                                 <TableCell>
-                                  <Badge variant="default">
+                                  <Badge variant="secondary">
                                     {user.test_score}%
                                   </Badge>
                                 </TableCell>
@@ -419,10 +426,10 @@ export default function AdminCertificatesPage() {
                                 </TableCell>
                                 <TableCell>
                                   <div className="flex items-center gap-2">
-                                    <Button variant="ghost" size="sm">
+                                    <Button variant="outline" size="sm" className="h-8 w-8 p-0">
                                       <Eye className="h-4 w-4" />
                                     </Button>
-                                    <Button variant="ghost" size="sm">
+                                    <Button variant="outline" size="sm" className="h-8 w-8 p-0">
                                       <Download className="h-4 w-4" />
                                     </Button>
                                   </div>
@@ -450,7 +457,7 @@ export default function AdminCertificatesPage() {
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                       {/* Organization Settings */}
                       <div className="space-y-4">
                         <h3 className="text-lg font-semibold flex items-center gap-2">
@@ -458,7 +465,7 @@ export default function AdminCertificatesPage() {
                           Organization Details
                         </h3>
 
-                        <div>
+                        <div className="space-y-2">
                           <Label htmlFor="template_name">Template Name</Label>
                           <Input
                             id="template_name"
@@ -467,7 +474,7 @@ export default function AdminCertificatesPage() {
                           />
                         </div>
 
-                        <div>
+                        <div className="space-y-2">
                           <Label htmlFor="organization_name">Organization Name</Label>
                           <Input
                             id="organization_name"
@@ -476,7 +483,7 @@ export default function AdminCertificatesPage() {
                           />
                         </div>
 
-                        <div>
+                        <div className="space-y-2">
                           <Label htmlFor="certificate_title">Certificate Title</Label>
                           <Input
                             id="certificate_title"
@@ -485,7 +492,7 @@ export default function AdminCertificatesPage() {
                           />
                         </div>
 
-                        <div>
+                        <div className="space-y-2">
                           <Label htmlFor="certificate_subtitle">Certificate Subtitle</Label>
                           <Input
                             id="certificate_subtitle"
@@ -502,7 +509,7 @@ export default function AdminCertificatesPage() {
                           Certificate Content
                         </h3>
 
-                        <div>
+                        <div className="space-y-2">
                           <Label htmlFor="main_title">Main Title</Label>
                           <Input
                             id="main_title"
@@ -511,7 +518,7 @@ export default function AdminCertificatesPage() {
                           />
                         </div>
 
-                        <div>
+                        <div className="space-y-2">
                           <Label htmlFor="recipient_title">Recipient Title</Label>
                           <Input
                             id="recipient_title"
@@ -520,199 +527,25 @@ export default function AdminCertificatesPage() {
                           />
                         </div>
 
-                        <div>
+                        <div className="space-y-2">
                           <Label htmlFor="achievement_description">Achievement Description</Label>
                           <Textarea
                             id="achievement_description"
                             value={templateForm.achievement_description}
                             onChange={(e) => handleTemplateChange('achievement_description', e.target.value)}
                             rows={4}
+                            className="resize-vertical"
                           />
                         </div>
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      {/* Labels */}
-                      <div className="space-y-4">
-                        <h3 className="text-lg font-semibold">Labels & Signatures</h3>
-
-                        <div>
-                          <Label htmlFor="date_label">Date Label</Label>
-                          <Input
-                            id="date_label"
-                            value={templateForm.date_label}
-                            onChange={(e) => handleTemplateChange('date_label', e.target.value)}
-                          />
-                        </div>
-
-                        <div>
-                          <Label htmlFor="score_label">Score Label</Label>
-                          <Input
-                            id="score_label"
-                            value={templateForm.score_label}
-                            onChange={(e) => handleTemplateChange('score_label', e.target.value)}
-                          />
-                        </div>
-
-                        <div>
-                          <Label htmlFor="certificate_id_label">Certificate ID Label</Label>
-                          <Input
-                            id="certificate_id_label"
-                            value={templateForm.certificate_id_label}
-                            onChange={(e) => handleTemplateChange('certificate_id_label', e.target.value)}
-                          />
-                        </div>
-                      </div>
-
-                      {/* Signature */}
-                      <div className="space-y-4">
-                        <h3 className="text-lg font-semibold">Signature Details</h3>
-
-                        <div>
-                          <Label htmlFor="signature_name">Signature Name</Label>
-                          <Input
-                            id="signature_name"
-                            value={templateForm.signature_name}
-                            onChange={(e) => handleTemplateChange('signature_name', e.target.value)}
-                          />
-                        </div>
-
-                        <div>
-                          <Label htmlFor="signature_title">Signature Title</Label>
-                          <Input
-                            id="signature_title"
-                            value={templateForm.signature_title}
-                            onChange={(e) => handleTemplateChange('signature_title', e.target.value)}
-                          />
-                        </div>
-
-                        <div>
-                          <Label htmlFor="signature_organization">Signature Organization</Label>
-                          <Input
-                            id="signature_organization"
-                            value={templateForm.signature_organization}
-                            onChange={(e) => handleTemplateChange('signature_organization', e.target.value)}
-                          />
-                        </div>
-
-                        <div>
-                          <Label htmlFor="director_signature">Director's Signature (Image URL)</Label>
-                          <Input
-                            id="director_signature"
-                            value={templateForm.director_signature}
-                            onChange={(e) => handleTemplateChange('director_signature', e.target.value)}
-                            placeholder="https://example.com/director-signature.png"
-                          />
-                          <p className="text-sm text-muted-foreground mt-1">
-                            Upload the director's signature image and paste the URL here
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                      {/* Colors */}
-                      <div className="space-y-4">
-                        <h3 className="text-lg font-semibold flex items-center gap-2">
-                          <Palette className="h-4 w-4" />
-                          Colors
-                        </h3>
-
-                        <div>
-                          <Label htmlFor="background_color">Background Color</Label>
-                          <div className="flex gap-2">
-                            <Input
-                              id="background_color"
-                              type="color"
-                              value={templateForm.background_color}
-                              onChange={(e) => handleTemplateChange('background_color', e.target.value)}
-                              className="w-16 h-10"
-                            />
-                            <Input
-                              value={templateForm.background_color}
-                              onChange={(e) => handleTemplateChange('background_color', e.target.value)}
-                              placeholder="#fefefe"
-                            />
-                          </div>
-                        </div>
-
-                        <div>
-                          <Label htmlFor="primary_color">Primary Color</Label>
-                          <div className="flex gap-2">
-                            <Input
-                              id="primary_color"
-                              type="color"
-                              value={templateForm.primary_color}
-                              onChange={(e) => handleTemplateChange('primary_color', e.target.value)}
-                              className="w-16 h-10"
-                            />
-                            <Input
-                              value={templateForm.primary_color}
-                              onChange={(e) => handleTemplateChange('primary_color', e.target.value)}
-                              placeholder="#1a2332"
-                            />
-                          </div>
-                        </div>
-
-                        <div>
-                          <Label htmlFor="accent_color">Accent Color</Label>
-                          <div className="flex gap-2">
-                            <Input
-                              id="accent_color"
-                              type="color"
-                              value={templateForm.accent_color}
-                              onChange={(e) => handleTemplateChange('accent_color', e.target.value)}
-                              className="w-16 h-10"
-                            />
-                            <Input
-                              value={templateForm.accent_color}
-                              onChange={(e) => handleTemplateChange('accent_color', e.target.value)}
-                              placeholder="#c9aa68"
-                            />
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Typography */}
-                      <div className="space-y-4">
-                        <h3 className="text-lg font-semibold">Typography</h3>
-
-                        <div>
-                          <Label htmlFor="font_family">Font Family</Label>
-                          <Select value={templateForm.font_family} onValueChange={(value) => handleTemplateChange('font_family', value)}>
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="Cormorant Garamond, Times New Roman, serif">Cormorant Garamond</SelectItem>
-                              <SelectItem value="Times New Roman, serif">Times New Roman</SelectItem>
-                              <SelectItem value="Georgia, serif">Georgia</SelectItem>
-                              <SelectItem value="Arial, sans-serif">Arial</SelectItem>
-                              <SelectItem value="Helvetica, sans-serif">Helvetica</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-
-                      {/* Watermark */}
-                      <div className="space-y-4">
-                        <h3 className="text-lg font-semibold">Watermark</h3>
-
-                        <div>
-                          <Label htmlFor="watermark_text">Watermark Text</Label>
-                          <Input
-                            id="watermark_text"
-                            value={templateForm.watermark_text}
-                            onChange={(e) => handleTemplateChange('watermark_text', e.target.value)}
-                            placeholder="CERTIFIED"
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex justify-end pt-6 border-t">
-                      <Button onClick={handleSaveTemplate} className="flex items-center gap-2">
+                    {/* Save Button */}
+                    <div className="flex justify-end pt-4">
+                      <Button
+                        onClick={handleSaveTemplate}
+                        className="flex items-center gap-2"
+                      >
                         <Save className="h-4 w-4" />
                         Save Template Changes
                       </Button>
@@ -732,16 +565,15 @@ export default function AdminCertificatesPage() {
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <div className="border rounded-lg p-4 bg-gradient-to-br from-blue-50 to-yellow-50">
+                    <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-4 bg-muted/50">
                       <div
-                        className="bg-white border-4 border-blue-600 rounded-lg p-8 mx-auto max-w-7xl shadow-2xl relative overflow-hidden"
+                        className="bg-white border-4 border-blue-600 rounded-lg p-8 mx-auto max-w-4xl shadow-2xl relative overflow-hidden"
                         style={{
                           fontFamily: templateForm.font_family,
-                          background: `linear-gradient(135deg, ${templateForm.background_color} 0%, #f8fafc 50%, #ffffff 100%)`,
-                          borderColor: '#1e40af'
+                          background: templateForm.background_color,
                         }}
                       >
-                        {/* Logo at the top */}
+                        {/* Certificate content remains the same */}
                         <div className="flex justify-center mb-4">
                           <img
                             src="/Global-Security-Practitioners-Alliance.png"
@@ -750,44 +582,46 @@ export default function AdminCertificatesPage() {
                           />
                         </div>
 
-                        {/* Decorative border */}
                         <div className="absolute inset-4 border-2 border-yellow-400 rounded pointer-events-none"></div>
 
-                        {/* Header */}
                         <div className="text-center mb-8 relative z-10">
-                          <div className="text-3xl font-bold mb-3 text-blue-800">
+                          <div className="text-3xl font-bold mb-3" style={{ color: templateForm.primary_color }}>
                             {templateForm.organization_name}
                           </div>
-                          <div className="text-xl mb-4 text-yellow-600 font-semibold">
+                          <div className="text-xl mb-4 font-semibold" style={{ color: templateForm.accent_color }}>
                             {templateForm.certificate_subtitle}
                           </div>
-                          <div className="w-24 h-1 mx-auto bg-gradient-to-r from-blue-600 to-yellow-500 rounded-full"></div>
+                          <div className="w-24 h-1 mx-auto rounded-full" style={{ 
+                            background: `linear-gradient(to right, ${templateForm.primary_color}, ${templateForm.accent_color})` 
+                          }}></div>
                         </div>
 
-                        {/* Main Title */}
-                        <h1 className="text-5xl font-bold text-center mb-8 italic text-blue-800 relative z-10">
+                        <h1 className="text-5xl font-bold text-center mb-8 italic" style={{ color: templateForm.primary_color }}>
                           {templateForm.main_title}
                         </h1>
 
-                        {/* Recipient */}
                         <div className="text-center mb-8 relative z-10">
-                          <p className="text-2xl mb-6 italic text-gray-700 font-semibold text-center">
+                          <p className="text-2xl mb-6 italic font-semibold text-center text-gray-700">
                             {templateForm.recipient_title}
                           </p>
-                          <div className="text-4xl font-bold inline-block px-8 py-3 border-b-4 border-yellow-500 bg-gradient-to-r from-blue-50 to-yellow-50 rounded-lg">
+                          <div 
+                            className="text-4xl font-bold inline-block px-8 py-3 border-b-4 rounded-lg"
+                            style={{ 
+                              borderColor: templateForm.accent_color,
+                              background: `linear-gradient(135deg, ${templateForm.background_color} 0%, #f8fafc 100%)`
+                            }}
+                          >
                             John Doe
                           </div>
                         </div>
 
-                        {/* Achievement Description - REMOVED */}
-
-                        {/* Details Section */}
+                        {/* Rest of the certificate preview content */}
                         <div className="flex justify-between items-center mb-12 px-8 relative z-10">
                           <div className="text-center bg-white/80 p-4 rounded-lg shadow-md">
-                            <div className="text-sm font-bold mb-2 text-blue-700 uppercase tracking-wide">
+                            <div className="text-sm font-bold mb-2 uppercase tracking-wide" style={{ color: templateForm.primary_color }}>
                               {templateForm.date_label}
                             </div>
-                            <div className="text-lg font-semibold text-blue-800">
+                            <div className="text-lg font-semibold" style={{ color: templateForm.primary_color }}>
                               {new Date().toLocaleDateString('en-US', {
                                 year: 'numeric',
                                 month: 'long',
@@ -796,29 +630,30 @@ export default function AdminCertificatesPage() {
                             </div>
                           </div>
 
-                          <div className="text-center bg-yellow-400 p-4 rounded-lg shadow-md">
-                            <div className="text-sm font-bold mb-2 text-blue-800 uppercase tracking-wide">
+                          <div className="text-center p-4 rounded-lg shadow-md" style={{ backgroundColor: templateForm.accent_color }}>
+                            <div className="text-sm font-bold mb-2 uppercase tracking-wide" style={{ color: templateForm.primary_color }}>
                               {templateForm.score_label}
                             </div>
-                            <div className="text-2xl font-bold text-blue-800">
+                            <div className="text-2xl font-bold" style={{ color: templateForm.primary_color }}>
                               95%
                             </div>
                           </div>
 
                           <div className="text-center bg-white/80 p-4 rounded-lg shadow-md">
-                            <div className="text-sm font-bold mb-2 text-blue-700 uppercase tracking-wide">
+                            <div className="text-sm font-bold mb-2 uppercase tracking-wide" style={{ color: templateForm.primary_color }}>
                               {templateForm.certificate_id_label}
                             </div>
-                            <div className="font-mono text-lg font-semibold text-blue-800">
+                            <div className="font-mono text-lg font-semibold" style={{ color: templateForm.primary_color }}>
                               GSPA-ABC123
                             </div>
                           </div>
                         </div>
 
-                        {/* Signature and Seal */}
                         <div className="flex justify-between items-end relative z-10 px-8">
                           <div className="text-center">
-                            <div className="w-64 h-px bg-gradient-to-r from-transparent via-blue-600 to-transparent mx-auto mb-4"></div>
+                            <div className="w-64 h-px mx-auto mb-4" style={{ 
+                              background: `linear-gradient(to right, transparent, ${templateForm.primary_color}, transparent)` 
+                            }}></div>
                             {templateForm.director_signature && (
                               <div className="mb-4">
                                 <img
@@ -828,40 +663,32 @@ export default function AdminCertificatesPage() {
                                 />
                               </div>
                             )}
-                            <div className="text-2xl font-bold italic text-blue-800 mb-2">
+                            <div className="text-2xl font-bold italic mb-2" style={{ color: templateForm.primary_color }}>
                               {templateForm.signature_name}
                             </div>
                             <div className="text-lg text-gray-600 mb-1">
                               {templateForm.signature_title}
                             </div>
-                            <div className="text-base text-yellow-600 font-semibold">
+                            <div className="text-base font-semibold" style={{ color: templateForm.accent_color }}>
                               {templateForm.signature_organization}
                             </div>
                           </div>
 
-                          {/* Certificate Seal */}
                           <div className="flex-shrink-0">
                             <CertificateSeal size={140} />
                           </div>
                         </div>
 
-                        {/* GSPA Certified Watermark */}
                         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                          <div className="text-8xl font-black text-blue-800/5 transform -rotate-45 select-none">
-                            GSPA CERTIFIED
+                          <div 
+                            className="text-8xl font-black transform -rotate-45 select-none"
+                            style={{ color: `${templateForm.primary_color}05` }}
+                          >
+                            {templateForm.watermark_text}
                           </div>
                         </div>
-
-                        {/* Decorative elements */}
-                        <div className="absolute top-8 left-8 w-20 h-20 border-4 border-yellow-400 rounded-full opacity-20"></div>
-                        <div className="absolute top-8 right-8 w-20 h-20 border-4 border-blue-600 rounded-full opacity-20"></div>
-                        <div className="absolute bottom-8 left-8 w-20 h-20 border-4 border-yellow-400 rounded-full opacity-20"></div>
-                        <div className="absolute bottom-8 right-8 w-20 h-20 border-4 border-blue-600 rounded-full opacity-20"></div>
                       </div>
                     </div>
-                    <p className="text-sm text-muted-foreground mt-4 text-center">
-                      This is a scaled preview. The actual certificate will be generated in high resolution with professional branding.
-                    </p>
                   </CardContent>
                 </Card>
               </TabsContent>

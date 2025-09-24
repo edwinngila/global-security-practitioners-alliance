@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { DashboardSidebar } from "@/components/dashboard-sidebar"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
@@ -56,7 +55,6 @@ export default function DashboardTestPage() {
   const [timeLeft, setTimeLeft] = useState(3600) // 60 minutes in seconds
   const [testStarted, setTestStarted] = useState(false)
   const [isOnline, setIsOnline] = useState(true)
-  const [isAdmin, setIsAdmin] = useState(false)
   const [testInfo, setTestInfo] = useState({ passingScore: 70, timeLimit: 60, isAssignedExam: false })
   const router = useRouter()
   const supabase = createClient()
@@ -283,8 +281,7 @@ export default function DashboardTestPage() {
         return
       }
 
-      // Check if user is admin
-      setIsAdmin(authUser.email === 'admin@gmail.com')
+      // Check if admin - handled in layout
 
       const { data: profile, error: profileError } = await supabase
         .from("profiles")
@@ -626,87 +623,74 @@ export default function DashboardTestPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex">
-        <div className="flex-1 flex items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin" />
-        </div>
+      <div className="flex items-center justify-center py-8">
+        <Loader2 className="h-8 w-8 animate-spin" />
       </div>
     )
   }
 
   if (!user || !questions.length) {
     return (
-      <div className="min-h-screen flex">
-        <div className="flex-1 flex items-center justify-center">
-          <Alert variant="destructive">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>Unable to load test. Please try again later.</AlertDescription>
-          </Alert>
-        </div>
+      <div className="flex items-center justify-center py-8">
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>Unable to load test. Please try again later.</AlertDescription>
+        </Alert>
       </div>
     )
   }
 
   if (!testStarted) {
     return (
-      <div className="min-h-screen flex">
-        <DashboardSidebar
-          isAdmin={isAdmin}
-          userName={`${user.first_name} ${user.last_name}`}
-          userEmail={user.email}
-        />
-        <main className="flex-1 overflow-y-auto md:ml-64">
-          <div className="p-4 md:p-8">
-            <div className="max-w-2xl mx-auto">
-              <Card>
-                <CardHeader className="text-center">
-                  <CardTitle className="text-3xl">Security Aptitude Test</CardTitle>
-                  <CardDescription className="text-lg">
-                    Welcome {user.first_name}! You are about to begin your certification assessment.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="bg-muted/50 p-6 rounded-lg">
-                    <h3 className="font-semibold mb-4">Test Information</h3>
-                    <div className="grid grid-cols-2 gap-4 text-sm">
-                      <div>
-                        <p>
-                          <strong>Total Questions:</strong> {questions.length}
-                        </p>
-                        <p>
-                          <strong>Time Limit:</strong> {testInfo.timeLimit} minutes
-                        </p>
-                      </div>
-                      <div>
-                        <p>
-                          <strong>Passing Score:</strong> {testInfo.passingScore}%
-                        </p>
-                        <p>
-                          <strong>Format:</strong> Multiple Choice
-                        </p>
-                      </div>
-                    </div>
+      <div className="p-4 md:p-8">
+        <div className="max-w-2xl mx-auto">
+          <Card>
+            <CardHeader className="text-center">
+              <CardTitle className="text-3xl">Security Aptitude Test</CardTitle>
+              <CardDescription className="text-lg">
+                Welcome {user.first_name}! You are about to begin your certification assessment.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="bg-muted/50 p-6 rounded-lg">
+                <h3 className="font-semibold mb-4">Test Information</h3>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <p>
+                      <strong>Total Questions:</strong> {questions.length}
+                    </p>
+                    <p>
+                      <strong>Time Limit:</strong> {testInfo.timeLimit} minutes
+                    </p>
                   </div>
+                  <div>
+                    <p>
+                      <strong>Passing Score:</strong> {testInfo.passingScore}%
+                    </p>
+                    <p>
+                      <strong>Format:</strong> Multiple Choice
+                    </p>
+                  </div>
+                </div>
+              </div>
 
-                  <Alert>
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertDescription>
-                      <strong>Important:</strong> {testInfo.isAssignedExam
-                        ? "You have been assigned a specific exam configuration."
-                        : "You will receive randomly selected questions from our question bank."
-                      } Once you start the test, the timer will begin and you cannot pause. Make sure you have a stable
-                      internet connection and sufficient time to complete the assessment.
-                    </AlertDescription>
-                  </Alert>
+              <Alert>
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  <strong>Important:</strong> {testInfo.isAssignedExam
+                    ? "You have been assigned a specific exam configuration."
+                    : "You will receive randomly selected questions from our question bank."
+                  } Once you start the test, the timer will begin and you cannot pause. Make sure you have a stable
+                  internet connection and sufficient time to complete the assessment.
+                </AlertDescription>
+              </Alert>
 
-                  <Button onClick={() => setTestStarted(true)} className="w-full text-lg py-6" size="lg">
-                    Start Test
-                  </Button>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-        </main>
+              <Button onClick={() => setTestStarted(true)} className="w-full text-lg py-6" size="lg">
+                Start Test
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     )
   }
@@ -715,120 +699,112 @@ export default function DashboardTestPage() {
   const progress = ((currentQuestion + 1) / questions.length) * 100
 
   return (
-    <div className="min-h-screen flex">
-      <DashboardSidebar
-        isAdmin={isAdmin}
-        userName={`${user.first_name} ${user.last_name}`}
-        userEmail={user.email}
-      />
-
-      <main className="flex-1 overflow-y-auto md:ml-64">
-        {/* Test Header */}
-        <div className="bg-primary text-primary-foreground py-4">
-          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between items-center">
-              <div>
-                <h1 className="text-xl font-semibold">Security Aptitude Test</h1>
-                <p className="text-sm opacity-90">
-                  Question {currentQuestion + 1} of {questions.length}
+    <>
+      {/* Test Header */}
+      <div className="bg-primary text-primary-foreground py-4">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center">
+            <div>
+              <h1 className="text-xl font-semibold">Security Aptitude Test</h1>
+              <p className="text-sm opacity-90">
+                Question {currentQuestion + 1} of {questions.length}
+              </p>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <Clock className="h-5 w-5" />
+                <span className="font-mono text-lg">{formatTime(timeLeft)}</span>
+              </div>
+              <div className="text-right">
+                <p className="text-sm">Answered</p>
+                <p className="font-semibold">
+                  {Object.keys(answers).length}/{questions.length}
                 </p>
               </div>
-              <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2">
-                  <Clock className="h-5 w-5" />
-                  <span className="font-mono text-lg">{formatTime(timeLeft)}</span>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm">Answered</p>
-                  <p className="font-semibold">
-                    {Object.keys(answers).length}/{questions.length}
-                  </p>
-                </div>
-              </div>
             </div>
-            <Progress value={progress} className="mt-4 h-2 bg-gray-200" />
+          </div>
+          <Progress value={progress} className="mt-4 h-2 bg-gray-200" />
 
-            {/* Internet Connection Warning */}
-            {!isOnline && (
-              <Alert className="mt-4 border-orange-500 bg-orange-50 text-orange-800">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>
-                  <strong>Connection Lost:</strong> Your internet connection is offline. Your progress is being saved locally and will be submitted when connection is restored.
-                </AlertDescription>
-              </Alert>
+          {/* Internet Connection Warning */}
+          {!isOnline && (
+            <Alert className="mt-4 border-orange-500 bg-orange-50 text-orange-800">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                <strong>Connection Lost:</strong> Your internet connection is offline. Your progress is being saved locally and will be submitted when connection is restored.
+              </AlertDescription>
+            </Alert>
+          )}
+        </div>
+      </div>
+
+      {/* Test Content */}
+      <div className="py-8">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+          <Card>
+            <CardContent className="p-8">
+              <div className="mb-6">
+                <h2 className="text-xl font-semibold mb-2">Question {currentQuestion + 1}</h2>
+                <p className="text-lg leading-relaxed">{currentQ.question}</p>
+                <p className="text-sm text-muted-foreground mt-2">Category: {currentQ.category}</p>
+              </div>
+
+              <RadioGroup
+                value={answers[currentQ.id] || ""}
+                onValueChange={(value: string) => handleAnswerSelect(currentQ.id, value)}
+                className="space-y-4"
+              >
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="A" id="a" />
+                  <Label htmlFor="a" className="flex-1 cursor-pointer">
+                    <span className="font-semibold mr-2">A)</span>
+                    {currentQ.option_a}
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="B" id="b" />
+                  <Label htmlFor="b" className="flex-1 cursor-pointer">
+                    <span className="font-semibold mr-2">B)</span>
+                    {currentQ.option_b}
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="C" id="c" />
+                  <Label htmlFor="c" className="flex-1 cursor-pointer">
+                    <span className="font-semibold mr-2">C)</span>
+                    {currentQ.option_c}
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="D" id="d" />
+                  <Label htmlFor="d" className="flex-1 cursor-pointer">
+                    <span className="font-semibold mr-2">D)</span>
+                    {currentQ.option_d}
+                  </Label>
+                </div>
+              </RadioGroup>
+            </CardContent>
+          </Card>
+
+          {/* Navigation */}
+          <div className="flex justify-between mt-8">
+            <Button variant="outline" onClick={handlePrevious} disabled={currentQuestion === 0}>
+              Previous
+            </Button>
+
+            {currentQuestion === questions.length - 1 ? (
+              <Button
+                onClick={handleSubmitTest}
+                disabled={isSubmitting || Object.keys(answers).length !== questions.length}
+                className="bg-green-600 hover:bg-green-700"
+              >
+                {isSubmitting ? "Submitting..." : "Submit Test"}
+              </Button>
+            ) : (
+              <Button onClick={handleNext}>Next</Button>
             )}
           </div>
         </div>
-
-        {/* Test Content */}
-        <div className="py-8">
-          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-            <Card>
-              <CardContent className="p-8">
-                <div className="mb-6">
-                  <h2 className="text-xl font-semibold mb-2">Question {currentQuestion + 1}</h2>
-                  <p className="text-lg leading-relaxed">{currentQ.question}</p>
-                  <p className="text-sm text-muted-foreground mt-2">Category: {currentQ.category}</p>
-                </div>
-
-                <RadioGroup
-                  value={answers[currentQ.id] || ""}
-                  onValueChange={(value: string) => handleAnswerSelect(currentQ.id, value)}
-                  className="space-y-4"
-                >
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="A" id="a" />
-                    <Label htmlFor="a" className="flex-1 cursor-pointer">
-                      <span className="font-semibold mr-2">A)</span>
-                      {currentQ.option_a}
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="B" id="b" />
-                    <Label htmlFor="b" className="flex-1 cursor-pointer">
-                      <span className="font-semibold mr-2">B)</span>
-                      {currentQ.option_b}
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="C" id="c" />
-                    <Label htmlFor="c" className="flex-1 cursor-pointer">
-                      <span className="font-semibold mr-2">C)</span>
-                      {currentQ.option_c}
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="D" id="d" />
-                    <Label htmlFor="d" className="flex-1 cursor-pointer">
-                      <span className="font-semibold mr-2">D)</span>
-                      {currentQ.option_d}
-                    </Label>
-                  </div>
-                </RadioGroup>
-              </CardContent>
-            </Card>
-
-            {/* Navigation */}
-            <div className="flex justify-between mt-8">
-              <Button variant="outline" onClick={handlePrevious} disabled={currentQuestion === 0}>
-                Previous
-              </Button>
-
-              {currentQuestion === questions.length - 1 ? (
-                <Button
-                  onClick={handleSubmitTest}
-                  disabled={isSubmitting || Object.keys(answers).length !== questions.length}
-                  className="bg-green-600 hover:bg-green-700"
-                >
-                  {isSubmitting ? "Submitting..." : "Submit Test"}
-                </Button>
-              ) : (
-                <Button onClick={handleNext}>Next</Button>
-              )}
-            </div>
-          </div>
-        </div>
-      </main>
-    </div>
+      </div>
+    </>
   )
 }

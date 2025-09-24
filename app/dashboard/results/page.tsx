@@ -1,11 +1,10 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { DashboardSidebar } from "@/components/dashboard-sidebar"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { CheckCircle, XCircle, Download, Award, User, Menu } from "lucide-react"
+import { CheckCircle, XCircle, Download, Award, User } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
@@ -35,8 +34,6 @@ export default function DashboardResultsPage() {
   const [results, setResults] = useState<TestResults | null>(null)
   const [user, setUser] = useState<UserProfile | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [isAdmin, setIsAdmin] = useState(false)
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const certificateRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
   const supabase = createClient()
@@ -71,8 +68,7 @@ export default function DashboardResultsPage() {
         return
       }
 
-      // Check if admin
-      setIsAdmin(authUser.email === 'admin@gmail.com')
+      // Check if admin - handled in layout
 
       const { data: profile } = await supabase.from("profiles").select("*").eq("id", authUser.id).single()
 
@@ -619,248 +615,204 @@ export default function DashboardResultsPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex">
-        <div className="flex-1 flex items-center justify-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-        </div>
+      <div className="flex items-center justify-center py-8">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
       </div>
     )
   }
 
   if (!results || !user) {
     return (
-      <div className="min-h-screen flex">
-        <div className="flex-1 flex items-center justify-center">
-          <Card className="max-w-md">
-            <CardContent className="pt-6 text-center">
-              <p>No test results found. Please take the test first.</p>
-              <Button asChild className="mt-4">
-                <Link href="/dashboard">Return to Dashboard</Link>
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
+      <div className="flex items-center justify-center py-8">
+        <Card className="max-w-md">
+          <CardContent className="pt-6 text-center">
+            <p>No test results found. Please take the test first.</p>
+            <Button asChild className="mt-4">
+              <Link href="/dashboard">Return to Dashboard</Link>
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen flex">
-      {/* Mobile Sidebar */}
-      {mobileMenuOpen && (
-        <div className="fixed inset-0 z-50 md:hidden">
-          <div className="absolute inset-0 bg-black/50" onClick={() => setMobileMenuOpen(false)} />
-          <div className="absolute left-0 top-0 h-full w-64">
-            <DashboardSidebar
-              isAdmin={isAdmin}
-              userName={`${user.first_name} ${user.last_name}`}
-              userEmail={user.email}
-            />
-          </div>
-        </div>
-      )}
-
-      {/* Desktop Sidebar */}
-      <DashboardSidebar
-        isAdmin={isAdmin}
-        userName={`${user.first_name} ${user.last_name}`}
-        userEmail={user.email}
-      />
-
-      <main className="flex-1 overflow-y-auto md:ml-64">
-        {/* Mobile Header */}
-        <div className="md:hidden bg-white border-b p-4 flex items-center justify-between">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setMobileMenuOpen(true)}
-            className="md:hidden"
-          >
-            <Menu className="h-5 w-5" />
-          </Button>
-          <h1 className="text-lg font-semibold">Test Results</h1>
-          <div className="w-8" /> {/* Spacer */}
-        </div>
-
-        {/* Results Content */}
-        <div className="p-4 md:p-8">
-          <div className="max-w-4xl mx-auto">
-            {/* Results Header */}
-            <div className="text-center mb-12">
-              <div className="flex justify-center mb-6">
-                {results.passed ? (
-                  <CheckCircle className="h-20 w-20 text-green-500" />
-                ) : (
-                  <XCircle className="h-20 w-20 text-red-500" />
-                )}
-              </div>
-              <h1 className="text-4xl font-bold mb-4">{results.passed ? "Congratulations!" : "Test Complete"}</h1>
-              <p className="text-xl text-muted-foreground">
-                {results.passed
-                  ? "You have successfully passed the Security Aptitude Test"
-                  : "You did not meet the passing requirements this time"}
-              </p>
-            </div>
-
-            {/* Results Card */}
-            <Card className="mb-8">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Award className="h-6 w-6" />
-                  Test Results
-                </CardTitle>
-                <CardDescription>Your performance on the Security Aptitude Test</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div className="text-center">
-                    <div className="text-3xl font-bold text-primary mb-2">{results.score}%</div>
-                    <p className="text-sm text-muted-foreground">Final Score</p>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-3xl font-bold text-primary mb-2">
-                      {results.correctAnswers}/{results.totalQuestions}
-                    </div>
-                    <p className="text-sm text-muted-foreground">Correct Answers</p>
-                  </div>
-                  <div className="text-center">
-                    <Badge variant={results.passed ? "default" : "destructive"} className="text-lg px-4 py-2">
-                      {results.passed ? "PASSED" : "FAILED"}
-                    </Badge>
-                    <p className="text-sm text-muted-foreground mt-2">
-                      {results.passed ? "70% or higher required" : "70% required to pass"}
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* User Information */}
-            <Card className="mb-8">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <User className="h-6 w-6" />
-                  Candidate Information
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Name</p>
-                    <p className="font-semibold">
-                      {user.first_name} {user.last_name}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Email</p>
-                    <p className="font-semibold">{user.email}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Test Date</p>
-                    <p className="font-semibold">
-                      {new Date().toLocaleDateString("en-US", {
-                        year: "numeric",
-                        month: "long",
-                        day: "numeric",
-                      })}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Certificate ID</p>
-                    <p className="font-semibold">GSI-{user.id.slice(0, 8).toUpperCase()}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Certificate Section */}
-            {results.passed && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Award className="h-6 w-6" />
-                    Your Certificate
-                  </CardTitle>
-                  <CardDescription>
-                    {isCertificateAvailable()
-                      ? "Download your official Security Professional Certificate"
-                      : "Your certificate will be available for download in 48 hours"
-                    }
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-center space-y-4">
-                    {isCertificateAvailable() ? (
-                      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-8 rounded-lg border-2 border-dashed border-blue-200">
-                        <Award className="h-16 w-16 text-blue-600 mx-auto mb-4" />
-                        <h3 className="text-xl font-semibold text-blue-900 mb-2">Security Professional Certificate</h3>
-                        <p className="text-blue-700 mb-4">
-                          Congratulations on achieving your certification! Your certificate is ready for download.
-                        </p>
-                        <Button onClick={downloadCertificate} size="lg" className="gap-2">
-                          <Download className="h-5 w-5" />
-                          Download Certificate
-                        </Button>
-                      </div>
-                    ) : (
-                      <div className="bg-gradient-to-r from-yellow-50 to-orange-50 p-8 rounded-lg border-2 border-dashed border-yellow-200">
-                        <Award className="h-16 w-16 text-yellow-600 mx-auto mb-4" />
-                        <h3 className="text-xl font-semibold text-yellow-900 mb-2">Certificate Processing</h3>
-                        <p className="text-yellow-700 mb-4">
-                          Your certificate is being processed and will be available for download in 48 hours.
-                        </p>
-                        <p className="text-sm text-yellow-600">
-                          Available on: {user?.certificate_available_at ? new Date(user.certificate_available_at).toLocaleString() : 'N/A'}
-                        </p>
-                      </div>
-                    )}
-                    <p className="text-sm text-muted-foreground">
-                      Your certificate will be downloaded as a professional PDF file in landscape orientation.
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
+    <div className="p-4 md:p-8">
+      <div className="max-w-4xl mx-auto">
+        {/* Results Header */}
+        <div className="text-center mb-12">
+          <div className="flex justify-center mb-6">
+            {results.passed ? (
+              <CheckCircle className="h-20 w-20 text-green-500" />
+            ) : (
+              <XCircle className="h-20 w-20 text-red-500" />
             )}
-
-            {/* Next Steps */}
-            <div className="mt-12 text-center">
-              {results.passed ? (
-                <div className="space-y-4">
-                  <h3 className="text-2xl font-semibold">What's Next?</h3>
-                  <p className="text-muted-foreground max-w-2xl mx-auto">
-                    You are now a certified Security Professional! Share your achievement and continue your professional
-                    development with advanced security courses and resources.
-                  </p>
-                  <div className="flex gap-4 justify-center">
-                    <Button asChild>
-                      <Link href="/dashboard">View Dashboard</Link>
-                    </Button>
-                    <Button variant="outline" asChild>
-                      <Link href="/">Return Home</Link>
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  <h3 className="text-2xl font-semibold">Don't Give Up!</h3>
-                  <p className="text-muted-foreground max-w-2xl mx-auto">
-                    You can retake the test after reviewing the study materials. Each attempt will have different
-                    questions to ensure a fair assessment.
-                  </p>
-                  <div className="flex gap-4 justify-center">
-                    <Button onClick={handleRetakeTest}>
-                      Retake Test
-                    </Button>
-                    <Button variant="outline" asChild>
-                      <Link href="/dashboard">Return to Dashboard</Link>
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </div>
           </div>
+          <h1 className="text-4xl font-bold mb-4">{results.passed ? "Congratulations!" : "Test Complete"}</h1>
+          <p className="text-xl text-muted-foreground">
+            {results.passed
+              ? "You have successfully passed the Security Aptitude Test"
+              : "You did not meet the passing requirements this time"}
+          </p>
         </div>
-      </main>
+
+        {/* Results Card */}
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Award className="h-6 w-6" />
+              Test Results
+            </CardTitle>
+            <CardDescription>Your performance on the Security Aptitude Test</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="text-center">
+                <div className="text-3xl font-bold text-primary mb-2">{results.score}%</div>
+                <p className="text-sm text-muted-foreground">Final Score</p>
+              </div>
+              <div className="text-center">
+                <div className="text-3xl font-bold text-primary mb-2">
+                  {results.correctAnswers}/{results.totalQuestions}
+                </div>
+                <p className="text-sm text-muted-foreground">Correct Answers</p>
+              </div>
+              <div className="text-center">
+                <Badge variant={results.passed ? "default" : "destructive"} className="text-lg px-4 py-2">
+                  {results.passed ? "PASSED" : "FAILED"}
+                </Badge>
+                <p className="text-sm text-muted-foreground mt-2">
+                  {results.passed ? "70% or higher required" : "70% required to pass"}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* User Information */}
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <User className="h-6 w-6" />
+              Candidate Information
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm text-muted-foreground">Name</p>
+                <p className="font-semibold">
+                  {user.first_name} {user.last_name}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Email</p>
+                <p className="font-semibold">{user.email}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Test Date</p>
+                <p className="font-semibold">
+                  {new Date().toLocaleDateString("en-US", {
+                    year: "numeric",
+                    month: "long",
+                    day: "numeric",
+                  })}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Certificate ID</p>
+                <p className="font-semibold">GSI-{user.id.slice(0, 8).toUpperCase()}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Certificate Section */}
+        {results.passed && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Award className="h-6 w-6" />
+                Your Certificate
+              </CardTitle>
+              <CardDescription>
+                {isCertificateAvailable()
+                  ? "Download your official Security Professional Certificate"
+                  : "Your certificate will be available for download in 48 hours"
+                }
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center space-y-4">
+                {isCertificateAvailable() ? (
+                  <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-8 rounded-lg border-2 border-dashed border-blue-200">
+                    <Award className="h-16 w-16 text-blue-600 mx-auto mb-4" />
+                    <h3 className="text-xl font-semibold text-blue-900 mb-2">Security Professional Certificate</h3>
+                    <p className="text-blue-700 mb-4">
+                      Congratulations on achieving your certification! Your certificate is ready for download.
+                    </p>
+                    <Button onClick={downloadCertificate} size="lg" className="gap-2">
+                      <Download className="h-5 w-5" />
+                      Download Certificate
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="bg-gradient-to-r from-yellow-50 to-orange-50 p-8 rounded-lg border-2 border-dashed border-yellow-200">
+                    <Award className="h-16 w-16 text-yellow-600 mx-auto mb-4" />
+                    <h3 className="text-xl font-semibold text-yellow-900 mb-2">Certificate Processing</h3>
+                    <p className="text-yellow-700 mb-4">
+                      Your certificate is being processed and will be available for download in 48 hours.
+                    </p>
+                    <p className="text-sm text-yellow-600">
+                      Available on: {user?.certificate_available_at ? new Date(user.certificate_available_at).toLocaleString() : 'N/A'}
+                    </p>
+                  </div>
+                )}
+                <p className="text-sm text-muted-foreground">
+                  Your certificate will be downloaded as a professional PDF file in landscape orientation.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Next Steps */}
+        <div className="mt-12 text-center">
+          {results.passed ? (
+            <div className="space-y-4">
+              <h3 className="text-2xl font-semibold">What's Next?</h3>
+              <p className="text-muted-foreground max-w-2xl mx-auto">
+                You are now a certified Security Professional! Share your achievement and continue your professional
+                development with advanced security courses and resources.
+              </p>
+              <div className="flex gap-4 justify-center">
+                <Button asChild>
+                  <Link href="/dashboard">View Dashboard</Link>
+                </Button>
+                <Button variant="outline" asChild>
+                  <Link href="/">Return Home</Link>
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <h3 className="text-2xl font-semibold">Don't Give Up!</h3>
+              <p className="text-muted-foreground max-w-2xl mx-auto">
+                You can retake the test after reviewing the study materials. Each attempt will have different
+                questions to ensure a fair assessment.
+              </p>
+              <div className="flex gap-4 justify-center">
+                <Button onClick={handleRetakeTest}>
+                  Retake Test
+                </Button>
+                <Button variant="outline" asChild>
+                  <Link href="/dashboard">Return to Dashboard</Link>
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   )
 }

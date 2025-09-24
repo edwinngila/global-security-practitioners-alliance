@@ -200,12 +200,12 @@ export default function AdminReportsPage() {
 
       <main className="flex-1 overflow-y-auto md:ml-64">
         {/* Mobile Header */}
-        <div className="md:hidden bg-white border-b p-4 flex items-center justify-between">
+        <div className="md:hidden bg-background border-b border-border p-4 flex items-center justify-between">
           <Button
-            variant="ghost"
+            variant="outline"
             size="sm"
             onClick={() => setMobileMenuOpen(true)}
-            className="md:hidden"
+            className="border-border hover:bg-muted"
           >
             <Menu className="h-5 w-5" />
           </Button>

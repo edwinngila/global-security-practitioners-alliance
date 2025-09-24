@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { DashboardSidebar } from "@/components/dashboard-sidebar"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -10,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
-import { User, Mail, Phone, MapPin, Briefcase, Calendar, Menu, Save, X } from "lucide-react"
+import { User, Mail, Phone, MapPin, Briefcase, Calendar, Save, X } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 
@@ -41,7 +40,6 @@ export default function ProfilePage() {
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const router = useRouter()
   const supabase = createClient()
 
@@ -163,316 +161,273 @@ export default function ProfilePage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex">
-        <div className="flex-1 flex items-center justify-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-        </div>
+      <div className="flex items-center justify-center py-8">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
       </div>
     )
   }
 
   if (!user) {
     return (
-      <div className="min-h-screen flex">
-        <div className="flex-1 flex items-center justify-center">
-          <Alert variant="destructive">
-            <X className="h-4 w-4" />
-            <AlertDescription>Please complete your registration first.</AlertDescription>
-          </Alert>
-        </div>
+      <div className="flex items-center justify-center py-8">
+        <Alert variant="destructive">
+          <X className="h-4 w-4" />
+          <AlertDescription>Please complete your registration first.</AlertDescription>
+        </Alert>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen flex">
-      {/* Mobile Sidebar */}
-      {mobileMenuOpen && (
-        <div className="fixed inset-0 z-50 md:hidden">
-          <div className="absolute inset-0 bg-black/50" onClick={() => setMobileMenuOpen(false)} />
-          <div className="absolute left-0 top-0 h-full w-64">
-            <DashboardSidebar
-              isAdmin={false}
-              userName={`${user.first_name} ${user.last_name}`}
-              userEmail={user.email}
-            />
-          </div>
-        </div>
-      )}
-
-      {/* Desktop Sidebar */}
-      <DashboardSidebar
-        isAdmin={false}
-        userName={`${user.first_name} ${user.last_name}`}
-        userEmail={user.email}
-      />
-
-      <main className="flex-1 overflow-y-auto md:ml-64">
-        {/* Mobile Header */}
-        <div className="md:hidden bg-white border-b p-4 flex items-center justify-between">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setMobileMenuOpen(true)}
-            className="md:hidden"
-          >
-            <Menu className="h-5 w-5" />
-          </Button>
-          <h1 className="text-lg font-semibold">Profile</h1>
-          <div className="w-8" />
+    <div className="p-4 md:p-8">
+      <div className="max-w-4xl mx-auto">
+        <div className="mb-8">
+          <h1 className="text-2xl md:text-3xl font-bold mb-2">Profile Information</h1>
+          <p className="text-muted-foreground">
+            Manage your personal and professional information.
+          </p>
         </div>
 
-        <div className="p-4 md:p-8">
-          <div className="max-w-4xl mx-auto">
-            <div className="mb-8">
-              <h1 className="text-2xl md:text-3xl font-bold mb-2">Profile Information</h1>
-              <p className="text-muted-foreground">
-                Manage your personal and professional information.
-              </p>
-            </div>
+        {success && (
+          <Alert className="mb-6 border-green-200 bg-green-50">
+            <AlertDescription className="text-green-800">
+              Profile updated successfully!
+            </AlertDescription>
+          </Alert>
+        )}
 
-            {success && (
-              <Alert className="mb-6 border-green-200 bg-green-50">
-                <AlertDescription className="text-green-800">
-                  Profile updated successfully!
-                </AlertDescription>
-              </Alert>
-            )}
+        {error && (
+          <Alert variant="destructive" className="mb-6">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
 
-            {error && (
-              <Alert variant="destructive" className="mb-6">
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Profile Overview */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <User className="h-5 w-5" />
+                Profile Overview
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center space-x-4">
+                <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center">
+                  <User className="h-8 w-8 text-primary" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-lg">
+                    {user.first_name} {user.last_name}
+                  </h3>
+                  <p className="text-sm text-muted-foreground">{user.email}</p>
+                </div>
+              </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Profile Overview */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <User className="h-5 w-5" />
-                    Profile Overview
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center space-x-4">
-                    <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center">
-                      <User className="h-8 w-8 text-primary" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-lg">
-                        {user.first_name} {user.last_name}
-                      </h3>
-                      <p className="text-sm text-muted-foreground">{user.email}</p>
-                    </div>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-sm">
+                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                  <span>Joined {new Date(user.created_at).toLocaleDateString()}</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <Briefcase className="h-4 w-4 text-muted-foreground" />
+                  <span>{user.designation}</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <MapPin className="h-4 w-4 text-muted-foreground" />
+                  <span>{user.organization_name}</span>
+                </div>
+              </div>
+
+              <div className="pt-4 border-t">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">Membership Status</span>
+                  <Badge variant={user.membership_fee_paid ? "default" : "secondary"}>
+                    {user.membership_fee_paid ? "Active" : "Pending"}
+                  </Badge>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Profile Form */}
+          <div className="lg:col-span-2">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Personal Information</CardTitle>
+                    <CardDescription>
+                      Update your personal details and contact information.
+                    </CardDescription>
                   </div>
-
+                  {!isEditing ? (
+                    <Button onClick={() => setIsEditing(true)} size="sm">
+                      Edit Profile
+                    </Button>
+                  ) : (
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={handleSave}
+                        disabled={isSaving}
+                        size="sm"
+                        className="bg-green-600 hover:bg-green-700"
+                      >
+                        {isSaving ? (
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                        ) : (
+                          <Save className="h-4 w-4 mr-2" />
+                        )}
+                        Save
+                      </Button>
+                      <Button
+                        onClick={handleCancel}
+                        disabled={isSaving}
+                        variant="outline"
+                        size="sm"
+                      >
+                        <X className="h-4 w-4 mr-2" />
+                        Cancel
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Basic Information */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <div className="flex items-center gap-2 text-sm">
-                      <Calendar className="h-4 w-4 text-muted-foreground" />
-                      <span>Joined {new Date(user.created_at).toLocaleDateString()}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm">
-                      <Briefcase className="h-4 w-4 text-muted-foreground" />
-                      <span>{user.designation}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm">
-                      <MapPin className="h-4 w-4 text-muted-foreground" />
-                      <span>{user.organization_name}</span>
-                    </div>
+                    <Label htmlFor="first_name">First Name</Label>
+                    <Input
+                      id="first_name"
+                      value={formData.first_name}
+                      onChange={(e) => setFormData(prev => ({ ...prev, first_name: e.target.value }))}
+                      disabled={!isEditing}
+                    />
                   </div>
-
-                  <div className="pt-4 border-t">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium">Membership Status</span>
-                      <Badge variant={user.membership_fee_paid ? "default" : "secondary"}>
-                        {user.membership_fee_paid ? "Active" : "Pending"}
-                      </Badge>
-                    </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="last_name">Last Name</Label>
+                    <Input
+                      id="last_name"
+                      value={formData.last_name}
+                      onChange={(e) => setFormData(prev => ({ ...prev, last_name: e.target.value }))}
+                      disabled={!isEditing}
+                    />
                   </div>
-                </CardContent>
-              </Card>
+                </div>
 
-              {/* Profile Form */}
-              <div className="lg:col-span-2">
-                <Card>
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <CardTitle>Personal Information</CardTitle>
-                        <CardDescription>
-                          Update your personal details and contact information.
-                        </CardDescription>
-                      </div>
-                      {!isEditing ? (
-                        <Button onClick={() => setIsEditing(true)} size="sm">
-                          Edit Profile
-                        </Button>
-                      ) : (
-                        <div className="flex gap-2">
-                          <Button
-                            onClick={handleSave}
-                            disabled={isSaving}
-                            size="sm"
-                            className="bg-green-600 hover:bg-green-700"
-                          >
-                            {isSaving ? (
-                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
-                            ) : (
-                              <Save className="h-4 w-4 mr-2" />
-                            )}
-                            Save
-                          </Button>
-                          <Button
-                            onClick={handleCancel}
-                            disabled={isSaving}
-                            variant="outline"
-                            size="sm"
-                          >
-                            <X className="h-4 w-4 mr-2" />
-                            Cancel
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    {/* Basic Information */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="first_name">First Name</Label>
-                        <Input
-                          id="first_name"
-                          value={formData.first_name}
-                          onChange={(e) => setFormData(prev => ({ ...prev, first_name: e.target.value }))}
-                          disabled={!isEditing}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="last_name">Last Name</Label>
-                        <Input
-                          id="last_name"
-                          value={formData.last_name}
-                          onChange={(e) => setFormData(prev => ({ ...prev, last_name: e.target.value }))}
-                          disabled={!isEditing}
-                        />
-                      </div>
-                    </div>
+                <div className="space-y-2">
+                  <Label htmlFor="phone">Phone Number</Label>
+                  <Input
+                    id="phone"
+                    value={formData.phone_number}
+                    onChange={(e) => setFormData(prev => ({ ...prev, phone_number: e.target.value }))}
+                    disabled={!isEditing}
+                  />
+                </div>
 
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="date_of_birth">Date of Birth</Label>
+                    <Input
+                      id="date_of_birth"
+                      type="date"
+                      value={formData.date_of_birth}
+                      onChange={(e) => setFormData(prev => ({ ...prev, date_of_birth: e.target.value }))}
+                      disabled={!isEditing}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="nationality">Nationality</Label>
+                    <Input
+                      id="nationality"
+                      value={formData.nationality}
+                      onChange={(e) => setFormData(prev => ({ ...prev, nationality: e.target.value }))}
+                      disabled={!isEditing}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="gender">Gender</Label>
+                  <Select
+                    value={formData.gender}
+                    onValueChange={(value) => setFormData(prev => ({ ...prev, gender: value }))}
+                    disabled={!isEditing}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select gender" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="male">Male</SelectItem>
+                      <SelectItem value="female">Female</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Professional Information */}
+                <div className="pt-6 border-t">
+                  <h3 className="text-lg font-semibold mb-4">Professional Information</h3>
+                  <div className="space-y-4">
                     <div className="space-y-2">
-                      <Label htmlFor="phone">Phone Number</Label>
+                      <Label htmlFor="designation">Designation</Label>
                       <Input
-                        id="phone"
-                        value={formData.phone_number}
-                        onChange={(e) => setFormData(prev => ({ ...prev, phone_number: e.target.value }))}
+                        id="designation"
+                        value={formData.designation}
+                        onChange={(e) => setFormData(prev => ({ ...prev, designation: e.target.value }))}
                         disabled={!isEditing}
                       />
                     </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="date_of_birth">Date of Birth</Label>
-                        <Input
-                          id="date_of_birth"
-                          type="date"
-                          value={formData.date_of_birth}
-                          onChange={(e) => setFormData(prev => ({ ...prev, date_of_birth: e.target.value }))}
-                          disabled={!isEditing}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="nationality">Nationality</Label>
-                        <Input
-                          id="nationality"
-                          value={formData.nationality}
-                          onChange={(e) => setFormData(prev => ({ ...prev, nationality: e.target.value }))}
-                          disabled={!isEditing}
-                        />
-                      </div>
-                    </div>
-
                     <div className="space-y-2">
-                      <Label htmlFor="gender">Gender</Label>
+                      <Label htmlFor="organization">Organization</Label>
+                      <Input
+                        id="organization"
+                        value={formData.organization_name}
+                        onChange={(e) => setFormData(prev => ({ ...prev, organization_name: e.target.value }))}
+                        disabled={!isEditing}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Document Information */}
+                <div className="pt-6 border-t">
+                  <h3 className="text-lg font-semibold mb-4">Document Information</h3>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="document_type">Document Type</Label>
                       <Select
-                        value={formData.gender}
-                        onValueChange={(value) => setFormData(prev => ({ ...prev, gender: value }))}
+                        value={formData.document_type}
+                        onValueChange={(value) => setFormData(prev => ({ ...prev, document_type: value }))}
                         disabled={!isEditing}
                       >
                         <SelectTrigger>
-                          <SelectValue placeholder="Select gender" />
+                          <SelectValue placeholder="Select document type" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="male">Male</SelectItem>
-                          <SelectItem value="female">Female</SelectItem>
-                          <SelectItem value="other">Other</SelectItem>
+                          <SelectItem value="passport">Passport</SelectItem>
+                          <SelectItem value="national_id">National ID</SelectItem>
+                          <SelectItem value="drivers_license">Driver's License</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
-
-                    {/* Professional Information */}
-                    <div className="pt-6 border-t">
-                      <h3 className="text-lg font-semibold mb-4">Professional Information</h3>
-                      <div className="space-y-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="designation">Designation</Label>
-                          <Input
-                            id="designation"
-                            value={formData.designation}
-                            onChange={(e) => setFormData(prev => ({ ...prev, designation: e.target.value }))}
-                            disabled={!isEditing}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="organization">Organization</Label>
-                          <Input
-                            id="organization"
-                            value={formData.organization_name}
-                            onChange={(e) => setFormData(prev => ({ ...prev, organization_name: e.target.value }))}
-                            disabled={!isEditing}
-                          />
-                        </div>
-                      </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="document_number">Document Number</Label>
+                      <Input
+                        id="document_number"
+                        value={formData.document_number}
+                        onChange={(e) => setFormData(prev => ({ ...prev, document_number: e.target.value }))}
+                        disabled={!isEditing}
+                      />
                     </div>
-
-                    {/* Document Information */}
-                    <div className="pt-6 border-t">
-                      <h3 className="text-lg font-semibold mb-4">Document Information</h3>
-                      <div className="space-y-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="document_type">Document Type</Label>
-                          <Select
-                            value={formData.document_type}
-                            onValueChange={(value) => setFormData(prev => ({ ...prev, document_type: value }))}
-                            disabled={!isEditing}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select document type" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="passport">Passport</SelectItem>
-                              <SelectItem value="national_id">National ID</SelectItem>
-                              <SelectItem value="drivers_license">Driver's License</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="document_number">Document Number</Label>
-                          <Input
-                            id="document_number"
-                            value={formData.document_number}
-                            onChange={(e) => setFormData(prev => ({ ...prev, document_number: e.target.value }))}
-                            disabled={!isEditing}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </div>
-      </main>
+      </div>
     </div>
   )
 }
