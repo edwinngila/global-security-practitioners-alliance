@@ -4,19 +4,85 @@ import { useState, useEffect } from "react"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Award, Users, BookOpen, Shield, X } from "lucide-react"
+import { createClient } from "@/lib/supabase/client"
 
 export function UserAdvertisement() {
   const [isVisible, setIsVisible] = useState(false)
+  const [shouldShow, setShouldShow] = useState(false)
+  const [userStatus, setUserStatus] = useState<{
+    isAuthenticated: boolean
+    hasCompletedTest: boolean
+    hasPaid: boolean
+  }>({ isAuthenticated: false, hasCompletedTest: false, hasPaid: false })
+  const supabase = createClient()
 
   useEffect(() => {
-    const hasSeenAd = localStorage.getItem("user-ad-seen")
-    if (!hasSeenAd) {
+    const checkUserStatus = async () => {
+      const hasSeenAd = localStorage.getItem("user-ad-seen")
+
+      // If user has already seen the ad, don't show it
+      if (hasSeenAd) {
+        setShouldShow(false)
+        return
+      }
+
+      try {
+        // Check if user is authenticated
+        const { data: { user } } = await supabase.auth.getUser()
+
+        if (user) {
+          // Get user profile
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("payment_status, test_completed")
+            .eq("id", user.id)
+            .single()
+
+          if (profile) {
+            const status = {
+              isAuthenticated: true,
+              hasCompletedTest: profile.test_completed || false,
+              hasPaid: profile.payment_status === "completed"
+            }
+            setUserStatus(status)
+
+            // Don't show popup if user has completed payment
+            if (status.hasPaid) {
+              setShouldShow(false)
+              return
+            }
+
+            // Show popup for authenticated users who haven't paid
+            setShouldShow(true)
+          } else {
+            // Show popup for users without profile
+            setUserStatus({ isAuthenticated: true, hasCompletedTest: false, hasPaid: false })
+            setShouldShow(true)
+          }
+        } else {
+          // Show popup for non-authenticated users
+          setUserStatus({ isAuthenticated: false, hasCompletedTest: false, hasPaid: false })
+          setShouldShow(true)
+        }
+      } catch (error) {
+        console.error("Error checking user status:", error)
+        // Show popup on error to be safe
+        setUserStatus({ isAuthenticated: false, hasCompletedTest: false, hasPaid: false })
+        setShouldShow(true)
+      }
+    }
+
+    checkUserStatus()
+  }, [supabase])
+
+  useEffect(() => {
+    if (shouldShow) {
       const timer = setTimeout(() => {
         setIsVisible(true)
       }, 2000)
       return () => clearTimeout(timer)
     }
-  }, [])
+  }, [shouldShow])
 
   const dismissAd = () => {
     localStorage.setItem("user-ad-seen", "true")
@@ -56,12 +122,20 @@ export function UserAdvertisement() {
               />
             </div>
             <h2 className="text-2xl sm:text-3xl font-bold text-primary max-w-3xl mx-auto break-words leading-snug">
-              Get Accredited Globally <br className="hidden sm:block" />
-              Take the Security Aptitude Exam
+              {userStatus.hasCompletedTest ? (
+                <>Ready for Your Next Challenge? <br className="hidden sm:block" />
+                Retake the Security Aptitude Exam</>
+              ) : (
+                <>Get Accredited Globally <br className="hidden sm:block" />
+                Take the Security Aptitude Exam</>
+              )}
             </h2>
             <p className="text-base text-muted-foreground max-w-2xl mx-auto">
-              Join thousands of professionals worldwide who have earned their GSPA certification.
-              Start your journey today!
+              {userStatus.hasCompletedTest ? (
+                "You've completed the test! Ready to improve your score? Retake the exam with a new set of questions."
+              ) : (
+                "Join thousands of professionals worldwide who have earned their GSPA certification. Start your journey today!"
+              )}
             </p>
           </div>
 
@@ -86,15 +160,30 @@ export function UserAdvertisement() {
           {/* Call to Action */}
           <div className="bg-gradient-to-r from-primary/10 to-accent/10 p-6 rounded-xl text-center space-y-4 shadow-md">
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
-              <Button asChild className="bg-primary hover:bg-primary/90 text-base px-6 py-3 rounded-xl shadow-md">
-                <a href="/register">Register to Take Exam Today</a>
-              </Button>
+              {userStatus.isAuthenticated ? (
+                userStatus.hasCompletedTest ? (
+                  <Button asChild className="bg-primary hover:bg-primary/90 text-base px-6 py-3 rounded-xl shadow-md">
+                    <a href="/dashboard/results">Pay for Retake (KES 4,550)</a>
+                  </Button>
+                ) : (
+                  <Button asChild className="bg-primary hover:bg-primary/90 text-base px-6 py-3 rounded-xl shadow-md">
+                    <a href="/dashboard/test">Take Exam Now</a>
+                  </Button>
+                )
+              ) : (
+                <Button asChild className="bg-primary hover:bg-primary/90 text-base px-6 py-3 rounded-xl shadow-md">
+                  <a href="/register">Register to Take Exam Today</a>
+                </Button>
+              )}
               <Button variant="outline" onClick={dismissAd} className="text-base px-6 py-3 rounded-xl">
                 Maybe Some Other Time
               </Button>
             </div>
             <p className="text-sm text-muted-foreground">
-              Professional certification • Global recognition • Career advancement
+              {userStatus.hasCompletedTest
+                ? "Improve your score • New questions • Professional certification"
+                : "Professional certification • Global recognition • Career advancement"
+              }
             </p>
           </div>
 

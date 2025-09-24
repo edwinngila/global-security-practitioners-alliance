@@ -4,10 +4,14 @@ import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { CheckCircle, XCircle, Download, Award, User } from "lucide-react"
+import { CheckCircle, XCircle, Download, Award, User, CreditCard, AlertCircle } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
+import dynamic from "next/dynamic"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+
+const PaystackButton = dynamic(() => import("react-paystack").then((mod) => mod.PaystackButton), { ssr: false })
 
 interface TestResults {
   score: number
@@ -31,12 +35,17 @@ interface UserProfile {
 }
 
 export default function DashboardResultsPage() {
-  const [results, setResults] = useState<TestResults | null>(null)
-  const [user, setUser] = useState<UserProfile | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const certificateRef = useRef<HTMLDivElement>(null)
-  const router = useRouter()
-  const supabase = createClient()
+   const [results, setResults] = useState<TestResults | null>(null)
+   const [user, setUser] = useState<UserProfile | null>(null)
+   const [isLoading, setIsLoading] = useState(true)
+   const [isPaymentProcessing, setIsPaymentProcessing] = useState(false)
+   const [paymentSuccess, setPaymentSuccess] = useState(false)
+   const certificateRef = useRef<HTMLDivElement>(null)
+   const router = useRouter()
+   const supabase = createClient()
+
+   const PAYSTACK_PUBLIC_KEY = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || "pk_test_your_key_here"
+   const RETAKE_FEE = 455000 // 4550 KES in cents
 
   useEffect(() => {
     const getResultsAndUser = async () => {
@@ -112,11 +121,14 @@ export default function DashboardResultsPage() {
     return new Date() >= new Date(user.certificate_available_at)
   }
 
-  const handleRetakeTest = async () => {
+
+  const handlePaymentSuccess = async (reference: any) => {
     if (!user) return
 
+    setIsPaymentProcessing(true)
+
     try {
-      // Reset test_completed status to allow retaking
+      // Update profile for retake
       const { error: profileError } = await supabase
         .from("profiles")
         .update({
@@ -124,6 +136,7 @@ export default function DashboardResultsPage() {
           test_score: null,
           certificate_issued: false,
           certificate_available_at: null,
+          payment_reference: reference.reference,
         })
         .eq("id", user.id)
 
@@ -139,12 +152,41 @@ export default function DashboardResultsPage() {
       localStorage.removeItem("test-progress")
       localStorage.removeItem("ongoing-test-backup")
 
-      // Redirect to test page
-      router.push("/dashboard/test")
+      setPaymentSuccess(true)
+
+      // Redirect to test page after a delay
+      setTimeout(() => {
+        router.push("/dashboard/test")
+      }, 3000)
     } catch (error) {
-      console.error("Error resetting test status:", error)
-      alert("Error preparing retake. Please try again.")
+      console.error("Payment update error:", error)
+      alert("Payment was successful but there was an error preparing your retake. Please contact support.")
+    } finally {
+      setIsPaymentProcessing(false)
     }
+  }
+
+  const handlePaymentClose = () => {
+    console.log("Payment cancelled")
+  }
+
+  const paystackConfig = {
+    reference: `GSPA-retake-${user?.id}-${Date.now()}`,
+    email: user?.email || "",
+    amount: RETAKE_FEE,
+    publicKey: PAYSTACK_PUBLIC_KEY,
+    currency: "KES",
+    metadata: {
+      user_id: user?.id,
+      payment_type: "retake",
+      custom_fields: [
+        {
+          display_name: "Test Retake Fee",
+          variable_name: "payment_type",
+          value: "retake",
+        },
+      ],
+    },
   }
 
   const downloadCertificate = async () => {
@@ -872,18 +914,67 @@ export default function DashboardResultsPage() {
               </div>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-6">
               <h3 className="text-2xl font-semibold">Don't Give Up!</h3>
               <p className="text-muted-foreground max-w-2xl mx-auto">
-                You can retake the test after reviewing the study materials. Each attempt will have different questions
-                to ensure a fair assessment.
+                You can retake the test after paying the retake fee. Each attempt will have different questions to ensure a fair assessment.
               </p>
-              <div className="flex gap-4 justify-center">
-                <Button onClick={handleRetakeTest}>Retake Test</Button>
-                <Button variant="outline" asChild>
-                  <Link href="/dashboard">Return to Dashboard</Link>
-                </Button>
-              </div>
+
+              {paymentSuccess ? (
+                <div className="text-center space-y-4">
+                  <CheckCircle className="h-16 w-16 text-green-500 mx-auto" />
+                  <h4 className="text-xl font-semibold text-green-600">Payment Successful!</h4>
+                  <p className="text-muted-foreground">
+                    Your retake payment has been processed. You will be redirected to the test in a few seconds.
+                  </p>
+                </div>
+              ) : (
+                <Card className="max-w-md mx-auto">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-lg">
+                      <CreditCard className="h-5 w-5" />
+                      Test Retake Fee
+                    </CardTitle>
+                    <CardDescription>
+                      Pay KES 4,550 (approximately $35 USD) to retake the security aptitude test
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="bg-muted/50 p-4 rounded-lg">
+                      <div className="flex justify-between items-center">
+                        <span className="font-semibold">Retake Fee</span>
+                        <span className="text-2xl font-bold">KES 4,550</span>
+                      </div>
+                      <p className="text-sm text-muted-foreground mt-2">
+                        Includes access to a new set of 30 questions and immediate results
+                      </p>
+                    </div>
+
+                    <Alert>
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription>
+                        Payment is processed securely through Paystack. All amounts in KES.
+                      </AlertDescription>
+                    </Alert>
+
+                    <PaystackButton
+                      {...paystackConfig}
+                      onSuccess={handlePaymentSuccess}
+                      onClose={handlePaymentClose}
+                      disabled={isPaymentProcessing}
+                      className="w-full bg-primary text-primary-foreground hover:bg-primary/90 h-12 px-4 py-2 rounded-md font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none"
+                    >
+                      {isPaymentProcessing ? "Processing..." : "Pay KES 4,550 with Paystack"}
+                    </PaystackButton>
+
+                    <div className="text-center">
+                      <Button variant="outline" asChild className="w-full">
+                        <Link href="/dashboard">Return to Dashboard</Link>
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
             </div>
           )}
         </div>

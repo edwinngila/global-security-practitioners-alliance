@@ -1,26 +1,29 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { CheckCircle2, XCircle, Loader2 } from "lucide-react"
 
 export default function ConfirmPage() {
-  const router = useRouter()
-  const searchParams = useSearchParams()
-  const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading')
+   const router = useRouter()
+   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading')
   const [message, setMessage] = useState('')
   const supabase = createClient()
 
   useEffect(() => {
     const handleEmailConfirmation = async () => {
       try {
-        // Get the tokens from URL params (Supabase email confirmation)
-        const accessToken = searchParams.get('access_token')
-        const refreshToken = searchParams.get('refresh_token')
-        const type = searchParams.get('type')
+        // Get the tokens from URL hash (Supabase email confirmation links use hash)
+        if (typeof window === 'undefined') return
+
+        const hash = window.location.hash.substring(1) // Remove the '#'
+        const params = new URLSearchParams(hash)
+        const accessToken = params.get('access_token')
+        const refreshToken = params.get('refresh_token')
+        const type = params.get('type')
 
         if (!accessToken || !refreshToken || type !== 'signup') {
           setStatus('error')
@@ -86,7 +89,7 @@ export default function ConfirmPage() {
     }
 
     handleEmailConfirmation()
-  }, [searchParams, supabase.auth, router])
+  }, [supabase.auth, router])
 
   const saveProfileData = async (data: any, accessToken: string) => {
     try {
