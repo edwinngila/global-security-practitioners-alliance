@@ -18,7 +18,7 @@ export function PhoneInput({ value, onChange, placeholder = "Enter phone number"
       placeholder={placeholder}
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className={cn("h-12 bg-black/5 text-black", className)}
+      className={cn("h-12 bg-input text-foreground", className)}
     />
   )
 }

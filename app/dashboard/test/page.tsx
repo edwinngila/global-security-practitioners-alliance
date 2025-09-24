@@ -701,29 +701,29 @@ export default function DashboardTestPage() {
   return (
     <>
       {/* Test Header */}
-      <div className="bg-primary text-primary-foreground py-4">
+      <div className="bg-primary text-primary-foreground py-3 md:py-4">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
             <div>
-              <h1 className="text-xl font-semibold">Security Aptitude Test</h1>
+              <h1 className="text-lg md:text-xl font-semibold">Security Aptitude Test</h1>
               <p className="text-sm opacity-90">
                 Question {currentQuestion + 1} of {questions.length}
               </p>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center justify-between sm:justify-end gap-4">
               <div className="flex items-center gap-2">
-                <Clock className="h-5 w-5" />
-                <span className="font-mono text-lg">{formatTime(timeLeft)}</span>
+                <Clock className="h-4 w-4 md:h-5 md:w-5" />
+                <span className="font-mono text-base md:text-lg">{formatTime(timeLeft)}</span>
               </div>
               <div className="text-right">
-                <p className="text-sm">Answered</p>
-                <p className="font-semibold">
+                <p className="text-xs md:text-sm">Answered</p>
+                <p className="font-semibold text-sm md:text-base">
                   {Object.keys(answers).length}/{questions.length}
                 </p>
               </div>
             </div>
           </div>
-          <Progress value={progress} className="mt-4 h-2 bg-gray-200" />
+          <Progress value={progress} className="mt-3 md:mt-4 h-2 bg-gray-200" />
 
           {/* Internet Connection Warning */}
           {!isOnline && (
@@ -738,10 +738,10 @@ export default function DashboardTestPage() {
       </div>
 
       {/* Test Content */}
-      <div className="py-8">
+      <div className="py-6 md:py-8">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <Card>
-            <CardContent className="p-8">
+            <CardContent className="p-4 md:p-8">
               <div className="mb-6">
                 <h2 className="text-xl font-semibold mb-2">Question {currentQuestion + 1}</h2>
                 <p className="text-lg leading-relaxed">{currentQ.question}</p>
@@ -786,8 +786,8 @@ export default function DashboardTestPage() {
           </Card>
 
           {/* Navigation */}
-          <div className="flex justify-between mt-8">
-            <Button variant="outline" onClick={handlePrevious} disabled={currentQuestion === 0}>
+          <div className="flex flex-col sm:flex-row sm:justify-between gap-4 mt-6 md:mt-8">
+            <Button variant="outline" onClick={handlePrevious} disabled={currentQuestion === 0} className="w-full sm:w-auto">
               Previous
             </Button>
 
@@ -795,12 +795,12 @@ export default function DashboardTestPage() {
               <Button
                 onClick={handleSubmitTest}
                 disabled={isSubmitting || Object.keys(answers).length !== questions.length}
-                className="bg-green-600 hover:bg-green-700"
+                className="bg-green-600 hover:bg-green-700 w-full sm:w-auto"
               >
                 {isSubmitting ? "Submitting..." : "Submit Test"}
               </Button>
             ) : (
-              <Button onClick={handleNext}>Next</Button>
+              <Button onClick={handleNext} className="w-full sm:w-auto">Next</Button>
             )}
           </div>
         </div>

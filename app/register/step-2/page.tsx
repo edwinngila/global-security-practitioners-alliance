@@ -235,7 +235,7 @@ export default function RegisterStep2() {
                     {...register("dateOfBirth", {
                       required: "Date of birth is required",
                     })}
-                    className={`h-12 bg-black/5 text-black ${errors.dateOfBirth ? "border-destructive" : ""
+                    className={`h-12 bg-input text-foreground ${errors.dateOfBirth ? "border-destructive" : ""
                       }`}
                     max={new Date(
                       new Date().setFullYear(new Date().getFullYear() - 18)
@@ -265,7 +265,7 @@ export default function RegisterStep2() {
                       },
                     })}
                     placeholder="Security Manager"
-                    className={`h-12 bg-black/5 text-black ${errors.designation ? "border-destructive" : ""
+                    className={`h-12 bg-input text-foreground ${errors.designation ? "border-destructive" : ""
                       }`}
                   />
                   {errors.designation && (
@@ -290,7 +290,7 @@ export default function RegisterStep2() {
                       },
                     })}
                     placeholder="ABC Corporation"
-                    className={`h-12 bg-black/5 text-black ${errors.organization ? "border-destructive" : ""
+                    className={`h-12 bg-input text-foreground ${errors.organization ? "border-destructive" : ""
                       }`}
                   />
                   {errors.organization && (

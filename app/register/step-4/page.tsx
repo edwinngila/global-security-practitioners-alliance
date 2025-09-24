@@ -46,7 +46,8 @@ export default function RegisterStep4() {
           data: {
             first_name: allData.firstName,
             last_name: allData.lastName,
-          }
+          },
+          emailRedirectTo: `${window.location.origin}/auth/confirm`
         }
       })
 
@@ -61,6 +62,15 @@ export default function RegisterStep4() {
 
       const userId = authData.user.id
       console.log("[v0] Created auth user ID:", userId)
+
+      // Store registration data temporarily for after email confirmation
+      localStorage.setItem("pending-registration", JSON.stringify({
+        userId,
+        ...allData
+      }))
+
+      // Don't sign in yet - user needs to confirm email
+      console.log("[v0] User account created, email confirmation sent")
 
       // Upload documents now that user is authenticated
       let passportPhotoUrl = null
@@ -163,19 +173,12 @@ export default function RegisterStep4() {
       // Store user ID for payment process
       localStorage.setItem("registration-user-id", userId)
 
-      // Clear registration data after successful submission
-      localStorage.removeItem("registration-step-1")
-      localStorage.removeItem("registration-step-2")
-      localStorage.removeItem("registration-step-3")
-      localStorage.removeItem("temp-passport-photo")
-      localStorage.removeItem("temp-signature")
+      // Don't clear registration data yet - wait for email confirmation
+      // Data will be cleared after successful confirmation
 
       setSubmitSuccess(true)
 
-      // Auto redirect to payment after 3 seconds
-      setTimeout(() => {
-        router.push("/payment")
-      }, 3000)
+      // Don't auto-redirect - user needs to confirm email first
     } catch (error: any) {
       console.error("[v0] Registration submission error:", error)
       setError(error.message || "Registration failed. Please try again.")
@@ -190,17 +193,17 @@ export default function RegisterStep4() {
 
   if (submitSuccess) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
           <CardContent className="pt-6">
             <div className="text-center space-y-4">
               <CheckCircle2 className="h-16 w-16 text-green-500 mx-auto" />
-              <h2 className="text-2xl font-bold text-gray-900">Registration Successful!</h2>
-              <p className="text-gray-600">
-                Your registration has been saved successfully. You will be redirected to the payment page in a few seconds to complete your certification process and gain access to the security aptitude test.
+              <h2 className="text-2xl font-bold text-foreground">Check Your Email!</h2>
+              <p className="text-muted-foreground">
+                We've sent a confirmation link to {allData.email}. Please check your email and click the link to verify your account. Once verified, you'll be able to proceed with payment and access the security aptitude test.
               </p>
-              <Button onClick={() => router.push("/payment")} className="w-full">
-                Proceed to Payment
+              <Button onClick={() => router.push("/")} className="w-full">
+                Return to Home
               </Button>
             </div>
           </CardContent>
@@ -211,15 +214,15 @@ export default function RegisterStep4() {
 
   if (isSubmitting) {
     return (
-      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center">
-        <div className="bg-white rounded-lg p-8 shadow-2xl max-w-sm w-full mx-4">
+      <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center">
+        <div className="bg-card rounded-lg p-8 shadow-2xl max-w-sm w-full mx-4">
           <div className="text-center space-y-4">
             <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto" />
-            <h3 className="text-xl font-semibold text-gray-900">Submitting Registration</h3>
-            <p className="text-gray-600">
+            <h3 className="text-xl font-semibold text-foreground">Submitting Registration</h3>
+            <p className="text-muted-foreground">
               Please wait while we process your information and create your account...
             </p>
-            <div className="w-full bg-gray-200 rounded-full h-2">
+            <div className="w-full bg-muted rounded-full h-2">
               <div className="bg-primary h-2 rounded-full animate-pulse" style={{ width: '60%' }}></div>
             </div>
           </div>
@@ -229,14 +232,14 @@ export default function RegisterStep4() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+    <div className="min-h-screen bg-background">
       <RegistrationProgress currentStep={4} totalSteps={4} stepTitles={stepTitles} />
 
       <div className="py-8 px-4">
         <div className="max-w-2xl mx-auto">
           <Card>
             <CardHeader className="text-center">
-              <CardTitle className="text-xl md:text-2xl font-bold text-gray-900">Review Your Information</CardTitle>
+              <CardTitle className="text-xl md:text-2xl font-bold text-foreground">Review Your Information</CardTitle>
               <CardDescription className="text-sm md:text-base">Please review all details before submitting</CardDescription>
             </CardHeader>
 
@@ -248,8 +251,8 @@ export default function RegisterStep4() {
               )}
 
               {/* Personal Information */}
-              <div className="bg-blue-50 rounded-lg p-4">
-                <h3 className="font-semibold text-blue-900 mb-3 text-sm md:text-base">Personal Information</h3>
+              <div className="bg-muted rounded-lg p-4">
+                <h3 className="font-semibold text-foreground mb-3 text-sm md:text-base">Personal Information</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs md:text-sm">
                   <div>
                     <span className="font-medium">Name:</span> {allData.firstName} {allData.lastName}
@@ -276,8 +279,8 @@ export default function RegisterStep4() {
               </div>
 
               {/* Professional Information */}
-              <div className="bg-green-50 rounded-lg p-4">
-                <h3 className="font-semibold text-green-900 mb-3 text-sm md:text-base">Professional Information</h3>
+              <div className="bg-muted rounded-lg p-4">
+                <h3 className="font-semibold text-foreground mb-3 text-sm md:text-base">Professional Information</h3>
                 <div className="grid grid-cols-1 gap-2 text-xs md:text-sm">
                   <div>
                     <span className="font-medium">Designation:</span> {allData.designation}
@@ -289,8 +292,8 @@ export default function RegisterStep4() {
               </div>
 
               {/* Document Information */}
-              <div className="bg-amber-50 rounded-lg p-4">
-                <h3 className="font-semibold text-amber-900 mb-3 text-sm md:text-base">Document Information</h3>
+              <div className="bg-muted rounded-lg p-4">
+                <h3 className="font-semibold text-foreground mb-3 text-sm md:text-base">Document Information</h3>
                 <div className="grid grid-cols-1 gap-2 text-xs md:text-sm">
                   <div>
                     <span className="font-medium">Document Type:</span> {allData.documentType}

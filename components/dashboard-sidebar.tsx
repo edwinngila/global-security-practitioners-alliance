@@ -14,6 +14,7 @@ import {
   BarChart3,
   Users,
   Settings,
+  BookOpen,
   ChevronLeft,
   ChevronRight,
   LogOut,
@@ -23,7 +24,7 @@ import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 
 interface DashboardSidebarProps {
-  isAdmin: boolean
+  userRole: string
   userName: string
   userEmail: string
   isMobileOpen?: boolean
@@ -101,19 +102,52 @@ const adminMenuItems = [
   },
 ]
 
-export function DashboardSidebar({ 
-  isAdmin, 
-  userName, 
-  userEmail, 
-  isMobileOpen = false, 
-  onMobileClose 
+export function DashboardSidebar({
+  userRole,
+  userName,
+  userEmail,
+  isMobileOpen = false,
+  onMobileClose
 }: DashboardSidebarProps) {
   const [collapsed, setCollapsed] = useState(false)
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
 
-  const menuItems = isAdmin ? adminMenuItems : userMenuItems
+  const getMenuItems = () => {
+    switch (userRole) {
+      case 'super_admin':
+      case 'admin':
+        return adminMenuItems
+      case 'master_practitioner':
+        return [
+          {
+            title: "Dashboard",
+            href: "/dashboard",
+            icon: LayoutDashboard,
+          },
+          {
+            title: "Content Management",
+            href: "/dashboard/content",
+            icon: BookOpen,
+          },
+          {
+            title: "Exam Management",
+            href: "/dashboard/exams",
+            icon: FileText,
+          },
+          {
+            title: "Profile",
+            href: "/dashboard/profile",
+            icon: User,
+          },
+        ]
+      default:
+        return userMenuItems
+    }
+  }
+
+  const menuItems = getMenuItems()
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
@@ -122,22 +156,25 @@ export function DashboardSidebar({
 
   return (
     <>
-      {/* Mobile Overlay */}
-      {isMobileOpen && (
-        <div 
-          className="fixed inset-0 z-40 bg-black/50 md:hidden"
-          onClick={onMobileClose}
-        />
-      )}
+      {/* Mobile Overlay - Improved with smooth transitions */}
+      <div 
+        className={cn(
+          "fixed inset-0 z-40 bg-black/50 transition-all duration-300 ease-in-out md:hidden",
+          isMobileOpen 
+            ? "opacity-100 pointer-events-auto" 
+            : "opacity-0 pointer-events-none"
+        )}
+        onClick={onMobileClose}
+      />
 
-      {/* Sidebar */}
+      {/* Sidebar - Enhanced with smoother transitions */}
       <div className={cn(
-        "fixed top-0 left-0 z-40 flex flex-col h-screen bg-slate-900 border-r border-gray-600 transition-all duration-300",
+        "fixed top-0 left-0 z-50 flex flex-col h-screen bg-slate-900 border-r border-gray-600 transition-all duration-300 ease-in-out",
         // Mobile behavior
         "md:sticky md:top-0 md:z-auto",
         isMobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0",
         // Desktop collapse behavior
-        collapsed ? "w-16 md:w-16" : "w-56",
+        collapsed ? "w-16 md:w-16" : "w-64 md:w-64",
         // Show/hide on different screens
         "md:flex" // Always show on desktop
       )}>
@@ -145,7 +182,7 @@ export function DashboardSidebar({
         <div className="p-4 border-b border-gray-600">
           <div className="flex items-center justify-between">
             {(!collapsed || isMobileOpen) && (
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center space-x-2 transition-opacity duration-200">
                 <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
                   <LayoutDashboard className="h-4 w-4 text-yellow-400" />
                 </div>
@@ -159,7 +196,7 @@ export function DashboardSidebar({
                 variant="ghost"
                 size="sm"
                 onClick={onMobileClose}
-                className="h-8 w-8 p-0 text-white hover:bg-amber-500 md:hidden"
+                className="h-8 w-8 p-0 text-white hover:bg-amber-500 transition-colors duration-200 md:hidden"
               >
                 <X className="h-4 w-4" />
               </Button>
@@ -171,12 +208,12 @@ export function DashboardSidebar({
                 variant="ghost"
                 size="sm"
                 onClick={() => setCollapsed(!collapsed)}
-                className="h-8 w-8 p-0 text-white hover:bg-amber-500 hidden md:flex"
+                className="h-8 w-8 p-0 text-white hover:bg-amber-500 transition-colors duration-200 hidden md:flex"
               >
                 {collapsed ? (
-                  <ChevronRight className="h-4 w-4" />
+                  <ChevronRight className="h-4 w-4 transition-transform duration-200" />
                 ) : (
-                  <ChevronLeft className="h-4 w-4" />
+                  <ChevronLeft className="h-4 w-4 transition-transform duration-200" />
                 )}
               </Button>
             )}
@@ -186,16 +223,21 @@ export function DashboardSidebar({
         {/* User Info */}
         <div className="p-4 border-b border-gray-600">
           <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 bg-amber-500 rounded-full flex items-center justify-center">
+            <div className="w-8 h-8 bg-amber-500 rounded-full flex items-center justify-center flex-shrink-0">
               <User className="h-4 w-4 text-white" />
             </div>
             {(!collapsed || isMobileOpen) && (
-              <div className="flex-1 min-w-0">
+              <div className="flex-1 min-w-0 transition-opacity duration-200">
                 <p className="text-sm font-medium truncate text-white">{userName}</p>
                 <p className="text-xs text-gray-300 truncate">{userEmail}</p>
-                {isAdmin && (
-                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-600 text-white">
-                    Admin
+                {(userRole === 'admin' || userRole === 'super_admin') && (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-600 text-white mt-1">
+                    {userRole === 'super_admin' ? 'Super Admin' : 'Admin'}
+                  </span>
+                )}
+                {userRole === 'master_practitioner' && (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-600 text-white mt-1">
+                    Master Practitioner
                   </span>
                 )}
               </div>
@@ -213,14 +255,19 @@ export function DashboardSidebar({
                   <Button
                     variant={isActive ? "secondary" : "ghost"}
                     className={cn(
-                      "w-full mt-2 justify-start h-10 text-white hover:bg-amber-500",
+                      "w-full mt-2 justify-start h-10 text-white hover:bg-amber-500 transition-all duration-200 ease-in-out",
                       (collapsed && !isMobileOpen) ? "px-2" : "px-3",
-                      isActive && "bg-blue-500 text-white"
+                      isActive && "bg-blue-500 text-white hover:bg-blue-600"
                     )}
                   >
-                    <item.icon className={cn("h-4 w-4", (!collapsed || isMobileOpen) && "mr-3")} />
+                    <item.icon className={cn(
+                      "h-4 w-4 transition-all duration-200", 
+                      (!collapsed || isMobileOpen) && "mr-3"
+                    )} />
                     {(!collapsed || isMobileOpen) && (
-                      <span className="text-sm">{item.title}</span>
+                      <span className="text-sm transition-opacity duration-200">
+                        {item.title}
+                      </span>
                     )}
                   </Button>
                 </Link>
@@ -235,12 +282,17 @@ export function DashboardSidebar({
             variant="ghost"
             onClick={handleLogout}
             className={cn(
-              "w-full justify-start h-10 text-white hover:bg-amber-500",
+              "w-full justify-start h-10 text-white hover:bg-amber-500 transition-all duration-200 ease-in-out",
               (collapsed && !isMobileOpen) ? "px-2" : "px-3"
             )}
           >
-            <LogOut className={cn("h-4 w-4", (!collapsed || isMobileOpen) && "mr-3")} />
-            {(!collapsed || isMobileOpen) && <span className="text-sm">Logout</span>}
+            <LogOut className={cn(
+              "h-4 w-4 transition-all duration-200", 
+              (!collapsed || isMobileOpen) && "mr-3"
+            )} />
+            {(!collapsed || isMobileOpen) && (
+              <span className="text-sm transition-opacity duration-200">Logout</span>
+            )}
           </Button>
         </div>
       </div>

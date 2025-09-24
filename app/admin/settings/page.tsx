@@ -188,27 +188,27 @@ export default function AdminSettingsPage() {
   return (
     <div className="min-h-screen flex">
       {/* Mobile Sidebar */}
-      {mobileMenuOpen && (
-        <div className="fixed inset-0 z-50 md:hidden">
-          <div className="absolute inset-0 bg-black/50" onClick={() => setMobileMenuOpen(false)} />
-          <div className="absolute left-0 top-0 h-full w-64">
-            <DashboardSidebar
-              isAdmin={isAdmin}
-              userName={userName}
-              userEmail={userEmail}
-            />
-          </div>
-        </div>
-      )}
+      <div className={`
+        fixed inset-y-0 left-0 z-50 w-64 transform transition-transform duration-300 md:hidden
+        ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
+      `}>
+        <DashboardSidebar
+          userRole="admin"
+          userName={userName}
+          userEmail={userEmail}
+          isMobileOpen={mobileMenuOpen}
+          onMobileClose={() => setMobileMenuOpen(false)}
+        />
+      </div>
 
       {/* Desktop Sidebar */}
       <DashboardSidebar
-        isAdmin={isAdmin}
+        userRole="admin"
         userName={userName}
         userEmail={userEmail}
       />
 
-      <main className="flex-1 overflow-y-auto md:ml-64">
+      <main className="flex-1 overflow-y-auto">
         {/* Mobile Header */}
         <div className="md:hidden bg-background border-b border-border p-4 flex items-center justify-between">
           <Button

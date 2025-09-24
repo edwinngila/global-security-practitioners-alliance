@@ -176,14 +176,14 @@ export default function CertificatePage() {
   return (
     <div className="p-4 md:p-8">
       <div className="max-w-7xl mx-auto">
-        <div className="mb-8">
+        <div className="mb-6 md:mb-8">
           <h1 className="text-2xl md:text-3xl font-bold mb-2">My Certificate</h1>
-          <p className="text-muted-foreground">
+          <p className="text-muted-foreground text-sm md:text-base">
             View and download your GSPA certification.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 md:gap-8">
           {/* Certification Status Card */}
           <Card>
             <CardHeader>
@@ -345,13 +345,13 @@ export default function CertificatePage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-12 text-center">
-                <Award className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-semibold mb-2">Certificate Preview</h3>
-                <p className="text-muted-foreground mb-4">
+              <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 md:p-12 text-center">
+                <Award className="h-12 w-12 md:h-16 md:w-16 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-base md:text-lg font-semibold mb-2">Certificate Preview</h3>
+                <p className="text-muted-foreground mb-4 text-sm md:text-base">
                   In a production environment, this would display a preview of your certificate.
                 </p>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-xs md:text-sm text-muted-foreground">
                   Certificate ID: GSPA-{user.id.toUpperCase().slice(0, 8)}
                 </p>
               </div>

@@ -249,7 +249,7 @@ export default function AdminCertificatesPage() {
       {/* Desktop Sidebar */}
       <div className="hidden md:block">
         <DashboardSidebar
-          isAdmin={isAdmin}
+          userRole="admin"
           userName={userName}
           userEmail={userEmail}
         />
@@ -261,7 +261,7 @@ export default function AdminCertificatesPage() {
         ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
       `}>
         <DashboardSidebar
-          isAdmin={isAdmin}
+          userRole="admin"
           userName={userName}
           userEmail={userEmail}
           isMobileOpen={mobileMenuOpen}
@@ -269,7 +269,7 @@ export default function AdminCertificatesPage() {
         />
       </div>
 
-      <main className="flex-1 min-h-screen overflow-y-auto md:ml-64">
+      <main className="flex-1 min-h-screen overflow-y-auto">
         {/* Mobile Header */}
         <header className="md:hidden bg-background border-b border-border p-4 flex items-center justify-between sticky top-0 z-30">
           <Button

@@ -111,17 +111,17 @@ export default function RegisterStep3() {
   }
 
   return (
-    <div className="min-h-screen form-gradient">
+    <div className="min-h-screen bg-background">
       <RegistrationProgress currentStep={3} totalSteps={4} stepTitles={stepTitles} />
 
       <div className="py-8 px-4">
         <div className="max-w-3xl mx-auto">
-          <Card className="form-card shadow-2xl border-0">
+          <Card className="shadow-lg">
             <CardHeader className="text-center pb-6 md:pb-8">
               <CardTitle className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
                 Documents & Verification
               </CardTitle>
-              <CardDescription className="text-base md:text-lg text-gray-600">
+              <CardDescription className="text-base md:text-lg">
                 Upload your documents and provide your digital signature
               </CardDescription>
             </CardHeader>
@@ -129,8 +129,8 @@ export default function RegisterStep3() {
             <CardContent className="space-y-6 md:space-y-8">
               <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 md:space-y-8">
                 {/* Document Information */}
-                <div className="bg-gray-50 rounded-xl p-6 space-y-6">
-                  <h3 className="text-lg font-semibold text-gray-800 border-b border-gray-200 pb-2">
+                <div className="bg-muted rounded-xl p-6 space-y-6">
+                  <h3 className="text-lg font-semibold text-foreground border-b border-border pb-2">
                     Document Information
                   </h3>
 
@@ -143,7 +143,7 @@ export default function RegisterStep3() {
                         rules={{ required: "Please select a document type" }}
                         render={({ field }) => (
                           <Select onValueChange={field.onChange} value={field.value}>
-                            <SelectTrigger className={cn("h-12 bg-black/5", errors.documentType ? "border-red-500" : "")}>
+                            <SelectTrigger className={cn("h-12 bg-input", errors.documentType ? "border-red-500" : "")}>
                               <SelectValue placeholder="Select document type" />
                             </SelectTrigger>
                             <SelectContent>
@@ -166,7 +166,7 @@ export default function RegisterStep3() {
                           minLength: { value: 3, message: "Document number must be at least 3 characters" },
                         })}
                         placeholder="Enter document number"
-                        className={cn("h-12 bg-black/5 text-black ", errors.documentNumber ? "border-red-500" : "")}
+                        className={cn("h-12 bg-input text-foreground ", errors.documentNumber ? "border-red-500" : "")}
                       />
                       {errors.documentNumber && <p className="text-sm text-red-600">{errors.documentNumber.message}</p>}
                     </div>
@@ -174,8 +174,8 @@ export default function RegisterStep3() {
                 </div>
 
                 {/* Photo Upload */}
-                <div className="bg-blue-50 rounded-xl p-6">
-                  <h3 className="text-lg font-semibold text-gray-800 border-b border-blue-200 pb-2 mb-6">
+                <div className="bg-muted rounded-xl p-6">
+                  <h3 className="text-lg font-semibold text-foreground border-b border-border pb-2 mb-6">
                     Passport Photo
                   </h3>
                   <Controller
@@ -207,8 +207,8 @@ export default function RegisterStep3() {
                 </div>
 
                 {/* Digital Signature */}
-                <div className="bg-green-50 rounded-xl p-6">
-                  <h3 className="text-lg font-semibold text-gray-800 border-b border-green-200 pb-2 mb-6">
+                <div className="bg-muted rounded-xl p-6">
+                  <h3 className="text-lg font-semibold text-foreground border-b border-border pb-2 mb-6">
                     Digital Signature
                   </h3>
                   <Controller
@@ -227,7 +227,7 @@ export default function RegisterStep3() {
                 </div>
 
                 {/* Declaration */}
-                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 md:p-6">
+                <div className="bg-muted border border-border rounded-xl p-4 md:p-6">
                   <div className="flex flex-col sm:flex-row sm:items-start gap-4">
                     <Controller
                       name="declarationAccepted"
@@ -246,10 +246,10 @@ export default function RegisterStep3() {
                       )}
                     />
                     <div className="space-y-2 md:space-y-3">
-                      <Label htmlFor="declaration" className="text-sm md:text-base font-semibold text-amber-800">
+                      <Label htmlFor="declaration" className="text-sm md:text-base font-semibold text-foreground">
                         Declaration & Agreement *
                       </Label>
-                      <div className="text-xs md:text-sm text-amber-700 space-y-2">
+                      <div className="text-xs md:text-sm text-muted-foreground space-y-2">
                         <p>
                           I hereby declare that all information provided is true and accurate to the best of my
                           knowledge. I understand that any false information may result in disqualification from the

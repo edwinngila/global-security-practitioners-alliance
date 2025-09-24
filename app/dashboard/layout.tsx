@@ -12,7 +12,7 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode
 }) {
-  const [isAdmin, setIsAdmin] = useState(false)
+  const [userRole, setUserRole] = useState<string>("")
   const [userName, setUserName] = useState("")
   const [userEmail, setUserEmail] = useState("")
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
@@ -29,18 +29,38 @@ export default function DashboardLayout({
         return
       }
 
-      setIsAdmin(authUser.email === 'admin@gmail.com')
+      // Set basic user info from auth
+      setUserName(authUser.user_metadata?.first_name && authUser.user_metadata?.last_name
+        ? `${authUser.user_metadata.first_name} ${authUser.user_metadata.last_name}`
+        : authUser.email?.split('@')[0] || 'User')
+      setUserEmail(authUser.email || '')
 
-      // Get profile for name and email
-      const { data: profile } = await supabase
+      // Get profile for additional info
+      const { data: profile, error: profileError } = await supabase
         .from("profiles")
-        .select("first_name, last_name, email")
+        .select("first_name, last_name, email, role_id")
         .eq("id", authUser.id)
         .single()
 
-      if (profile) {
-        setUserName(`${profile.first_name} ${profile.last_name}`)
-        setUserEmail(profile.email)
+      if (!profileError && profile) {
+        // Update with profile data if available
+        setUserName(`${profile.first_name || authUser.user_metadata?.first_name || 'User'} ${profile.last_name || authUser.user_metadata?.last_name || ''}`.trim())
+        setUserEmail(profile.email || authUser.email || '')
+
+        // Get role if role_id exists
+        if (profile.role_id) {
+          const { data: roleData } = await supabase
+            .from("roles")
+            .select("name")
+            .eq("id", profile.role_id)
+            .single()
+
+          setUserRole(roleData?.name || "practitioner")
+        } else {
+          setUserRole("practitioner") // default
+        }
+      } else {
+        setUserRole("practitioner") // default
       }
     }
 
@@ -66,15 +86,17 @@ export default function DashboardLayout({
     }
   }
 
+  const isTestPage = pathname === '/dashboard/test'
+
   return (
     <div className="min-h-screen flex">
-      {/* Mobile Sidebar */}
-      {mobileMenuOpen && (
+      {/* Mobile Sidebar - Hide on test page */}
+      {!isTestPage && mobileMenuOpen && (
         <div className="fixed inset-0 z-50 md:hidden">
           <div className="absolute inset-0 bg-black/50" onClick={() => setMobileMenuOpen(false)} />
           <div className="absolute left-0 top-0 h-full">
             <DashboardSidebar
-              isAdmin={isAdmin}
+              userRole={userRole}
               userName={userName}
               userEmail={userEmail}
               isMobileOpen={mobileMenuOpen}
@@ -84,32 +106,46 @@ export default function DashboardLayout({
         </div>
       )}
 
-      {/* Desktop Sidebar */}
-      <div className="hidden md:block">
-        <DashboardSidebar
-          isAdmin={isAdmin}
-          userName={userName}
-          userEmail={userEmail}
-        />
-      </div>
-
-      <main className="flex-1 overflow-y-auto md:ml-56 min-h-screen">
-        {/* Mobile Header */}
-        <div className="md:hidden bg-white border-b p-4 flex items-center justify-between">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setMobileMenuOpen(true)}
-            className="md:hidden"
-          >
-            <Menu className="h-5 w-5" />
-          </Button>
-          <h1 className="text-lg font-semibold">{getPageTitle()}</h1>
-          <div className="w-8" /> {/* Spacer */}
+      {/* Desktop Sidebar - Hide on test page */}
+      {!isTestPage && (
+        <div className="hidden md:block">
+          <DashboardSidebar
+            userRole={userRole}
+            userName={userName}
+            userEmail={userEmail}
+          />
         </div>
+      )}
 
-        {children}
+      <main
+        className={[
+          "flex-1 min-h-screen overflow-y-auto", // base styles
+          !isTestPage ? "md:ml-1" : "", // sidebar spacing only on non-test pages
+        ].join(" ")}
+      >
+        {/* Mobile Header - only render if not test page */}
+        {!isTestPage && (
+          <header className="md:hidden bg-background/95 backdrop-blur-sm border-b border-border p-4 flex items-center justify-between shadow-sm">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setMobileMenuOpen(true)}
+              className="md:hidden hover:bg-muted"
+            >
+              <Menu className="h-5 w-5" />
+            </Button>
+
+            <h1 className="text-lg font-semibold truncate text-foreground">{getPageTitle()}</h1>
+
+            {/* Spacer for alignment */}
+            <div className="w-8" />
+          </header>
+        )}
+
+        {/* Page content */}
+        <div className="p-4 md:p-6">{children}</div>
       </main>
+
     </div>
   )
 }

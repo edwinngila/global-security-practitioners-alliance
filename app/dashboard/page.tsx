@@ -188,289 +188,344 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="p-4 md:p-8">
-      <div className="max-w-screen-2xl mx-auto">
-        <div className="mb-8">
-          <h1 className="text-2xl md:text-3xl font-bold mb-2">Dashboard</h1>
-          <p className="text-muted-foreground">
-            Welcome back, {user.first_name}! Here's your certification progress.
-          </p>
+    <div className="p-4 md:p-6 bg-gradient-to-br from-muted/10 to-background min-h-screen">
+      <div className="max-w-7xl mx-auto">
+        <div className="mb-8 md:mb-12">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-4">
+            <div className="w-12 h-12 bg-gradient-to-br from-primary to-accent rounded-xl flex items-center justify-center shadow-lg flex-shrink-0">
+              <User className="h-6 w-6 text-white" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold">Dashboard</h1>
+              <p className="text-muted-foreground text-base md:text-lg">
+                Welcome back, {user.first_name}! Here's your certification progress.
+              </p>
+            </div>
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-8">
+        {/* Stats Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-8 md:mb-12">
           {/* Profile Card */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <User className="h-5 w-5" />
-                Profile Information
-              </CardTitle>
+          <Card className="group hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 border-0 bg-gradient-to-br from-background to-muted/20 backdrop-blur-sm">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+              <div>
+                <CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Profile Information</CardTitle>
+                <div className="text-2xl font-bold mt-2">{user.first_name} {user.last_name}</div>
+              </div>
+              <div className="w-12 h-12 bg-gradient-to-br from-primary/10 to-primary/5 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                <User className="h-6 w-6 text-primary" />
+              </div>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <p className="text-sm text-muted-foreground">Name</p>
-                <p className="font-semibold">
-                  {user.first_name} {user.last_name}
+            <CardContent>
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                <p className="text-sm text-muted-foreground">
+                  Member since {new Date(user.created_at).toLocaleDateString()}
                 </p>
               </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Email</p>
-                <p className="font-semibold">{user.email}</p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Registration Date</p>
-                <p className="font-semibold flex items-center gap-2">
-                  <Calendar className="h-4 w-4" />
-                  {new Date(user.created_at).toLocaleDateString()}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Membership Status</p>
-                <Badge variant={user.membership_fee_paid ? "default" : "secondary"}>
-                  {user.membership_fee_paid ? "Active Member" : "Pending Payment"}
-                </Badge>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Test Payment Status</p>
-                <Badge variant={user.payment_status === "completed" ? "default" : "secondary"}>
-                  {user.payment_status}
-                </Badge>
+              <div className="mt-4 space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Membership</span>
+                  <Badge variant={user.membership_fee_paid ? "default" : "secondary"}>
+                    {user.membership_fee_paid ? "Active" : "Pending"}
+                  </Badge>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Test Access</span>
+                  <Badge variant={user.payment_status === "completed" ? "default" : "secondary"}>
+                    {user.payment_status === "completed" ? "Paid" : "Pending"}
+                  </Badge>
+                </div>
               </div>
             </CardContent>
           </Card>
 
           {/* Test Status Card */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="h-5 w-5" />
-                Test Status
-              </CardTitle>
+          <Card className="group hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 border-0 bg-gradient-to-br from-background to-muted/20 backdrop-blur-sm">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+              <div>
+                <CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Test Status</CardTitle>
+                <div className="text-2xl font-bold mt-2">
+                  {ongoingTest ? "In Progress" : user.test_completed ? "Completed" : "Not Started"}
+                </div>
+              </div>
+              <div className="w-12 h-12 bg-gradient-to-br from-primary/10 to-primary/5 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                <FileText className="h-6 w-6 text-primary" />
+              </div>
             </CardHeader>
-            <CardContent className="space-y-4">
-              {ongoingTest ? (
-                <>
-                  <div className="flex items-center gap-2">
-                    <Clock className="h-5 w-5 text-blue-600" />
-                    <span className="font-semibold text-blue-600">Test In Progress</span>
+            <CardContent>
+              <div className="flex items-center gap-2 mb-4">
+                {ongoingTest ? (
+                  <>
+                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                    <p className="text-sm text-muted-foreground">
+                      Question {ongoingTest.current_question + 1} of {ongoingTest.questions_data.length}
+                    </p>
+                  </>
+                ) : user.test_completed ? (
+                  <>
+                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                    <p className="text-sm text-muted-foreground">
+                      Completed {testAttempt ? new Date(testAttempt.completed_at).toLocaleDateString() : ''}
+                    </p>
+                  </>
+                ) : user.payment_status === "completed" ? (
+                  <>
+                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                    <p className="text-sm text-muted-foreground">
+                      Ready to start
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+                    <p className="text-sm text-muted-foreground">
+                      Payment required
+                    </p>
+                  </>
+                )}
+              </div>
+
+              {ongoingTest && (
+                <div className="space-y-3">
+                  <div className="flex justify-between text-sm">
+                    <span>Progress</span>
+                    <span>{Math.round((ongoingTest.current_question / ongoingTest.questions_data.length) * 100)}%</span>
                   </div>
-                  <p className="text-sm text-muted-foreground">
-                    You have an ongoing security aptitude test. Continue where you left off.
+                  <Progress value={(ongoingTest.current_question / ongoingTest.questions_data.length) * 100} />
+                  {ongoingTest.test_started && (
+                    <p className="text-xs text-muted-foreground">
+                      Time: {Math.floor(ongoingTest.time_left / 60)}:{(ongoingTest.time_left % 60).toString().padStart(2, '0')} remaining
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {user.test_completed && testAttempt && (
+                <div className="space-y-3">
+                  <div className="flex justify-between text-sm">
+                    <span>Score</span>
+                    <span>{Math.round((testAttempt.score / testAttempt.total_questions) * 100)}%</span>
+                  </div>
+                  <Progress value={(testAttempt.score / testAttempt.total_questions) * 100} />
+                  <p className="text-xs text-muted-foreground">
+                    {testAttempt.score}/{testAttempt.total_questions} - {testAttempt.passed ? "Passed" : "Failed"}
                   </p>
-                  <div className="text-sm space-y-1">
-                    <p>Progress: Question {ongoingTest.current_question + 1} of {ongoingTest.questions_data.length}</p>
-                    <p>Answered: {Object.keys(ongoingTest.answers_data).length} questions</p>
-                    {ongoingTest.test_started && (
-                      <p>Time Remaining: {Math.floor(ongoingTest.time_left / 60)}:{(ongoingTest.time_left % 60).toString().padStart(2, '0')}</p>
-                    )}
-                  </div>
+                </div>
+              )}
+
+              <div className="mt-4">
+                {ongoingTest ? (
                   <Button asChild className="w-full">
                     <Link href="/dashboard/test">Continue Test</Link>
                   </Button>
-                </>
-              ) : user.test_completed ? (
-                <>
-                  <div className="flex items-center gap-2">
-                    <CheckCircle className="h-5 w-5 text-green-600" />
-                    <span className="font-semibold text-green-600">Test Completed</span>
-                  </div>
-                  {testAttempt && (
-                    <>
-                      <div>
-                        <p className="text-sm text-muted-foreground">Score</p>
-                        <div className="flex items-center gap-2">
-                          <Progress
-                            value={(testAttempt.score / testAttempt.total_questions) * 100}
-                            className="flex-1"
-                          />
-                          <span className="font-semibold">
-                            {testAttempt.score}/{testAttempt.total_questions}
-                          </span>
-                        </div>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {Math.round((testAttempt.score / testAttempt.total_questions) * 100)}% -{" "}
-                          {testAttempt.passed ? "Passed" : "Failed"}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-muted-foreground">Completed On</p>
-                        <p className="font-semibold">{new Date(testAttempt.completed_at).toLocaleDateString()}</p>
-                      </div>
-                      {!testAttempt.passed && (
-                        <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-                          <p className="text-sm text-red-800">
-                            You scored below 50%. You can retake the test for $35.
-                          </p>
-                          <Button asChild variant="outline" className="w-full mt-2">
-                            <Link href="/dashboard/payment?type=retake">Retake Test ($35)</Link>
-                          </Button>
-                        </div>
-                      )}
-                    </>
-                  )}
-                </>
-              ) : !user.membership_fee_paid ? (
-                <>
-                  <div className="flex items-center gap-2">
-                    <XCircle className="h-5 w-5 text-red-600" />
-                    <span className="font-semibold text-red-600">Membership Required</span>
-                  </div>
-                  <p className="text-sm text-muted-foreground">Complete your membership payment to access the test.</p>
-                  <Button asChild variant="outline" className="w-full bg-transparent">
-                    <Link href="/dashboard/payment">Complete Membership Payment</Link>
+                ) : user.test_completed ? (
+                  !testAttempt?.passed && (
+                    <Button asChild variant="outline" className="w-full">
+                      <Link href="/dashboard/payment?type=retake">Retake Test ($35)</Link>
+                    </Button>
+                  )
+                ) : !user.membership_fee_paid ? (
+                  <Button asChild variant="outline" className="w-full">
+                    <Link href="/dashboard/payment">Complete Membership</Link>
                   </Button>
-                </>
-              ) : user.payment_status === "completed" ? (
-                <>
-                  <div className="flex items-center gap-2">
-                    <Clock className="h-5 w-5 text-blue-600" />
-                    <span className="font-semibold text-blue-600">Test Available</span>
-                  </div>
-                  <p className="text-sm text-muted-foreground">You can now take the security aptitude test.</p>
+                ) : user.payment_status === "completed" ? (
                   <Button asChild className="w-full">
                     <Link href="/dashboard/test">Start Test</Link>
                   </Button>
-                </>
-              ) : (
-                <>
-                  <div className="flex items-center gap-2">
-                    <XCircle className="h-5 w-5 text-red-600" />
-                    <span className="font-semibold text-red-600">Test Payment Required</span>
-                  </div>
-                  <p className="text-sm text-muted-foreground">Complete your test payment to access the aptitude test.</p>
-                  <Button asChild variant="outline" className="w-full bg-transparent">
-                    <Link href="/dashboard/payment">Complete Test Payment</Link>
+                ) : (
+                  <Button asChild variant="outline" className="w-full">
+                    <Link href="/dashboard/payment">Complete Payment</Link>
                   </Button>
-                </>
-              )}
+                )}
+              </div>
             </CardContent>
           </Card>
 
           {/* Certificate Card */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Award className="h-5 w-5" />
-                Certificate
-              </CardTitle>
+          <Card className="group hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 border-0 bg-gradient-to-br from-background to-muted/20 backdrop-blur-sm">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+              <div>
+                <CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Certificate</CardTitle>
+                <div className="text-2xl font-bold mt-2">
+                  {user.certificate_issued ? "Issued" : user.test_completed && testAttempt?.passed ? "Available" : "Pending"}
+                </div>
+              </div>
+              <div className="w-12 h-12 bg-gradient-to-br from-primary/10 to-primary/5 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                <Award className="h-6 w-6 text-primary" />
+              </div>
             </CardHeader>
-            <CardContent className="space-y-4">
-              {user.certificate_issued ? (
-                <>
-                  <div className="flex items-center gap-2">
-                    <CheckCircle className="h-5 w-5 text-green-600" />
-                    <span className="font-semibold text-green-600">Certificate Issued</span>
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    Your GSPA certification has been issued successfully.
-                  </p>
+            <CardContent>
+              <div className="flex items-center gap-2 mb-4">
+                {user.certificate_issued ? (
+                  <>
+                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                    <p className="text-sm text-muted-foreground">
+                      Certificate issued and ready for download
+                    </p>
+                  </>
+                ) : user.test_completed && testAttempt?.passed ? (
+                  <>
+                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                    <p className="text-sm text-muted-foreground">
+                      Ready to generate certificate
+                    </p>
+                  </>
+                ) : user.test_completed && testAttempt && !testAttempt.passed ? (
+                  <>
+                    <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+                    <p className="text-sm text-muted-foreground">
+                      Test failed - minimum 70% required
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <div className="w-2 h-2 bg-gray-500 rounded-full"></div>
+                    <p className="text-sm text-muted-foreground">
+                      Complete test to earn certificate
+                    </p>
+                  </>
+                )}
+              </div>
+
+              <div className="mt-4">
+                {user.certificate_issued ? (
                   <Button onClick={downloadCertificate} className="w-full">
                     <Download className="h-4 w-4 mr-2" />
                     Download Certificate
                   </Button>
-                </>
-              ) : user.test_completed && testAttempt?.passed ? (
-                <>
-                  <div className="flex items-center gap-2">
-                    <Award className="h-5 w-5 text-blue-600" />
-                    <span className="font-semibold text-blue-600">Certificate Available</span>
-                  </div>
-                  <p className="text-sm text-muted-foreground">Congratulations! Generate your certificate now.</p>
+                ) : user.test_completed && testAttempt?.passed ? (
                   <Button onClick={generateCertificate} className="w-full">
                     Generate Certificate
                   </Button>
-                </>
-              ) : user.test_completed && testAttempt && !testAttempt.passed ? (
-                <>
-                  <div className="flex items-center gap-2">
-                    <XCircle className="h-5 w-5 text-red-600" />
-                    <span className="font-semibold text-red-600">Test Failed</span>
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    You need to score at least 70% to receive a certificate. You can retake the test after 30 days.
-                  </p>
-                </>
-              ) : (
-                <>
-                  <div className="flex items-center gap-2">
-                    <Clock className="h-5 w-5 text-gray-600" />
-                    <span className="font-semibold text-gray-600">Not Available</span>
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    Complete the test successfully to receive your certificate.
-                  </p>
-                </>
-              )}
+                ) : null}
+              </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Next Steps */}
-        <Card className="mt-8">
-          <CardHeader>
-            <CardTitle>Next Steps</CardTitle>
-            <CardDescription>Here's what you can do next in your certification journey.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
-              {!user.test_completed && user.payment_status === "completed" && (
-                <div className="text-center">
-                  <div className="w-12 h-12 bg-primary rounded-full flex items-center justify-center mx-auto mb-4">
-                    <FileText className="h-6 w-6 text-primary-foreground" />
-                  </div>
-                  <h3 className="font-semibold mb-2">Take the Test</h3>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Complete the security aptitude assessment to earn your certification.
-                  </p>
-                  <Button asChild size="sm">
-                    <Link href="/dashboard/test">Start Test</Link>
-                  </Button>
+        {/* Quick Actions & Next Steps */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8 mt-8 md:mt-12">
+          <Card className="border-0 bg-gradient-to-br from-background to-muted/20 backdrop-blur-sm shadow-xl">
+            <CardHeader className="pb-6">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-gradient-to-br from-primary/10 to-primary/5 rounded-lg flex items-center justify-center">
+                  <FileText className="h-5 w-5 text-primary" />
                 </div>
-              )}
-
-              {user.test_completed && testAttempt?.passed && !user.certificate_issued && (
-                <div className="text-center">
-                  <div className="w-12 h-12 bg-primary rounded-full flex items-center justify-center mx-auto mb-4">
-                    <Award className="h-6 w-6 text-primary-foreground" />
-                  </div>
-                  <h3 className="font-semibold mb-2">Get Certified</h3>
-                  <p className="text-sm text-muted-foreground mb-4">Generate your official GSPA certificate.</p>
-                  <Button onClick={generateCertificate} size="sm">
-                    Generate Certificate
-                  </Button>
+                <div>
+                  <CardTitle className="text-xl">Next Steps</CardTitle>
+                  <CardDescription>Your certification journey</CardDescription>
                 </div>
-              )}
-
-              {user.certificate_issued && (
-                <div className="text-center">
-                  <div className="w-12 h-12 bg-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <CheckCircle className="h-6 w-6 text-white" />
-                  </div>
-                  <h3 className="font-semibold mb-2">Share Your Achievement</h3>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Share your certification on LinkedIn and other professional networks.
-                  </p>
-                  <Button variant="outline" size="sm">
-                    Share on LinkedIn
-                  </Button>
-                </div>
-              )}
-
-              <div className="text-center">
-                <div className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <User className="h-6 w-6 text-white" />
-                </div>
-                <h3 className="font-semibold mb-2">Join the Community</h3>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Connect with other certified security professionals worldwide.
-                </p>
-                <Button variant="outline" size="sm">
-                  Join Community
-                </Button>
               </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 gap-4">
+                {!user.test_completed && user.payment_status === "completed" && (
+                  <div className="group p-4 bg-gradient-to-br from-muted/20 to-muted/10 rounded-xl border border-border/50 hover:shadow-lg hover:-translate-y-1 transition-all duration-300">
+                    <div className="flex items-start gap-4">
+                      <div className="w-10 h-10 bg-gradient-to-br from-primary/10 to-primary/5 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform duration-300 flex-shrink-0">
+                        <FileText className="h-5 w-5 text-primary" />
+                      </div>
+                      <div className="flex-1">
+                        <div className="font-semibold text-base mb-1">Take the Test</div>
+                        <div className="text-sm text-muted-foreground mb-3 leading-relaxed">
+                          Complete the security aptitude assessment to earn your certification.
+                        </div>
+                        <Button asChild size="sm">
+                          <Link href="/dashboard/test">Start Test</Link>
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {user.test_completed && testAttempt?.passed && !user.certificate_issued && (
+                  <div className="group p-4 bg-gradient-to-br from-muted/20 to-muted/10 rounded-xl border border-border/50 hover:shadow-lg hover:-translate-y-1 transition-all duration-300">
+                    <div className="flex items-start gap-4">
+                      <div className="w-10 h-10 bg-gradient-to-br from-primary/10 to-primary/5 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform duration-300 flex-shrink-0">
+                        <Award className="h-5 w-5 text-primary" />
+                      </div>
+                      <div className="flex-1">
+                        <div className="font-semibold text-base mb-1">Get Certified</div>
+                        <div className="text-sm text-muted-foreground mb-3 leading-relaxed">
+                          Generate your official GSPA certificate.
+                        </div>
+                        <Button onClick={generateCertificate} size="sm">
+                          Generate Certificate
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {user.certificate_issued && (
+                  <div className="group p-4 bg-gradient-to-br from-muted/20 to-muted/10 rounded-xl border border-border/50 hover:shadow-lg hover:-translate-y-1 transition-all duration-300">
+                    <div className="flex items-start gap-4">
+                      <div className="w-10 h-10 bg-gradient-to-br from-green-500/10 to-green-500/5 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform duration-300 flex-shrink-0">
+                        <CheckCircle className="h-5 w-5 text-green-600" />
+                      </div>
+                      <div className="flex-1">
+                        <div className="font-semibold text-base mb-1">Share Your Achievement</div>
+                        <div className="text-sm text-muted-foreground mb-3 leading-relaxed">
+                          Share your certification on LinkedIn and other professional networks.
+                        </div>
+                        <Button variant="outline" size="sm">
+                          Share on LinkedIn
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-0 bg-gradient-to-br from-background to-muted/20 backdrop-blur-sm shadow-xl">
+            <CardHeader className="pb-6">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-gradient-to-br from-primary/10 to-primary/5 rounded-lg flex items-center justify-center">
+                  <User className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <CardTitle className="text-xl">Community & Resources</CardTitle>
+                  <CardDescription>Connect and learn more</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="group p-4 bg-gradient-to-br from-muted/20 to-muted/10 rounded-xl border border-border/50 hover:shadow-lg hover:-translate-y-1 transition-all duration-300">
+                  <div className="flex items-start gap-4">
+                    <div className="w-10 h-10 bg-gradient-to-br from-blue-500/10 to-blue-500/5 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform duration-300 flex-shrink-0">
+                      <User className="h-5 w-5 text-blue-600" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="font-semibold text-base mb-1">Join the Community</div>
+                      <div className="text-sm text-muted-foreground leading-relaxed">
+                        Connect with other certified security professionals worldwide.
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="group p-4 bg-gradient-to-br from-muted/20 to-muted/10 rounded-xl border border-border/50 hover:shadow-lg hover:-translate-y-1 transition-all duration-300">
+                  <div className="flex items-start gap-4">
+                    <div className="w-10 h-10 bg-gradient-to-br from-purple-500/10 to-purple-500/5 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform duration-300 flex-shrink-0">
+                      <FileText className="h-5 w-5 text-purple-600" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="font-semibold text-base mb-1">Learning Resources</div>
+                      <div className="text-sm text-muted-foreground leading-relaxed">
+                        Access additional training materials and security best practices.
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   )

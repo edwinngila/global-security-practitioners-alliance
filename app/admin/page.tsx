@@ -119,25 +119,23 @@ export default function AdminDashboardPage() {
   return (
     <div className="min-h-screen flex">
       {/* Mobile Sidebar */}
-      {mobileMenuOpen && (
-        <div className="fixed inset-0 z-50 md:hidden">
-          <div className="absolute inset-0 bg-black/50" onClick={() => setMobileMenuOpen(false)} />
-          <div className="absolute left-0 top-0 h-full">
-            <DashboardSidebar
-              isAdmin={isAdmin}
-              userName={userName}
-              userEmail={userEmail}
-              isMobileOpen={mobileMenuOpen}
-              onMobileClose={() => setMobileMenuOpen(false)}
-            />
-          </div>
-        </div>
-      )}
+      <div className={`
+        fixed inset-y-0 left-0 z-50 w-64 transform transition-transform duration-300 md:hidden
+        ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
+      `}>
+        <DashboardSidebar
+          userRole="admin"
+          userName={userName}
+          userEmail={userEmail}
+          isMobileOpen={mobileMenuOpen}
+          onMobileClose={() => setMobileMenuOpen(false)}
+        />
+      </div>
 
       {/* Desktop Sidebar */}
       <div className="hidden md:block">
         <DashboardSidebar
-          isAdmin={isAdmin}
+          userRole="admin"
           userName={userName}
           userEmail={userEmail}
         />

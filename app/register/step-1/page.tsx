@@ -97,7 +97,7 @@ export default function RegisterStep1() {
                         minLength: { value: 2, message: "Must be at least 2 characters" },
                       })}
                       placeholder="John"
-                      className={`h-12 bg-black/5 text-black ${errors.firstName ? "border-destructive" : ""}`}
+                      className={`h-12 bg-input text-foreground ${errors.firstName ? "border-destructive" : ""}`}
                     />
                     {errors.firstName && <p className="text-sm text-destructive">{errors.firstName.message}</p>}
                   </div>
@@ -111,7 +111,7 @@ export default function RegisterStep1() {
                         minLength: { value: 2, message: "Must be at least 2 characters" },
                       })}
                       placeholder="Doe"
-                      className={`h-12 bg-black/5 text-black ${errors.lastName ? "border-destructive" : ""}`}
+                      className={`h-12 bg-input text-foreground ${errors.lastName ? "border-destructive" : ""}`}
                     />
                     {errors.lastName && <p className="text-sm text-destructive">{errors.lastName.message}</p>}
                   </div>
@@ -128,9 +128,32 @@ export default function RegisterStep1() {
                         value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
                         message: "Enter a valid email address",
                       },
+                      validate: async (value) => {
+                        if (!value) return true
+                        try {
+                          const response = await fetch('/api/check-email', {
+                            method: 'POST',
+                            headers: {
+                              'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({ email: value }),
+                          })
+
+                          const result = await response.json()
+
+                          if (result.exists) {
+                            return "This email address is already registered"
+                          }
+                          return true
+                        } catch (error) {
+                          // If API fails, allow registration to continue
+                          console.error('Email check failed:', error)
+                          return true
+                        }
+                      }
                     })}
                     placeholder="john.doe@example.com"
-                    className={`h-12 bg-black/5 text-black ${errors.email ? "border-destructive" : ""}`}
+                    className={`h-12 bg-input text-foreground ${errors.email ? "border-destructive" : ""}`}
                   />
                   {errors.email && <p className="text-sm text-destructive">{errors.email.message}</p>}
                 </div>
@@ -175,7 +198,7 @@ export default function RegisterStep1() {
                       }
                     })}
                     placeholder="Create a strong password"
-                    className={`h-12 bg-black/5 text-black ${errors.password ? "border-destructive" : ""}`}
+                    className={`h-12 bg-input text-foreground ${errors.password ? "border-destructive" : ""}`}
                   />
                   {errors.password && <p className="text-sm text-destructive">{errors.password.message}</p>}
                 </div>
@@ -195,7 +218,7 @@ export default function RegisterStep1() {
                       }
                     })}
                     placeholder="Confirm your password"
-                    className={`h-12 bg-black/5 text-black ${errors.confirmPassword ? "border-destructive" : ""}`}
+                    className={`h-12 bg-input text-foreground ${errors.confirmPassword ? "border-destructive" : ""}`}
                   />
                   {errors.confirmPassword && <p className="text-sm text-destructive">{errors.confirmPassword.message}</p>}
                 </div>
