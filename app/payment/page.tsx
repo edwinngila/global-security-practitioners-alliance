@@ -22,23 +22,32 @@ interface UserProfile {
   payment_status: string
 }
 
-export default function PaymentPage() {
-  const [user, setUser] = useState<UserProfile | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [paymentSuccess, setPaymentSuccess] = useState(false)
-  const [paymentType, setPaymentType] = useState<'membership' | 'test' | 'retake'>('membership')
-  const router = useRouter()
-  const supabase = createClient()
+interface Module {
+  id: string
+  title: string
+  price_kes: number
+  price_usd: number
+}
 
-  const PAYSTACK_PUBLIC_KEY = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || "pk_test_your_key_here"
-  const MEMBERSHIP_FEE = 910000 // 9100 KES in cents
-  const TEST_FEE = 650000 // 6500 KES in cents
-  const RETAKE_FEE = 455000 // 4550 KES in cents
+export default function PaymentPage() {
+   const [user, setUser] = useState<UserProfile | null>(null)
+   const [module, setModule] = useState<Module | null>(null)
+   const [isLoading, setIsLoading] = useState(true)
+   const [paymentSuccess, setPaymentSuccess] = useState(false)
+   const [paymentType, setPaymentType] = useState<'membership' | 'test' | 'retake' | 'module'>('membership')
+   const router = useRouter()
+   const supabase = createClient()
+
+   const PAYSTACK_PUBLIC_KEY = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || "pk_test_your_key_here"
+   const MEMBERSHIP_FEE = 910000 // 9100 KES in cents
+   const TEST_FEE = 650000 // 6500 KES in cents
+   const RETAKE_FEE = 455000 // 4550 KES in cents
 
   useEffect(() => {
     const getUserProfile = async () => {
       const urlParams = new URLSearchParams(window.location.search)
-      const requestedType = urlParams.get('type') as 'membership' | 'test' | 'retake' | null
+      const requestedType = urlParams.get('type') as 'membership' | 'test' | 'retake' | 'module' | null
+      const moduleId = urlParams.get('moduleId')
 
       const registrationUserId = localStorage.getItem("registration-user-id")
 
@@ -81,11 +90,30 @@ export default function PaymentPage() {
 
       setUser(profile)
 
-      if (profile.membership_fee_paid && profile.payment_status === "completed" && !requestedType) {
-        router.push("/test")
+      // Handle module payment - fetch module details
+      if (requestedType === 'module' && moduleId) {
+        const { data: moduleData, error: moduleError } = await supabase
+          .from('modules')
+          .select('id, title, price_kes, price_usd')
+          .eq('id', moduleId)
+          .single()
+
+        if (moduleError || !moduleData) {
+          alert('Module not found')
+          router.push('/modules')
+          return
+        }
+
+        setModule(moduleData)
+        setPaymentType('module')
+      } else {
+        if (profile.membership_fee_paid && profile.payment_status === "completed" && !requestedType) {
+          router.push("/test")
+        }
+
+        setPaymentType(requestedType || (profile.membership_fee_paid ? 'test' : 'membership'))
       }
 
-      setPaymentType(requestedType || (profile.membership_fee_paid ? 'test' : 'membership'))
       setIsLoading(false)
     }
 
@@ -96,40 +124,67 @@ export default function PaymentPage() {
     if (!user) return
 
     try {
-      const updateData: any = {}
+      if (paymentType === 'module' && module) {
+        // Handle module enrollment
+        const urlParams = new URLSearchParams(window.location.search)
+        const examDate = urlParams.get('examDate')
 
-      if (paymentType === 'membership') {
-        updateData.membership_fee_paid = true
-        updateData.membership_payment_reference = reference.reference
-      } else if (paymentType === 'test') {
-        updateData.payment_status = "completed"
-        updateData.payment_reference = reference.reference
-      } else if (paymentType === 'retake') {
-        updateData.payment_status = "completed"
-        updateData.test_completed = false // Allow retake
-        updateData.test_score = null
-        updateData.payment_reference = reference.reference
-      }
-
-      const { error } = await supabase
-        .from("profiles")
-        .update(updateData)
-        .eq("id", user.id)
-
-      if (error) throw error
-
-      setPaymentSuccess(true)
-
-      localStorage.setItem("paid-user-id", user.id)
-      localStorage.removeItem("registration-user-id")
-
-      setTimeout(() => {
-        if (paymentType === 'membership') {
-          router.push("/dashboard")
-        } else {
-          router.push("/test")
+        const enrollmentData = {
+          user_id: user.id,
+          module_id: module.id,
+          payment_status: 'completed',
+          payment_reference: reference.reference,
+          exam_date: examDate || null
         }
-      }, 3000)
+
+        const { error: enrollmentError } = await supabase
+          .from('module_enrollments')
+          .insert(enrollmentData)
+
+        if (enrollmentError) throw enrollmentError
+
+        setPaymentSuccess(true)
+
+        setTimeout(() => {
+          router.push(`/dashboard/my-modules/${module.id}`)
+        }, 3000)
+      } else {
+        // Handle other payment types
+        const updateData: any = {}
+
+        if (paymentType === 'membership') {
+          updateData.membership_fee_paid = true
+          updateData.membership_payment_reference = reference.reference
+        } else if (paymentType === 'test') {
+          updateData.payment_status = "completed"
+          updateData.payment_reference = reference.reference
+        } else if (paymentType === 'retake') {
+          updateData.payment_status = "completed"
+          updateData.test_completed = false // Allow retake
+          updateData.test_score = null
+          updateData.payment_reference = reference.reference
+        }
+
+        const { error } = await supabase
+          .from("profiles")
+          .update(updateData)
+          .eq("id", user.id)
+
+        if (error) throw error
+
+        setPaymentSuccess(true)
+
+        localStorage.setItem("paid-user-id", user.id)
+        localStorage.removeItem("registration-user-id")
+
+        setTimeout(() => {
+          if (paymentType === 'membership') {
+            router.push("/dashboard")
+          } else {
+            router.push("/test")
+          }
+        }, 3000)
+      }
     } catch (error) {
       console.error("Payment update error:", error)
       alert("Payment was successful but there was an error updating your status. Please contact support.")
@@ -145,6 +200,7 @@ export default function PaymentPage() {
       case 'membership': return MEMBERSHIP_FEE
       case 'test': return TEST_FEE
       case 'retake': return RETAKE_FEE
+      case 'module': return module ? module.price_kes * 100 : 0 // Convert to cents
       default: return MEMBERSHIP_FEE
     }
   }
@@ -154,12 +210,13 @@ export default function PaymentPage() {
       case 'membership': return 'Membership Fee'
       case 'test': return 'Security Aptitude Test Fee'
       case 'retake': return 'Test Retake Fee'
+      case 'module': return module ? `${module.title} Enrollment` : 'Module Fee'
       default: return 'Fee'
     }
   }
 
   const paystackConfig = {
-    reference: `GSPA-${paymentType}-${user?.id}-${Date.now()}`,
+    reference: `GSPA-${paymentType}-${module?.id || ''}-${user?.id}-${Date.now()}`,
     email: user?.email || "",
     amount: getAmount(),
     publicKey: PAYSTACK_PUBLIC_KEY,
@@ -167,6 +224,7 @@ export default function PaymentPage() {
     metadata: {
       user_id: user?.id,
       payment_type: paymentType,
+      module_id: module?.id || null,
       custom_fields: [
         {
           display_name: getPaymentTitle(),
@@ -218,13 +276,30 @@ export default function PaymentPage() {
                   ? 'Your membership payment has been processed successfully. You are now a GSPA member and can access the dashboard.'
                   : paymentType === 'test'
                   ? 'Your payment has been processed successfully. You can now access the security aptitude test.'
-                  : 'Your retake payment has been processed successfully. You can now retake the security aptitude test.'
+                  : paymentType === 'retake'
+                  ? 'Your retake payment has been processed successfully. You can now retake the security aptitude test.'
+                  : paymentType === 'module' && module
+                  ? `Your enrollment in "${module.title}" has been processed successfully. You can now access the module content.`
+                  : 'Your payment has been processed successfully.'
                 }
               </CardDescription>
             </CardHeader>
             <CardContent className="text-center">
-              <Button onClick={() => router.push(paymentType === 'membership' ? "/dashboard" : "/test")} className="w-full">
-                {paymentType === 'membership' ? 'Go to Dashboard' : 'Start Security Test'}
+              <Button onClick={() => {
+                if (paymentType === 'module' && module) {
+                  router.push(`/dashboard/my-modules/${module.id}`)
+                } else if (paymentType === 'membership') {
+                  router.push("/dashboard")
+                } else {
+                  router.push("/test")
+                }
+              }} className="w-full">
+                {paymentType === 'module' && module
+                  ? `Start ${module.title}`
+                  : paymentType === 'membership'
+                  ? 'Go to Dashboard'
+                  : 'Start Security Test'
+                }
               </Button>
             </CardContent>
           </Card>

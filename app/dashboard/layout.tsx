@@ -71,6 +71,8 @@ export default function DashboardLayout({
     switch (pathname) {
       case "/dashboard":
         return "Dashboard"
+      case "/dashboard/enrolled":
+        return "Enroll in Modules"
       case "/dashboard/profile":
         return "Profile"
       case "/dashboard/test":

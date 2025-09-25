@@ -38,6 +38,11 @@ const userMenuItems = [
     icon: LayoutDashboard,
   },
   {
+    title: "Enrolled",
+    href: "/dashboard/enrolled",
+    icon: BookOpen,
+  },
+  {
     title: "Profile",
     href: "/dashboard/profile",
     icon: User,
@@ -79,6 +84,16 @@ const adminMenuItems = [
     title: "User Management",
     href: "/admin/users",
     icon: Users,
+  },
+  {
+    title: "Module Management",
+    href: "/admin/modules",
+    icon: BookOpen,
+  },
+  {
+    title: "Content Management",
+    href: "/admin/modules/content",
+    icon: FileText,
   },
   {
     title: "Test Management",

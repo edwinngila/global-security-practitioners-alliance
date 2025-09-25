@@ -22,6 +22,7 @@ export default function Navigation() {
 
   const navItems = [
     { href: "/", label: "Home" },
+    { href: "/modules", label: "Modules" },
     { href: "/about", label: "About" },
     { href: "/why-join", label: "Why Join Us" },
     { href: "/contact", label: "Contact" },

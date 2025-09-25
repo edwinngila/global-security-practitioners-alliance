@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Progress } from "@/components/ui/progress"
-import { Award, Download, CheckCircle, XCircle, Clock, FileText, User, Calendar } from "lucide-react"
+import { Award, Download, CheckCircle, XCircle, Clock, FileText, User, Calendar, BookOpen } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
@@ -34,6 +34,15 @@ interface TestAttempt {
   completed_at: string
 }
 
+interface ModuleEnrollment {
+  id: string
+  module_id: string
+  module_title: string
+  progress_percentage: number
+  payment_status: string
+  completed_at: string | null
+}
+
 interface OngoingTest {
   id: string
   user_id: string
@@ -47,12 +56,13 @@ interface OngoingTest {
 }
 
 export default function DashboardPage() {
-  const [user, setUser] = useState<UserProfile | null>(null)
-  const [testAttempt, setTestAttempt] = useState<TestAttempt | null>(null)
-  const [ongoingTest, setOngoingTest] = useState<OngoingTest | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const router = useRouter()
-  const supabase = createClient()
+   const [user, setUser] = useState<UserProfile | null>(null)
+   const [testAttempt, setTestAttempt] = useState<TestAttempt | null>(null)
+   const [ongoingTest, setOngoingTest] = useState<OngoingTest | null>(null)
+   const [moduleEnrollments, setModuleEnrollments] = useState<ModuleEnrollment[]>([])
+   const [isLoading, setIsLoading] = useState(true)
+   const router = useRouter()
+   const supabase = createClient()
 
   useEffect(() => {
     const getUserData = async () => {
@@ -105,6 +115,47 @@ export default function DashboardPage() {
 
         if (!ongoingError && ongoing) {
           setOngoingTest(ongoing)
+        }
+      }
+
+      // Get user's module enrollments with module details
+      const { data: enrollments, error: enrollmentsError } = await supabase
+        .from("module_enrollments")
+        .select(`
+          id,
+          module_id,
+          progress_percentage,
+          payment_status,
+          completed_at
+        `)
+        .eq("user_id", authUser.id)
+        .eq("payment_status", "completed")
+
+      if (!enrollmentsError && enrollments) {
+        // Get module titles separately to avoid join issues
+        const moduleIds = enrollments.map(e => e.module_id)
+        if (moduleIds.length > 0) {
+          const { data: modules, error: modulesError } = await supabase
+            .from("modules")
+            .select("id, title")
+            .in("id", moduleIds)
+
+          if (!modulesError && modules) {
+            const moduleMap = modules.reduce((acc, module) => {
+              acc[module.id] = module.title
+              return acc
+            }, {} as Record<string, string>)
+
+            const formattedEnrollments = enrollments.map(enrollment => ({
+              id: enrollment.id,
+              module_id: enrollment.module_id,
+              module_title: moduleMap[enrollment.module_id] || 'Unknown Module',
+              progress_percentage: enrollment.progress_percentage,
+              payment_status: enrollment.payment_status,
+              completed_at: enrollment.completed_at
+            }))
+            setModuleEnrollments(formattedEnrollments)
+          }
         }
       }
 
@@ -405,6 +456,62 @@ export default function DashboardPage() {
           </Card>
         </div>
 
+        {/* Modules Section */}
+        {moduleEnrollments.length > 0 && (
+          <div className="mb-8 md:mb-12">
+            <Card className="border-0 bg-gradient-to-br from-background to-muted/20 backdrop-blur-sm">
+              <CardHeader className="pb-6">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-gradient-to-br from-primary/10 to-primary/5 rounded-lg flex items-center justify-center">
+                    <BookOpen className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-xl">My Modules</CardTitle>
+                    <CardDescription>Your enrolled training modules</CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {moduleEnrollments.map((enrollment) => (
+                    <Card key={enrollment.id} className="group hover:shadow-lg hover:-translate-y-1 transition-all duration-300 border border-border/50">
+                      <CardContent className="p-4">
+                        <div className="flex items-start justify-between mb-3">
+                          <h4 className="font-semibold text-sm line-clamp-2 group-hover:text-primary transition-colors">
+                            {enrollment.module_title}
+                          </h4>
+                          {enrollment.completed_at && (
+                            <CheckCircle className="h-4 w-4 text-green-500 flex-shrink-0 ml-2" />
+                          )}
+                        </div>
+
+                        <div className="space-y-3">
+                          <div className="flex justify-between text-xs text-muted-foreground">
+                            <span>Progress</span>
+                            <span>{enrollment.progress_percentage}%</span>
+                          </div>
+                          <Progress value={enrollment.progress_percentage} className="h-2" />
+
+                          <Button
+                            asChild
+                            size="sm"
+                            className="w-full text-xs"
+                            variant={enrollment.progress_percentage === 100 ? "outline" : "default"}
+                          >
+                            <Link href={`/dashboard/my-modules/${enrollment.module_id}`}>
+                              {enrollment.progress_percentage === 100 ? 'Review Module' : 'Continue Learning'}
+                            </Link>
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
         {/* Quick Actions & Next Steps */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8 mt-8 md:mt-12">
           <Card className="border-0 bg-gradient-to-br from-background to-muted/20 backdrop-blur-sm shadow-xl">
@@ -477,6 +584,24 @@ export default function DashboardPage() {
                     </div>
                   </div>
                 )}
+
+                {/* Module Enrollment Suggestion */}
+                <div className="group p-4 bg-gradient-to-br from-blue-50/50 to-purple-50/50 dark:from-blue-950/20 dark:to-purple-950/20 rounded-xl border border-blue-200/50 dark:border-blue-800/50 hover:shadow-lg hover:-translate-y-1 transition-all duration-300">
+                  <div className="flex items-start gap-4">
+                    <div className="w-10 h-10 bg-gradient-to-br from-blue-500/10 to-purple-500/10 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform duration-300 flex-shrink-0">
+                      <BookOpen className="h-5 w-5 text-blue-600" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="font-semibold text-base mb-1">Explore Training Modules</div>
+                      <div className="text-sm text-muted-foreground mb-3 leading-relaxed">
+                        Enhance your skills with our comprehensive training modules covering various cybersecurity topics.
+                      </div>
+                      <Button asChild size="sm" variant="outline">
+                        <Link href="/modules">Browse Modules</Link>
+                      </Button>
+                    </div>
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>

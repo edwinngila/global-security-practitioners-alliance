@@ -10,6 +10,7 @@ import { useRouter } from "next/navigation"
 import Link from "next/link"
 import dynamic from "next/dynamic"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { generateCertificateHTML } from "@/components/certificate-HTML"
 
 const PaystackButton = dynamic(() => import("react-paystack").then((mod) => mod.PaystackButton), { ssr: false })
 
@@ -35,17 +36,17 @@ interface UserProfile {
 }
 
 export default function DashboardResultsPage() {
-   const [results, setResults] = useState<TestResults | null>(null)
-   const [user, setUser] = useState<UserProfile | null>(null)
-   const [isLoading, setIsLoading] = useState(true)
-   const [isPaymentProcessing, setIsPaymentProcessing] = useState(false)
-   const [paymentSuccess, setPaymentSuccess] = useState(false)
-   const certificateRef = useRef<HTMLDivElement>(null)
-   const router = useRouter()
-   const supabase = createClient()
+  const [results, setResults] = useState<TestResults | null>(null)
+  const [user, setUser] = useState<UserProfile | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [isPaymentProcessing, setIsPaymentProcessing] = useState(false)
+  const [paymentSuccess, setPaymentSuccess] = useState(false)
+  const certificateRef = useRef<HTMLDivElement>(null)
+  const router = useRouter()
+  const supabase = createClient()
 
-   const PAYSTACK_PUBLIC_KEY = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || "pk_test_your_key_here"
-   const RETAKE_FEE = 455000 // 4550 KES in cents
+  const PAYSTACK_PUBLIC_KEY = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || "pk_test_your_key_here"
+  const RETAKE_FEE = 455000 // 4550 KES in cents
 
   useEffect(() => {
     const getResultsAndUser = async () => {
@@ -121,7 +122,6 @@ export default function DashboardResultsPage() {
     return new Date() >= new Date(user.certificate_available_at)
   }
 
-
   const handlePaymentSuccess = async (reference: any) => {
     if (!user) return
 
@@ -189,547 +189,96 @@ export default function DashboardResultsPage() {
     },
   }
 
-  const downloadCertificate = async () => {
-    if (!user || !results?.passed) return
+const downloadCertificate = async () => {
+  if (!user || !results?.passed) return;
 
+  try {
     // Dynamically import client-side libraries
-    const { default: jsPDF } = await import("jspdf")
-    const { default: html2canvas } = await import("html2canvas")
+    const { default: jsPDF } = await import("jspdf");
+    const { default: html2canvas } = await import("html2canvas");
 
-    // Get certificate template
-    const { data: template } = await supabase.from("certificate_templates").select("*").eq("is_active", true).single()
+    const certificateHTML = generateCertificateHTML(user, results);
 
-    const certificateTemplate = template || {
-      organization_name: "Global Security Practitioners Alliance",
-      certificate_title: "Certificate of Excellence",
-      certificate_subtitle: "Professional Security Certification",
-      main_title: "Certificate of Excellence",
-      recipient_title: "This certifies that",
-      achievement_description:
-        "has demonstrated exceptional mastery and professional excellence in the field of Cybersecurity and Risk Management, successfully completing the comprehensive Security Aptitude Assessment with distinction. This achievement represents a commitment to the highest standards of professional competency in security protocols, threat analysis, compliance frameworks, and emergency response procedures.",
-      date_label: "Date of Achievement",
-      score_label: "Excellence Score",
-      certificate_id_label: "Certification ID",
-      signature_name: "Dr. Alexandra Sterling",
-      signature_title: "Director of Professional Certification",
-      signature_organization: "Global Security Institute",
-      background_color: "#fef7e6",
-      primary_color: "#1a2332",
-      accent_color: "#c9aa68",
-      font_family: "Georgia, Times New Roman, serif",
-      watermark_text: "CERTIFIED",
+    // Create temporary element with proper styling
+    const tempDiv = document.createElement("div");
+    tempDiv.innerHTML = certificateHTML;
+    
+    // Position off-screen but visible to html2canvas
+    tempDiv.style.position = "fixed";
+    tempDiv.style.left = "-9999px";
+    tempDiv.style.top = "0";
+    tempDiv.style.width = "1000px";
+    tempDiv.style.height = "750px";
+    tempDiv.style.zIndex = "9999";
+    document.body.appendChild(tempDiv);
+
+    // Get the certificate element
+    const certificateElement = tempDiv.firstElementChild as HTMLElement;
+    
+    // Ensure it's visible and properly sized
+    certificateElement.style.visibility = "visible";
+    certificateElement.style.opacity = "1";
+
+    // Wait for images to load
+    const images = tempDiv.getElementsByTagName('img');
+    const imagePromises = Array.from(images).map(img => {
+      if (img.complete) return Promise.resolve();
+      return new Promise((resolve) => {
+        img.onload = resolve;
+        img.onerror = resolve;
+      });
+    });
+
+    await Promise.all(imagePromises);
+
+    // Add a small delay to ensure rendering is complete
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    // Use html2canvas to capture the certificate with better settings
+    const canvas = await html2canvas(certificateElement, {
+      scale: 2,
+      useCORS: true,
+      allowTaint: false,
+      backgroundColor: "#ffffff",
+      logging: true, // Enable logging to see what's happening
+      width: certificateElement.offsetWidth,
+      height: certificateElement.offsetHeight,
+      scrollX: 0,
+      scrollY: 0,
+      windowWidth: certificateElement.scrollWidth,
+      windowHeight: certificateElement.scrollHeight
+    });
+
+    // Check if canvas has content
+    if (canvas.width === 0 || canvas.height === 0) {
+      throw new Error("Canvas is empty - certificate not rendered properly");
     }
 
-    const certificateHTML = `
-    <div style="
-  width: 1000px;
-  height: 750px;
-  background: linear-gradient(135deg, #f8f6f0 0%, #f5f1e8 25%, #f2ede0 50%, #efe8d8 75%, #ece3d0 100%);
-  border: 20px solid #1a365d;
-  padding: 0;
-  box-shadow: 
-    0 0 0 8px #d4af37,
-    0 0 0 12px #1a365d,
-    0 20px 60px rgba(0,0,0,0.3),
-    inset 0 0 100px rgba(212,175,55,0.1);
-  text-align: center;
-  position: relative;
-  overflow: hidden;
-  font-family: 'Playfair Display', Georgia, 'Times New Roman', serif;
-  margin: 0 auto;
-">
-  <!-- Elegant parchment texture overlay -->
-  <div style="
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-image: 
-      url('data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"200\" height=\"200\" opacity=\"0.03\"><filter id=\"noise\"><feTurbulence type=\"fractalNoise\" baseFrequency=\"0.7\" numOctaves=\"2\" /></filter><rect width=\"200\" height=\"200\" filter=\"url(%23noise)\" /></svg>'),
-      radial-gradient(circle at 25% 25%, rgba(255,255,255,0.3) 0%, transparent 50%),
-      radial-gradient(circle at 75% 75%, rgba(255,255,255,0.2) 0%, transparent 50%),
-      linear-gradient(45deg, transparent 48%, rgba(212,175,55,0.05) 49%, rgba(212,175,55,0.05) 51%, transparent 52%);
-    pointer-events: none;
-    z-index: 1;
-  "></div>
+    // Create PDF in landscape
+    const pdf = new jsPDF({
+      orientation: "landscape",
+      unit: "px",
+      format: [canvas.width, canvas.height],
+    });
 
-  <!-- Ornate corner flourishes -->
-  <div style="
-    position: absolute;
-    top: 30px;
-    left: 30px;
-    width: 120px;
-    height: 120px;
-    background: radial-gradient(circle, #d4af37 0%, transparent 70%);
-    opacity: 0.1;
-    border-radius: 50%;
-  "></div>
-  <div style="
-    position: absolute;
-    top: 30px;
-    right: 30px;
-    width: 120px;
-    height: 120px;
-    background: radial-gradient(circle, #d4af37 0%, transparent 70%);
-    opacity: 0.1;
-    border-radius: 50%;
-  "></div>
-  <div style="
-    position: absolute;
-    bottom: 30px;
-    left: 30px;
-    width: 120px;
-    height: 120px;
-    background: radial-gradient(circle, #d4af37 0%, transparent 70%);
-    opacity: 0.1;
-    border-radius: 50%;
-  "></div>
-  <div style="
-    position: absolute;
-    bottom: 30px;
-    right: 30px;
-    width: 120px;
-    height: 120px;
-    background: radial-gradient(circle, #d4af37 0%, transparent 70%);
-    opacity: 0.1;
-    border-radius: 50%;
-  "></div>
+    // Add the canvas image to PDF
+    const imgData = canvas.toDataURL("image/png", 1.0);
+    pdf.addImage(imgData, "PNG", 0, 0, canvas.width, canvas.height);
 
-  <!-- Decorative corner borders -->
-  <div style="
-    position: absolute;
-    top: 40px;
-    left: 40px;
-    width: 100px;
-    height: 100px;
-    border-top: 4px solid #d4af37;
-    border-left: 4px solid #d4af37;
-    opacity: 0.8;
-  "></div>
-  <div style="
-    position: absolute;
-    top: 50px;
-    left: 50px;
-    width: 80px;
-    height: 80px;
-    border-top: 2px solid #1a365d;
-    border-left: 2px solid #1a365d;
-    opacity: 0.6;
-  "></div>
-  <div style="
-    position: absolute;
-    top: 40px;
-    right: 40px;
-    width: 100px;
-    height: 100px;
-    border-top: 4px solid #d4af37;
-    border-right: 4px solid #d4af37;
-    opacity: 0.8;
-  "></div>
-  <div style="
-    position: absolute;
-    top: 50px;
-    right: 50px;
-    width: 80px;
-    height: 80px;
-    border-top: 2px solid #1a365d;
-    border-right: 2px solid #1a365d;
-    opacity: 0.6;
-  "></div>
-  <div style="
-    position: absolute;
-    bottom: 40px;
-    left: 40px;
-    width: 100px;
-    height: 100px;
-    border-bottom: 4px solid #d4af37;
-    border-left: 4px solid #d4af37;
-    opacity: 0.8;
-  "></div>
-  <div style="
-    position: absolute;
-    bottom: 50px;
-    left: 50px;
-    width: 80px;
-    height: 80px;
-    border-bottom: 2px solid #1a365d;
-    border-left: 2px solid #1a365d;
-    opacity: 0.6;
-  "></div>
-  <div style="
-    position: absolute;
-    bottom: 40px;
-    right: 40px;
-    width: 100px;
-    height: 100px;
-    border-bottom: 4px solid #d4af37;
-    border-right: 4px solid #d4af37;
-    opacity: 0.8;
-  "></div>
-  <div style="
-    position: absolute;
-    bottom: 50px;
-    right: 50px;
-    width: 80px;
-    height: 80px;
-    border-bottom: 2px solid #1a365d;
-    border-right: 2px solid #1a365d;
-    opacity: 0.6;
-  "></div>
+    // Download the PDF
+    pdf.save(`GSPA-Certificate-${user?.first_name}-${user?.last_name}.pdf`);
 
-  <!-- Organization logo at the top -->
-  <div style="
-    position: absolute;
-    top: 100px;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 20;
-  ">
-    <div style="
-      background: linear-gradient(135deg, #1a365d, #2d4a6b);
-      padding: 20px;
-      border-radius: 50%;
-      box-shadow: 
-        0 8px 25px rgba(0,0,0,0.3),
-        0 0 0 5px #d4af37,
-        0 0 0 8px #1a365d;
-      border: 3px solid #f8f6f0;
-    ">
-      <img src="/Global-Security-Practitioners-Alliance.png" alt="GSPA Logo" style="height: 80px; width: auto;" />
-    </div>
-  </div>
-
-  <!-- Main content container -->
-  <div style="
-    position: relative;
-    z-index: 10;
-    padding: 160px 80px 60px;
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-  ">
-
-    <!-- Organization Name with elegant styling -->
-    <div style="
-      font-size: 28px;
-      font-weight: 700;
-      color: #1a365d;
-      margin-bottom: 15px;
-      letter-spacing: 3px;
-      text-transform: uppercase;
-      text-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    ">Global Security Practitioners Alliance</div>
-
-    <!-- Decorative line -->
-    <div style="
-      width: 300px;
-      height: 3px;
-      background: linear-gradient(90deg, transparent, #d4af37, transparent);
-      margin: 0 auto 20px;
-    "></div>
-
-    <!-- Certificate Title with enhanced typography -->
-    <div style="margin-bottom: 40px;">
-      <div style="
-        font-size: 48px;
-        font-weight: bold;
-        color: #1a365d;
-        letter-spacing: 4px;
-        margin-bottom: 8px;
-        text-shadow: 0 3px 6px rgba(0,0,0,0.1);
-      ">CERTIFICATE</div>
-      <div style="
-        font-size: 24px;
-        color: #d4af37;
-        letter-spacing: 8px;
-        font-weight: 600;
-        margin-top: -5px;
-      ">OF PROFESSIONAL EXCELLENCE</div>
-    </div>
-
-    <!-- Recipient section with elegant presentation -->
-    <div style="margin: 30px 0;">
-      <div style="
-        font-size: 18px;
-        color: #1a365d;
-        margin-bottom: 15px;
-        font-style: italic;
-      ">This is to certify that</div>
-      <div style="
-        font-size: 36px;
-        font-weight: bold;
-        color: #1a365d;
-        margin: 20px 0;
-        padding: 12px 0;
-        border-top: 3px solid #d4af37;
-        border-bottom: 3px solid #d4af37;
-        background: linear-gradient(90deg, transparent, rgba(212,175,55,0.1), transparent);
-        text-shadow: 0 2px 4px rgba(0,0,0,0.1);
-      ">${user?.first_name || "First Name"} ${user?.last_name || "Last Name"}</div>
-    </div>
-
-    <!-- Achievement description with professional formatting -->
-    <div style="
-      font-size: 16px;
-      line-height: 1.6;
-      color: #1a365d;
-      margin: 25px 0;
-      max-width: 700px;
-      margin-left: auto;
-      margin-right: auto;
-      text-align: justify;
-      font-style: italic;
-    ">has demonstrated exceptional mastery and professional excellence in the field of Cybersecurity and Risk Management, successfully completing the comprehensive Security Aptitude Assessment with distinction. This achievement represents a commitment to the highest standards of professional competency in security protocols, threat analysis, compliance frameworks, and emergency response procedures.</div>
-
-    <!-- Score and Date section -->
-    <div style="
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin: 30px 0;
-      padding: 0 50px;
-    ">
-      <div style="text-align: left;">
-        <div style="
-          font-size: 16px;
-          color: #1a365d;
-          margin-bottom: 8px;
-          font-weight: 600;
-        ">Excellence Score</div>
-        <div style="
-          font-size: 24px;
-          font-weight: bold;
-          color: #d4af37;
-          text-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        ">${results?.score || 0}%</div>
-      </div>
-      <div style="text-align: right;">
-        <div style="
-          font-size: 16px;
-          color: #1a365d;
-          margin-bottom: 8px;
-          font-weight: 600;
-        ">Date of Achievement</div>
-        <div style="
-          font-size: 20px;
-          font-weight: bold;
-          color: #1a365d;
-        ">${new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}</div>
-      </div>
-    </div>
-
-    <!-- Signature and Enhanced Seal Section -->
-    <div style="
-      margin-top: 40px;
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-end;
-      padding: 0 40px;
-    ">
-      <!-- Signature -->
-      <div style="text-align: center; width: 45%;">
-        <div style="
-          border-top: 2px solid #1a365d;
-          margin: 40px 0 15px;
-        "></div>
-        <div style="
-          font-size: 18px;
-          font-weight: bold;
-          color: #1a365d;
-          margin-bottom: 5px;
-        ">Dr. Alexandra Sterling</div>
-        <div style="
-          font-size: 14px;
-          color: #1a365d;
-          margin-bottom: 3px;
-        ">Director of Professional Certification</div>
-        <div style="
-          font-size: 12px;
-          color: #d4af37;
-          font-style: italic;
-        ">Global Security Practitioners Alliance</div>
-      </div>
-
-      <!-- Enhanced Professional Seal -->
-      <div style="
-        flex-shrink: 0;
-        margin-bottom: 15px;
-        position: relative;
-      ">
-        <!-- Outer Seal Ring with enhanced design -->
-        <div style="
-          width: 140px;
-          height: 140px;
-          border: 8px double #d4af37;
-          border-radius: 50%;
-          background: radial-gradient(circle, #1a365d 0%, #0f1419 100%);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          position: relative;
-          box-shadow: 
-            0 0 0 4px #f8f6f0,
-            0 0 0 8px #1a365d,
-            0 10px 30px rgba(0,0,0,0.4),
-            inset 0 0 20px rgba(0,0,0,0.3);
-        ">
-          <!-- Inner Seal with organization branding -->
-          <div style="
-            width: 100px;
-            height: 100px;
-            border: 3px solid #d4af37;
-            border-radius: 50%;
-            background: radial-gradient(circle, #2d4a6b 0%, #1a365d 100%);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            position: relative;
-          ">
-            <!-- Globe and Shield Icon -->
-            <div style="
-              width: 35px;
-              height: 40px;
-              background: linear-gradient(135deg, #d4af37, #f4d03f);
-              clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
-              margin-bottom: 8px;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-            ">
-              <div style="
-                width: 20px;
-                height: 20px;
-                border: 2px solid #1a365d;
-                border-radius: 50%;
-                background: linear-gradient(135deg, #1a365d, #2d4a6b);
-                display: flex;
-                align-items: center;
-                justify-content: center;
-              ">
-                <span style="color: #d4af37; font-size: 10px; font-weight: bold;">🌍</span>
-              </div>
-            </div>
-            
-            <!-- Organization Text -->
-            <div style="color: #d4af37; font-size: 9px; font-weight: bold; letter-spacing: 0.5px; text-align: center; line-height: 1.2;">
-              CERTIFIED<br/>
-              <span style="font-size: 7px; color: #f4d03f;">PROFESSIONAL</span><br/>
-              <span style="font-size: 6px; color: #f8f6f0;">GSPA</span>
-            </div>
-          </div>
-        </div>
-        
-        <!-- Enhanced Ribbon Effect -->
-        <div style="
-          position: absolute;
-          top: -8px;
-          left: 50%;
-          transform: translateX(-50%);
-          width: 80px;
-          height: 16px;
-          background: linear-gradient(90deg, #d4af37, #f4d03f, #d4af37);
-          clip-path: polygon(0% 0%, 100% 0%, 85% 100%, 15% 100%);
-          box-shadow: 0 3px 8px rgba(0,0,0,0.2);
-        "></div>
-        
-        <!-- Seal Authentication Text -->
-        <div style="
-          position: absolute;
-          bottom: -25px;
-          left: 50%;
-          transform: translateX(-50%);
-          font-size: 8px;
-          color: #1a365d;
-          font-weight: bold;
-          letter-spacing: 1px;
-          text-align: center;
-        ">OFFICIAL SEAL</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Enhanced Watermark -->
-  <div style="
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%) rotate(-45deg);
-    font-size: 120px;
-    color: rgba(212,175,55,0.08);
-    letter-spacing: 20px;
-    z-index: 0;
-    white-space: nowrap;
-    font-weight: bold;
-  ">CERTIFIED</div>
-
-  <!-- Certificate ID and Security Features -->
-  <div style="
-    position: absolute;
-    bottom: 20px;
-    left: 20px;
-    font-size: 9px;
-    color: rgba(26,54,93,0.4);
-    font-family: 'Courier New', monospace;
-    letter-spacing: 1px;
-    z-index: 2;
-  ">Certificate ID: GSPA-${user?.id ? user.id.slice(0, 8).toUpperCase() : "CERT-XXXX"}</div>
-  
-  <div style="
-    position: absolute;
-    bottom: 20px;
-    right: 20px;
-    font-size: 9px;
-    color: rgba(26,54,93,0.4);
-    font-family: 'Courier New', monospace;
-    letter-spacing: 1px;
-    z-index: 2;
-  ">Verification: gspa.org/verify</div>
-</div>
-  `
-
-    // Create temporary element
-    const tempDiv = document.createElement("div")
-    tempDiv.innerHTML = certificateHTML
-    tempDiv.style.position = "absolute"
-    tempDiv.style.left = "-9999px"
-    tempDiv.style.top = "-9999px"
-    document.body.appendChild(tempDiv)
-
-    try {
-      // Use html2canvas to capture the certificate
-      const canvas = await html2canvas(tempDiv.firstElementChild as HTMLElement, {
-        scale: 2,
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: "#f8f6f0",
-      })
-
-      // Create PDF in landscape
-      const pdf = new jsPDF({
-        orientation: "landscape",
-        unit: "px",
-        format: [canvas.width, canvas.height],
-      })
-
-      // Add the canvas image to PDF
-      const imgData = canvas.toDataURL("image/png")
-      pdf.addImage(imgData, "PNG", 0, 0, canvas.width, canvas.height)
-
-      // Download the PDF
-      pdf.save(`GSPA-Certificate-${user?.first_name}-${user?.last_name}.pdf`)
-    } catch (error) {
-      console.error("Error generating certificate PDF:", error)
-      alert("Error generating certificate. Please try again.")
-    } finally {
-      // Clean up
-      document.body.removeChild(tempDiv)
+  } catch (error) {
+    console.error("Error generating certificate PDF:", error);
+    alert("Error generating certificate. Please try again.");
+  } finally {
+    // Clean up - more specific selector
+    const tempDiv = document.querySelector('div[style*="left: -9999px"]');
+    if (tempDiv && tempDiv.parentNode) {
+      tempDiv.parentNode.removeChild(tempDiv);
     }
   }
-
+};
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-8">
@@ -861,16 +410,21 @@ export default function DashboardResultsPage() {
             <CardContent>
               <div className="text-center space-y-4">
                 {isCertificateAvailable() ? (
-                  <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-8 rounded-lg border-2 border-dashed border-blue-200">
-                    <Award className="h-16 w-16 text-blue-600 mx-auto mb-4" />
-                    <h3 className="text-xl font-semibold text-blue-900 mb-2">Security Professional Certificate</h3>
-                    <p className="text-blue-700 mb-4">
-                      Congratulations on achieving your certification! Your certificate is ready for download.
-                    </p>
-                    <Button onClick={downloadCertificate} size="lg" className="gap-2">
-                      <Download className="h-5 w-5" />
-                      Download Certificate
-                    </Button>
+                  <div className="space-y-6">
+                    {/* Download Section */}
+                    <div className="bg-gradient-to-r from-green-50 to-emerald-50 p-6 rounded-lg border-2 border-dashed border-green-200">
+                      <Award className="h-16 w-16 text-green-600 mx-auto mb-4" />
+                      <h3 className="text-xl font-semibold text-green-900 mb-2 text-center">Download Your Certificate</h3>
+                      <p className="text-green-700 mb-4 text-center">
+                        Congratulations on achieving your certification! Download your official certificate below.
+                      </p>
+                      <div className="text-center">
+                        <Button onClick={downloadCertificate} size="lg" className="gap-2">
+                          <Download className="h-5 w-5" />
+                          Download Certificate (PDF)
+                        </Button>
+                      </div>
+                    </div>
                   </div>
                 ) : (
                   <div className="bg-gradient-to-r from-yellow-50 to-orange-50 p-8 rounded-lg border-2 border-dashed border-yellow-200">
@@ -917,7 +471,8 @@ export default function DashboardResultsPage() {
             <div className="space-y-6">
               <h3 className="text-2xl font-semibold">Don't Give Up!</h3>
               <p className="text-muted-foreground max-w-2xl mx-auto">
-                You can retake the test after paying the retake fee. Each attempt will have different questions to ensure a fair assessment.
+                You can retake the test after paying the retake fee. Each attempt will have different questions to
+                ensure a fair assessment.
               </p>
 
               {paymentSuccess ? (
@@ -968,7 +523,7 @@ export default function DashboardResultsPage() {
                     </PaystackButton>
 
                     <div className="text-center">
-                      <Button variant="outline" asChild className="w-full">
+                      <Button variant="outline" asChild className="w-full bg-transparent">
                         <Link href="/dashboard">Return to Dashboard</Link>
                       </Button>
                     </div>
