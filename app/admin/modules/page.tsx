@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { DashboardSidebar } from "@/components/dashboard-sidebar"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -10,7 +11,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Plus, Edit, Trash2, Eye, Users, Clock, DollarSign } from "lucide-react"
+import { Plus, Edit, Trash2, Eye, Users, Clock, DollarSign, Menu } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 
@@ -33,6 +34,10 @@ interface Module {
 export default function AdminModulesPage() {
   const [modules, setModules] = useState<Module[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [userName, setUserName] = useState("")
+  const [userEmail, setUserEmail] = useState("")
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingModule, setEditingModule] = useState<Module | null>(null)
   const [formData, setFormData] = useState({
@@ -55,8 +60,31 @@ export default function AdminModulesPage() {
   const router = useRouter()
 
   useEffect(() => {
-    fetchModules()
-  }, [])
+    const checkAdminAndLoadData = async () => {
+      const {
+        data: { user: authUser },
+      } = await supabase.auth.getUser()
+
+      if (!authUser) {
+        router.push("/auth/login")
+        return
+      }
+
+      // Check if admin
+      if (authUser.email !== 'admin@gmail.com') {
+        router.push("/dashboard")
+        return
+      }
+
+      setIsAdmin(true)
+      setUserName(`${authUser.user_metadata?.first_name || ''} ${authUser.user_metadata?.last_name || ''}`.trim() || 'Admin')
+      setUserEmail(authUser.email || '')
+
+      fetchModules()
+    }
+
+    checkAdminAndLoadData()
+  }, [supabase, router])
 
   const fetchModules = async () => {
     try {
@@ -189,14 +217,66 @@ export default function AdminModulesPage() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-8">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      <div className="min-h-screen flex">
+        <div className="flex-1 flex items-center justify-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
+      </div>
+    )
+  }
+
+  if (!isAdmin) {
+    return (
+      <div className="min-h-screen flex">
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <h2 className="text-2xl font-bold mb-2">Access Denied</h2>
+            <p className="text-muted-foreground">Admin privileges required.</p>
+          </div>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="p-6">
+    <div className="min-h-screen flex">
+      {/* Mobile Sidebar */}
+      <div className={`
+        fixed inset-y-0 left-0 z-50 w-64 transform transition-transform duration-300 md:hidden
+        ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
+      `}>
+        <DashboardSidebar
+          userRole="admin"
+          userName={userName}
+          userEmail={userEmail}
+          isMobileOpen={mobileMenuOpen}
+          onMobileClose={() => setMobileMenuOpen(false)}
+        />
+      </div>
+
+      {/* Desktop Sidebar */}
+      <DashboardSidebar
+        userRole="admin"
+        userName={userName}
+        userEmail={userEmail}
+      />
+
+      <main className="flex-1 overflow-y-auto">
+        {/* Mobile Header */}
+        <div className="md:hidden bg-background border-b border-border p-4 flex items-center justify-between">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setMobileMenuOpen(true)}
+            className="border-border hover:bg-muted"
+          >
+            <Menu className="h-5 w-5" />
+          </Button>
+          <h1 className="text-lg font-semibold">Module Management</h1>
+          <div className="w-8" />
+        </div>
+
+        <div className="p-4 md:p-8">
       <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-3xl font-bold">Module Management</h1>
@@ -396,6 +476,8 @@ export default function AdminModulesPage() {
           </Table>
         </CardContent>
       </Card>
+        </div>
+      </main>
     </div>
   )
 }

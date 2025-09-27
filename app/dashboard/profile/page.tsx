@@ -26,11 +26,26 @@ interface UserProfile {
   organization_name: string
   document_type: string
   document_number: string
+  passport_photo_url: string | null
+  signature_data: string | null
   membership_fee_paid: boolean
   payment_status: string
   test_completed: boolean
   certificate_issued: boolean
   created_at: string
+}
+
+// Helper function to check if user has uploaded required documents
+const hasUploadedPhoto = (profile: UserProfile | null): boolean => {
+  return profile?.passport_photo_url !== null && profile?.passport_photo_url !== undefined && profile?.passport_photo_url.trim() !== ""
+}
+
+const hasUploadedSignature = (profile: UserProfile | null): boolean => {
+  return profile?.signature_data !== null && profile?.signature_data !== undefined && profile?.signature_data.trim() !== ""
+}
+
+const hasUploadedAllDocuments = (profile: UserProfile | null): boolean => {
+  return hasUploadedPhoto(profile) && hasUploadedSignature(profile)
 }
 
 export default function ProfilePage() {
@@ -239,13 +254,29 @@ export default function ProfilePage() {
                 </div>
               </div>
 
-              <div className="pt-4 border-t">
+              <div className="pt-4 border-t space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium">Membership Status</span>
                   <Badge variant={user.membership_fee_paid ? "default" : "secondary"}>
                     {user.membership_fee_paid ? "Active" : "Pending"}
                   </Badge>
                 </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">Documents Status</span>
+                  <div className="flex gap-2">
+                    <Badge variant={hasUploadedPhoto(user) ? "default" : "secondary"} className="text-xs">
+                      Photo {hasUploadedPhoto(user) ? "✓" : "✗"}
+                    </Badge>
+                    <Badge variant={hasUploadedSignature(user) ? "default" : "secondary"} className="text-xs">
+                      Signature {hasUploadedSignature(user) ? "✓" : "✗"}
+                    </Badge>
+                  </div>
+                </div>
+                {!hasUploadedAllDocuments(user) && (
+                  <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs text-yellow-800">
+                    <strong>Note:</strong> Complete document uploads are required for certification. Contact support if you need to re-upload documents.
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -420,6 +451,49 @@ export default function ProfilePage() {
                         onChange={(e) => setFormData(prev => ({ ...prev, document_number: e.target.value }))}
                         disabled={!isEditing}
                       />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Uploaded Documents */}
+                <div className="pt-6 border-t">
+                  <h3 className="text-lg font-semibold mb-4">Uploaded Documents</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Passport Photo</Label>
+                      {hasUploadedPhoto(user) ? (
+                        <div className="border rounded-lg p-2 bg-muted">
+                          <img
+                            src={user.passport_photo_url!}
+                            alt="Passport Photo"
+                            className="w-full h-32 object-cover rounded"
+                          />
+                          <p className="text-xs text-green-600 mt-1 font-medium">✓ Uploaded successfully</p>
+                        </div>
+                      ) : (
+                        <div className="border rounded-lg p-4 bg-red-50 border-red-200 text-center">
+                          <p className="text-sm text-red-600 font-medium">No photo uploaded</p>
+                          <p className="text-xs text-red-500 mt-1">Upload required for certification</p>
+                        </div>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Digital Signature</Label>
+                      {hasUploadedSignature(user) ? (
+                        <div className="border rounded-lg p-2 bg-muted">
+                          <img
+                            src={user.signature_data!}
+                            alt="Digital Signature"
+                            className="w-full h-16 object-contain rounded bg-white"
+                          />
+                          <p className="text-xs text-green-600 mt-1 font-medium">✓ Uploaded successfully</p>
+                        </div>
+                      ) : (
+                        <div className="border rounded-lg p-4 bg-red-50 border-red-200 text-center">
+                          <p className="text-sm text-red-600 font-medium">No signature uploaded</p>
+                          <p className="text-xs text-red-500 mt-1">Upload required for certification</p>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>

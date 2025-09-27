@@ -7,6 +7,7 @@ import { Suspense } from "react"
 import ExamPopupWrapper from "@/components/exam-popup-wrapper"
 import { ThemeProvider } from "@/components/theme-provider"
 import { SkipLinks } from "@/components/skip-links"
+import { UserProvider } from "@/components/user-context"
 import "./globals.css"
 
 export const metadata: Metadata = {
@@ -102,13 +103,15 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <SkipLinks />
-          <Suspense fallback={null}>
-            <ExamPopupWrapper>
-              {children}
-            </ExamPopupWrapper>
-          </Suspense>
-          <Analytics />
+          <UserProvider>
+            <SkipLinks />
+            <Suspense fallback={null}>
+              <ExamPopupWrapper>
+                {children}
+              </ExamPopupWrapper>
+            </Suspense>
+            <Analytics />
+          </UserProvider>
         </ThemeProvider>
       </body>
     </html>

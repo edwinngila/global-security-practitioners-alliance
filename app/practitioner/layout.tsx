@@ -7,12 +7,12 @@ import { Menu } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter, usePathname } from "next/navigation"
 
-export default function DashboardLayout({
+export default function PractitionerLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  const [userRole, setUserRole] = useState<string>("")
+  const [userRole, setUserRole] = useState<string>("practitioner")
   const [userName, setUserName] = useState("")
   const [userEmail, setUserEmail] = useState("")
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
@@ -69,26 +69,26 @@ export default function DashboardLayout({
 
   const getPageTitle = () => {
     switch (pathname) {
-      case "/dashboard":
+      case "/practitioner":
         return "Dashboard"
-      case "/dashboard/enrolled":
+      case "/practitioner/enrolled":
         return "Enroll in Modules"
-      case "/dashboard/profile":
+      case "/practitioner/profile":
         return "Profile"
-      case "/dashboard/test":
+      case "/practitioner/test":
         return "Test"
-      case "/dashboard/certificate":
+      case "/practitioner/certificate":
         return "Certificate"
-      case "/dashboard/payment":
+      case "/practitioner/payment":
         return "Payment"
-      case "/dashboard/results":
+      case "/practitioner/results":
         return "Results"
       default:
         return "Dashboard"
     }
   }
 
-  const isTestPage = pathname === '/dashboard/test'
+  const isTestPage = pathname === '/practitioner/test'
 
   return (
     <div className="min-h-screen flex">

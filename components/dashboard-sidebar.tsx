@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
@@ -19,9 +19,12 @@ import {
   ChevronRight,
   LogOut,
   X,
+  GraduationCap,
+  Mail,
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
+import { getNavigationItems, getCurrentUserRole, type UserRole } from "@/lib/rbac"
 
 interface DashboardSidebarProps {
   userRole: string
@@ -125,41 +128,45 @@ export function DashboardSidebar({
   onMobileClose
 }: DashboardSidebarProps) {
   const [collapsed, setCollapsed] = useState(false)
+  const [actualUserRole, setActualUserRole] = useState<UserRole>('practitioner')
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
 
-  const getMenuItems = () => {
-    switch (userRole) {
-      case 'super_admin':
-      case 'admin':
-        return adminMenuItems
-      case 'master_practitioner':
-        return [
-          {
-            title: "Dashboard",
-            href: "/dashboard",
-            icon: LayoutDashboard,
-          },
-          {
-            title: "Content Management",
-            href: "/dashboard/content",
-            icon: BookOpen,
-          },
-          {
-            title: "Exam Management",
-            href: "/dashboard/exams",
-            icon: FileText,
-          },
-          {
-            title: "Profile",
-            href: "/dashboard/profile",
-            icon: User,
-          },
-        ]
-      default:
-        return userMenuItems
+  useEffect(() => {
+    const fetchUserRole = async () => {
+      const role = await getCurrentUserRole()
+      setActualUserRole(role)
     }
+    fetchUserRole()
+  }, [])
+
+  const getMenuItems = () => {
+    const navigationItems = getNavigationItems(actualUserRole)
+
+    // Convert the navigation items to the format expected by the sidebar
+    return navigationItems.map(item => ({
+      title: item.label,
+      href: item.href,
+      icon: getIconComponent(item.icon)
+    }))
+  }
+
+  const getIconComponent = (iconName: string) => {
+    const iconMap: { [key: string]: any } = {
+      LayoutDashboard,
+      User,
+      BookOpen,
+      FileText,
+      Award,
+      CreditCard,
+      BarChart3,
+      Users,
+      Settings,
+      GraduationCap,
+      Mail
+    }
+    return iconMap[iconName] || LayoutDashboard
   }
 
   const menuItems = getMenuItems()
@@ -245,14 +252,19 @@ export function DashboardSidebar({
               <div className="flex-1 min-w-0 transition-opacity duration-200">
                 <p className="text-sm font-medium truncate text-white">{userName}</p>
                 <p className="text-xs text-gray-300 truncate">{userEmail}</p>
-                {(userRole === 'admin' || userRole === 'super_admin') && (
+                {actualUserRole === 'admin' && (
                   <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-600 text-white mt-1">
-                    {userRole === 'super_admin' ? 'Super Admin' : 'Admin'}
+                    Admin
                   </span>
                 )}
-                {userRole === 'master_practitioner' && (
+                {actualUserRole === 'master_practitioner' && (
                   <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-600 text-white mt-1">
                     Master Practitioner
+                  </span>
+                )}
+                {actualUserRole === 'practitioner' && (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-600 text-white mt-1">
+                    Practitioner
                   </span>
                 )}
               </div>

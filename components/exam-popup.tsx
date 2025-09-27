@@ -80,15 +80,6 @@ export default function ExamPopup({ isOpen, onClose, isRegisteredUser = false }:
             <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full h-32 bg-gradient-to-r from-transparent via-primary/5 to-transparent"></div>
           </div>
 
-          {/* Close button */}
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onClose}
-            className="absolute top-2 right-2 sm:top-3 sm:right-3 md:top-4 md:right-4 z-20 h-8 w-8 sm:h-9 sm:w-9 md:h-8 md:w-8 rounded-full bg-background/90 hover:bg-muted border border-border/50 text-foreground shadow-lg hover:scale-110 transition-all duration-200 backdrop-blur-sm"
-          >
-            <X className="h-4 w-4 sm:h-5 sm:w-5" />
-          </Button>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8 items-center relative z-10">
             {/* Left side - Visual content */}

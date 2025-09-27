@@ -89,6 +89,7 @@ export default function AdminTestsPage() {
   // Dialog states
   const [createExamDialogOpen, setCreateExamDialogOpen] = useState(false)
   const [assignExamDialogOpen, setAssignExamDialogOpen] = useState(false)
+  const [addQuestionDialogOpen, setAddQuestionDialogOpen] = useState(false)
 
   // Form states
   const [examName, setExamName] = useState("")
@@ -100,6 +101,16 @@ export default function AdminTestsPage() {
   const [selectedExamId, setSelectedExamId] = useState("")
   const [availableFrom, setAvailableFrom] = useState("")
   const [availableUntil, setAvailableUntil] = useState("")
+
+  // Add question form states
+  const [questionText, setQuestionText] = useState("")
+  const [optionA, setOptionA] = useState("")
+  const [optionB, setOptionB] = useState("")
+  const [optionC, setOptionC] = useState("")
+  const [optionD, setOptionD] = useState("")
+  const [correctAnswer, setCorrectAnswer] = useState("")
+  const [questionCategory, setQuestionCategory] = useState("")
+  const [questionDifficulty, setQuestionDifficulty] = useState("easy")
 
   const router = useRouter()
   const supabase = createClient()
@@ -281,6 +292,52 @@ export default function AdminTestsPage() {
     } catch (error) {
       console.error("Error assigning exam:", error)
       alert("Error assigning exam. Please try again.")
+    }
+  }
+
+  const handleAddQuestion = async () => {
+    if (!questionText.trim() || !optionA.trim() || !optionB.trim() || !optionC.trim() || !optionD.trim() || !correctAnswer || !questionCategory.trim()) {
+      alert("Please fill in all fields.")
+      return
+    }
+
+    if (!['A', 'B', 'C', 'D'].includes(correctAnswer.toUpperCase())) {
+      alert("Correct answer must be A, B, C, or D.")
+      return
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from("test_questions")
+        .insert({
+          question: questionText,
+          option_a: optionA,
+          option_b: optionB,
+          option_c: optionC,
+          option_d: optionD,
+          correct_answer: correctAnswer.toUpperCase(),
+          category: questionCategory,
+          difficulty: questionDifficulty,
+          is_active: true,
+        })
+        .select()
+        .single()
+
+      if (error) throw error
+
+      setQuestions([data, ...questions])
+      setAddQuestionDialogOpen(false)
+      setQuestionText("")
+      setOptionA("")
+      setOptionB("")
+      setOptionC("")
+      setOptionD("")
+      setCorrectAnswer("")
+      setQuestionCategory("")
+      setQuestionDifficulty("easy")
+    } catch (error) {
+      console.error("Error adding question:", error)
+      alert("Error adding question. Please try again.")
     }
   }
 
@@ -609,10 +666,128 @@ export default function AdminTestsPage() {
                 {/* Questions Table */}
                 <Card>
                   <CardHeader>
-                    <CardTitle>Test Questions</CardTitle>
-                    <CardDescription>
-                      All test questions in the system. You can add, edit, or deactivate questions.
-                    </CardDescription>
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <CardTitle>Test Questions</CardTitle>
+                        <CardDescription>
+                          All test questions in the system. You can add, edit, or deactivate questions.
+                        </CardDescription>
+                      </div>
+                      <Dialog open={addQuestionDialogOpen} onOpenChange={setAddQuestionDialogOpen}>
+                        <DialogTrigger asChild>
+                          <Button>
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add Question
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                          <DialogHeader>
+                            <DialogTitle>Add New Question</DialogTitle>
+                            <DialogDescription>
+                              Create a new test question with multiple choice options.
+                            </DialogDescription>
+                          </DialogHeader>
+                          <div className="space-y-4">
+                            <div>
+                              <Label htmlFor="question-text">Question</Label>
+                              <Textarea
+                                id="question-text"
+                                value={questionText}
+                                onChange={(e) => setQuestionText(e.target.value)}
+                                placeholder="Enter the question text"
+                                rows={3}
+                              />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <Label htmlFor="option-a">Option A</Label>
+                                <Input
+                                  id="option-a"
+                                  value={optionA}
+                                  onChange={(e) => setOptionA(e.target.value)}
+                                  placeholder="Enter option A"
+                                />
+                              </div>
+                              <div>
+                                <Label htmlFor="option-b">Option B</Label>
+                                <Input
+                                  id="option-b"
+                                  value={optionB}
+                                  onChange={(e) => setOptionB(e.target.value)}
+                                  placeholder="Enter option B"
+                                />
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <Label htmlFor="option-c">Option C</Label>
+                                <Input
+                                  id="option-c"
+                                  value={optionC}
+                                  onChange={(e) => setOptionC(e.target.value)}
+                                  placeholder="Enter option C"
+                                />
+                              </div>
+                              <div>
+                                <Label htmlFor="option-d">Option D</Label>
+                                <Input
+                                  id="option-d"
+                                  value={optionD}
+                                  onChange={(e) => setOptionD(e.target.value)}
+                                  placeholder="Enter option D"
+                                />
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <Label htmlFor="correct-answer">Correct Answer</Label>
+                                <Select value={correctAnswer} onValueChange={setCorrectAnswer}>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select correct answer" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="A">A</SelectItem>
+                                    <SelectItem value="B">B</SelectItem>
+                                    <SelectItem value="C">C</SelectItem>
+                                    <SelectItem value="D">D</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div>
+                                <Label htmlFor="question-category">Category</Label>
+                                <Input
+                                  id="question-category"
+                                  value={questionCategory}
+                                  onChange={(e) => setQuestionCategory(e.target.value)}
+                                  placeholder="e.g., Security, Networking"
+                                />
+                              </div>
+                            </div>
+                            <div>
+                              <Label htmlFor="question-difficulty">Difficulty</Label>
+                              <Select value={questionDifficulty} onValueChange={setQuestionDifficulty}>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select difficulty" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="easy">Easy</SelectItem>
+                                  <SelectItem value="medium">Medium</SelectItem>
+                                  <SelectItem value="hard">Hard</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="flex justify-end gap-2">
+                              <Button variant="outline" onClick={() => setAddQuestionDialogOpen(false)}>
+                                Cancel
+                              </Button>
+                              <Button onClick={handleAddQuestion}>
+                                Add Question
+                              </Button>
+                            </div>
+                          </div>
+                        </DialogContent>
+                      </Dialog>
+                    </div>
                   </CardHeader>
                   <CardContent>
                     <div className="overflow-x-auto">

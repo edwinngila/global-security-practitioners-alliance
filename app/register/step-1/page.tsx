@@ -48,9 +48,23 @@ export default function RegisterStep1() {
   // Load saved data from localStorage
   useEffect(() => {
     const saved = localStorage.getItem("registration-step-1")
+    const signupData = localStorage.getItem("temp-signup-data")
+
+    let formData = {}
+
     if (saved) {
-      const data = JSON.parse(saved)
-      reset(data)
+      formData = { ...formData, ...JSON.parse(saved) }
+    }
+
+    if (signupData) {
+      const signup = JSON.parse(signupData)
+      formData = { ...formData, email: signup.email, password: signup.password, confirmPassword: signup.password }
+      // Clear the temp signup data after using it
+      localStorage.removeItem("temp-signup-data")
+    }
+
+    if (Object.keys(formData).length > 0) {
+      reset(formData)
     }
   }, [reset])
 
@@ -77,17 +91,17 @@ export default function RegisterStep1() {
     <div className="min-h-screen bg-background">
       <RegistrationProgress currentStep={1} totalSteps={4} stepTitles={stepTitles} />
 
-      <div className="py-12 px-4">
-        <div className="max-w-2xl mx-auto">
+      <div className="py-8 px-4 sm:py-12">
+        <div className="max-w-md sm:max-w-lg md:max-w-2xl mx-auto">
           <Card className="shadow-lg">
             <CardHeader className="text-center pb-6 md:pb-8">
               <CardTitle className="text-2xl md:text-3xl font-bold">Personal Information</CardTitle>
               <CardDescription className="text-base md:text-lg">Let's start with your basic details</CardDescription>
             </CardHeader>
 
-            <CardContent className="pt-0">
-              <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 md:space-y-8">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <CardContent className="pt-0 px-4 sm:px-6">
+              <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 sm:space-y-6 md:space-y-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                   <div className="space-y-3">
                     <Label htmlFor="firstName" className="text-sm font-medium">First Name *</Label>
                     <Input

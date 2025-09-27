@@ -16,6 +16,8 @@ import { useRouter } from "next/navigation"
 import Link from "next/link"
 import Navigation from "@/components/navigation"
 import { emailValidation, rateLimiting } from "@/lib/validationUtils"
+import { useUser } from "@/components/user-context"
+import { UserRole } from "@/lib/rbac"
 
 const loginSchema = z.object({
   email: emailValidation,
@@ -33,6 +35,7 @@ export default function LoginPage() {
   const [blockTimeRemaining, setBlockTimeRemaining] = useState(0)
   const router = useRouter()
   const supabase = createClient()
+  const { setProfile, setRole } = useUser()
 
   const {
     register,
@@ -102,25 +105,46 @@ export default function LoginPage() {
       rateLimiting.clearAttempts(clientId)
       setAttemptCount(0)
 
-      if (authData.user?.email === "admin@gmail.com") {
-        router.push("/admin")
-      } else {
-        // Check if user has completed registration by checking profiles table
-        const { data: userProfile, error: profileError } = await supabase
+      if (authData.user) {
+        const { data: profile, error: profileError } = await supabase
           .from("profiles")
-          .select("id, membership_fee_paid")
+          .select("*")
           .eq("id", authData.user.id)
           .single()
 
-        if (profileError || !userProfile) {
-          // No profile found, redirect to continue registration
+        if (profileError || !profile) {
           router.push("/register/step-1")
-        } else if (userProfile.membership_fee_paid) {
-          // Registration completed and payment made, go to dashboard
-          router.push("/dashboard")
+          return
+        }
+
+        setProfile(profile)
+
+        let userRole: UserRole = 'practitioner'
+        // Special case for admin email
+        if (authData.user.email === 'admin@gmail.com') {
+          userRole = 'admin'
+        } else if (profile.role_id) {
+          const { data: roleData, error: roleError } = await supabase
+            .from("roles")
+            .select("name")
+            .eq("id", profile.role_id)
+            .single()
+
+          if (!roleError && roleData?.name) {
+            userRole = roleData.name as UserRole
+          }
+        }
+
+        setRole(userRole)
+
+        if (userRole === 'admin') {
+          router.push('/admin/master-dashboard')
+        } else if (userRole === 'master_practitioner') {
+          router.push('/master-practitioner')
+        } else if (profile.membership_fee_paid) {
+          router.push('/practitioner')
         } else {
-          // Profile exists but payment not made, go to payment
-          router.push("/payment")
+          router.push('/payment')
         }
       }
     } catch (error: any) {

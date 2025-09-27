@@ -89,7 +89,7 @@ export function PhotoUpload({ onPhotoChange, value, label = "Passport Photo", re
             <img
               src={preview || "/placeholder.svg"}
               alt="Preview"
-              className="w-32 h-40 object-cover rounded-lg border-2 border-gray-200"
+              className="w-24 h-32 sm:w-32 sm:h-40 object-cover rounded-lg border-2 border-gray-200"
             />
             <Button
               type="button"

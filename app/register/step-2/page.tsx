@@ -119,8 +119,8 @@ export default function RegisterStep2() {
         stepTitles={stepTitles}
       />
 
-      <div className="py-12 px-4">
-        <div className="max-w-2xl mx-auto">
+      <div className="py-8 px-4 sm:py-12">
+        <div className="max-w-md sm:max-w-lg md:max-w-2xl mx-auto">
           <Card className="shadow-lg">
             <CardHeader className="text-center pb-6 md:pb-8">
               <CardTitle className="text-2xl md:text-3xl font-bold">
@@ -131,12 +131,12 @@ export default function RegisterStep2() {
               </CardDescription>
             </CardHeader>
 
-            <CardContent className="pt-0">
+            <CardContent className="pt-0 px-4 sm:px-6">
               <form
                 onSubmit={handleSubmit(onSubmit)}
-                className="space-y-6 md:space-y-8"
+                className="space-y-4 sm:space-y-6 md:space-y-8"
               >
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                   {/* Nationality */}
                   <div className="space-y-3">
                     <Label className="text-sm font-medium">Nationality *</Label>
@@ -151,7 +151,7 @@ export default function RegisterStep2() {
                           disabled={loadingCountries}
                         >
                           <SelectTrigger
-                            className={`h-12 bg-black/5 ${errors.nationality ? "border-destructive" : ""
+                            className={`h-12 bg-input ${errors.nationality ? "border-destructive" : ""
                               }`}
                           >
                             <SelectValue
@@ -203,7 +203,7 @@ export default function RegisterStep2() {
                       render={({ field }) => (
                         <Select onValueChange={field.onChange} value={field.value}>
                           <SelectTrigger
-                            className={`h-12 bg-black/5 ${errors.gender ? "border-destructive" : ""
+                            className={`h-12 bg-input ${errors.gender ? "border-destructive" : ""
                               }`}
                           >
                             <SelectValue placeholder="Select gender" />

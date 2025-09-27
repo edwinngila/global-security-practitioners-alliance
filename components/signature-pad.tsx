@@ -55,7 +55,7 @@ export function SignaturePad({
     }
   }, [value])
 
-  const startDrawing = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current
     if (!canvas) return
 
@@ -65,10 +65,15 @@ export function SignaturePad({
 
     setIsDrawing(true)
     ctx.beginPath()
-    ctx.moveTo(e.clientX - rect.left, e.clientY - rect.top)
+
+    // Handle both mouse and touch events
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY
+
+    ctx.moveTo(clientX - rect.left, clientY - rect.top)
   }
 
-  const draw = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  const draw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
     if (!isDrawing) return
 
     const canvas = canvasRef.current
@@ -78,7 +83,11 @@ export function SignaturePad({
     const ctx = canvas.getContext("2d")
     if (!ctx) return
 
-    ctx.lineTo(e.clientX - rect.left, e.clientY - rect.top)
+    // Handle both mouse and touch events
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY
+
+    ctx.lineTo(clientX - rect.left, clientY - rect.top)
     ctx.stroke()
     setHasSignature(true)
   }
@@ -125,11 +134,14 @@ export function SignaturePad({
       <div className="signature-pad p-4">
         <canvas
           ref={canvasRef}
-          className="w-full h-48 cursor-crosshair border rounded-md bg-white"
+          className="w-full h-48 cursor-crosshair border rounded-md bg-white touch-none"
           onMouseDown={startDrawing}
           onMouseMove={draw}
           onMouseUp={stopDrawing}
           onMouseLeave={stopDrawing}
+          onTouchStart={startDrawing}
+          onTouchMove={draw}
+          onTouchEnd={stopDrawing}
         />
 
         <div className="flex justify-between items-center mt-3">

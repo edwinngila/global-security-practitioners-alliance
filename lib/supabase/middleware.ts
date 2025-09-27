@@ -54,14 +54,30 @@ export async function updateSession(request: NextRequest) {
         url.pathname = "/admin"
         return NextResponse.redirect(url)
       } else {
-        // For regular users, check if they have completed registration
+        // Check user role first
         try {
           const { data: profile } = await supabase
             .from("profiles")
-            .select("membership_fee_paid")
+            .select("membership_fee_paid, role_id")
             .eq("id", user.id)
             .single()
 
+          if (profile?.role_id) {
+            // Check if user is master practitioner
+            const { data: role } = await supabase
+              .from("roles")
+              .select("name")
+              .eq("id", profile.role_id)
+              .single()
+
+            if (role?.name === "master_practitioner") {
+              const url = request.nextUrl.clone()
+              url.pathname = "/admin/master-dashboard"
+              return NextResponse.redirect(url)
+            }
+          }
+
+          // For regular users, check if they have completed registration
           const url = request.nextUrl.clone()
           if (!profile) {
             url.pathname = "/register/step-1"

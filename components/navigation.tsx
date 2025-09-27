@@ -2,14 +2,20 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Shield, Menu, X } from "lucide-react"
+import { Shield, Menu, X, LogOut } from "lucide-react"
 import { useState, useEffect } from "react"
 import { ThemeToggle } from "@/components/theme-toggle"
+import { useUser } from "@/components/user-context"
+import { useRouter } from "next/navigation"
 
 export default function Navigation() {
   const pathname = usePathname()
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [isScrolled, setIsScrolled] = useState(false)
+  const { role, logout } = useUser()
+  const router = useRouter()
+
+  const dashboardHref = role === 'admin' ? '/admin/master-dashboard' : role === 'master_practitioner' ? '/master-practitioner' : '/practitioner'
 
   useEffect(() => {
     const handleScroll = () => {
@@ -19,6 +25,11 @@ export default function Navigation() {
     window.addEventListener("scroll", handleScroll)
     return () => window.removeEventListener("scroll", handleScroll)
   }, [])
+
+  const handleLogout = async () => {
+    await logout()
+    router.push("/")
+  }
 
   const navItems = [
     { href: "/", label: "Home" },
@@ -76,19 +87,43 @@ export default function Navigation() {
 
             <div className="flex items-center gap-4">
               <ThemeToggle />
-              <Button
-                variant="ghost"
-                asChild
-                className={`${isScrolled ? "hover:bg-muted hover:text-primary" : "hover:bg-primary-foreground/10 hover:text-accent"} transition-colors duration-200`}
-              >
-                <Link href="/auth/login">Login</Link>
-              </Button>
-              <Button
-                asChild
-                className="bg-gradient-to-r from-accent to-secondary hover:from-accent/90 hover:to-secondary/90 text-primary font-semibold shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105"
-              >
-                <Link href="/register">Join GSPA</Link>
-              </Button>
+              {role ? (
+                <>
+                  <Button
+                    variant="ghost"
+                    asChild
+                    className={`${isScrolled ? "hover:bg-muted hover:text-primary" : "hover:bg-primary-foreground/10 hover:text-accent"} transition-colors duration-200`}
+                  >
+                    <Link href={dashboardHref}>
+                      My Dashboard
+                    </Link>
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    onClick={handleLogout}
+                    className={`${isScrolled ? "hover:bg-muted hover:text-primary" : "hover:bg-primary-foreground/10 hover:text-accent"} transition-colors duration-200`}
+                  >
+                    <LogOut className="h-4 w-4 mr-2" />
+                    Logout
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button
+                    variant="ghost"
+                    asChild
+                    className={`${isScrolled ? "hover:bg-muted hover:text-primary" : "hover:bg-primary-foreground/10 hover:text-accent"} transition-colors duration-200`}
+                  >
+                    <Link href="/auth/login">Login</Link>
+                  </Button>
+                  <Button
+                    asChild
+                    className="bg-gradient-to-r from-accent to-secondary hover:from-accent/90 hover:to-secondary/90 text-primary font-semibold shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105"
+                  >
+                    <Link href="/register">Join GSPA</Link>
+                  </Button>
+                </>
+              )}
             </div>
           </div>
 
@@ -138,23 +173,47 @@ export default function Navigation() {
             ))}
 
             <div className="border-t border-primary-600 pt-4 mt-2">
-              <Button
-                variant="ghost"
-                asChild
-                className={`w-full justify-start ${isScrolled ? "hover:bg-muted hover:text-primary" : "hover:bg-primary-foreground/10 hover:text-accent"}`}
-              >
-                <Link href="/auth/login" onClick={() => setIsMenuOpen(false)}>
-                  Login
-                </Link>
-              </Button>
-              <Button
-                asChild
-                className="w-full justify-start bg-gradient-to-r from-accent to-secondary hover:from-accent/90 hover:to-secondary/90 text-primary font-semibold mt-2"
-              >
-                <Link href="/register" onClick={() => setIsMenuOpen(false)}>
-                  Join GSPA
-                </Link>
-              </Button>
+              {role ? (
+                <>
+                  <Button
+                    variant="ghost"
+                    asChild
+                    className={`w-full justify-start ${isScrolled ? "hover:bg-muted hover:text-primary" : "hover:bg-primary-foreground/10 hover:text-accent"}`}
+                  >
+                    <Link href={dashboardHref} onClick={() => setIsMenuOpen(false)}>
+                      My Dashboard
+                    </Link>
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    onClick={() => { handleLogout(); setIsMenuOpen(false) }}
+                    className={`w-full justify-start mt-2 ${isScrolled ? "hover:bg-muted hover:text-primary" : "hover:bg-primary-foreground/10 hover:text-accent"}`}
+                  >
+                    <LogOut className="h-4 w-4 mr-2" />
+                    Logout
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button
+                    variant="ghost"
+                    asChild
+                    className={`w-full justify-start ${isScrolled ? "hover:bg-muted hover:text-primary" : "hover:bg-primary-foreground/10 hover:text-accent"}`}
+                  >
+                    <Link href="/auth/login" onClick={() => setIsMenuOpen(false)}>
+                      Login
+                    </Link>
+                  </Button>
+                  <Button
+                    asChild
+                    className="w-full justify-start bg-gradient-to-r from-accent to-secondary hover:from-accent/90 hover:to-secondary/90 text-primary font-semibold mt-2"
+                  >
+                    <Link href="/register" onClick={() => setIsMenuOpen(false)}>
+                      Join GSPA
+                    </Link>
+                  </Button>
+                </>
+              )}
             </div>
           </div>
         </div>

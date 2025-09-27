@@ -6,9 +6,12 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Users, UserCheck, UserX, Mail, Calendar, Menu } from "lucide-react"
+import { Users, UserCheck, UserX, Mail, Calendar, Menu, Settings } from "lucide-react"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { getAllRoles, updateUserRole } from "@/lib/rbac"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
+import { isAdmin as checkAdminRole } from "@/lib/rbac"
 
 interface UserProfile {
   id: string
@@ -21,10 +24,14 @@ interface UserProfile {
   test_score: number | null
   certificate_issued: boolean
   created_at: string
+  role_id: string | null
+  role_name?: string
+  role_display_name?: string
 }
 
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<UserProfile[]>([])
+  const [roles, setRoles] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isAdmin, setIsAdmin] = useState(false)
   const [userName, setUserName] = useState("")
@@ -44,8 +51,9 @@ export default function AdminUsersPage() {
         return
       }
 
-      // Check if admin
-      if (authUser.email !== 'admin@gmail.com') {
+      // Check if admin using role-based access control
+      const adminCheck = await checkAdminRole()
+      if (!adminCheck) {
         router.push("/dashboard")
         return
       }
@@ -54,14 +62,31 @@ export default function AdminUsersPage() {
       setUserName(`${authUser.user_metadata?.first_name || ''} ${authUser.user_metadata?.last_name || ''}`.trim() || 'Admin')
       setUserEmail(authUser.email || '')
 
-      // Load all users
+      // Load roles
+      const availableRoles = await getAllRoles()
+      setRoles(availableRoles)
+
+      // Load all users with role information
       const { data: profiles, error } = await supabase
         .from("profiles")
-        .select("*")
+        .select(`
+          *,
+          roles:role_id (
+            id,
+            name,
+            display_name
+          )
+        `)
         .order("created_at", { ascending: false })
 
       if (!error && profiles) {
-        setUsers(profiles)
+        // Transform the data to include role information
+        const usersWithRoles = profiles.map(profile => ({
+          ...profile,
+          role_name: profile.roles?.name || 'practitioner',
+          role_display_name: profile.roles?.display_name || 'Practitioner'
+        }))
+        setUsers(usersWithRoles)
       }
 
       setIsLoading(false)
@@ -69,6 +94,33 @@ export default function AdminUsersPage() {
 
     checkAdminAndLoadUsers()
   }, [supabase, router])
+
+  const handleRoleChange = async (userId: string, newRoleId: string) => {
+    const success = await updateUserRole(userId, newRoleId)
+    if (success) {
+      // Refresh the users list
+      const { data: profiles, error } = await supabase
+        .from("profiles")
+        .select(`
+          *,
+          roles:role_id (
+            id,
+            name,
+            display_name
+          )
+        `)
+        .order("created_at", { ascending: false })
+
+      if (!error && profiles) {
+        const usersWithRoles = profiles.map(profile => ({
+          ...profile,
+          role_name: profile.roles?.name || 'practitioner',
+          role_display_name: profile.roles?.display_name || 'Practitioner'
+        }))
+        setUsers(usersWithRoles)
+      }
+    }
+  }
 
   if (isLoading) {
     return (
@@ -204,6 +256,7 @@ export default function AdminUsersPage() {
                       <TableRow>
                         <TableHead className="min-w-[150px]">Name</TableHead>
                         <TableHead className="min-w-[200px]">Email</TableHead>
+                        <TableHead className="min-w-[120px]">Role</TableHead>
                         <TableHead className="min-w-[100px]">Membership</TableHead>
                         <TableHead className="min-w-[120px]">Test Status</TableHead>
                         <TableHead className="min-w-[100px]">Certificate</TableHead>
@@ -217,6 +270,23 @@ export default function AdminUsersPage() {
                             {user.first_name} {user.last_name}
                           </TableCell>
                           <TableCell>{user.email}</TableCell>
+                          <TableCell>
+                            <Select
+                              value={user.role_id || ""}
+                              onValueChange={(value) => handleRoleChange(user.id, value)}
+                            >
+                              <SelectTrigger className="w-[140px]">
+                                <SelectValue placeholder="Select role" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {roles.map((role) => (
+                                  <SelectItem key={role.id} value={role.id}>
+                                    {role.display_name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </TableCell>
                           <TableCell>
                             <Badge variant={user.membership_fee_paid ? "default" : "secondary"}>
                               {user.membership_fee_paid ? "Active" : "Pending"}

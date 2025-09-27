@@ -1,3 +1,7 @@
+"use client"
+
+import { useState, useEffect } from "react"
+import { useForm } from "react-hook-form"
 import Navigation from "@/components/navigation"
 import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
@@ -5,9 +9,95 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Mail, Phone, MapPin, Clock, Facebook, Twitter, Linkedin, Youtube, Send, Zap, Users, Globe } from "lucide-react"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Mail, Phone, MapPin, Clock, Facebook, Twitter, Linkedin, Youtube, Send, Zap, Users, Globe, Loader2, CheckCircle } from "lucide-react"
+
+interface ContactForm {
+  firstName: string
+  lastName: string
+  email: string
+  subject: string
+  message: string
+}
 
 export default function ContactPage() {
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submitSuccess, setSubmitSuccess] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
+  const [honeypot, setHoneypot] = useState("")
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+    reset,
+    watch,
+    clearErrors,
+    setError,
+  } = useForm<ContactForm>({
+    mode: "onChange", // Validate on change for immediate feedback
+  })
+
+  // Debug: watch form values
+  const watchedValues = watch()
+  console.log('Form values:', watchedValues)
+
+  // Clear submit error when user starts typing
+  useEffect(() => {
+    if (submitError && Object.values(watchedValues).some(value => value && value.length > 0)) {
+      setSubmitError(null)
+    }
+  }, [watchedValues, submitError])
+
+  const onSubmit = async (data: ContactForm) => {
+    // Check honeypot
+    if (honeypot) {
+      setSubmitError('Spam detected. Please try again.')
+      return
+    }
+
+    console.log('Form data:', data) // Debug log
+    setIsSubmitting(true)
+    setSubmitError(null)
+
+    try {
+      const response = await fetch('/api/contact', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      })
+
+      const result = await response.json()
+      console.log('API response:', result) // Debug log
+
+      if (!response.ok) {
+        // Handle specific error types
+        if (response.status === 400) {
+          setSubmitError('Please check your input and try again.')
+        } else if (response.status === 500) {
+          setSubmitError('Server error. Please try again later.')
+        } else {
+          setSubmitError(result.error || 'Failed to send message')
+        }
+        return
+      }
+
+      setSubmitSuccess(true)
+      reset()
+      // Clear success message after 5 seconds
+      setTimeout(() => setSubmitSuccess(false), 5000)
+    } catch (error: any) {
+      if (error.name === 'TypeError' && error.message.includes('fetch')) {
+        setSubmitError('Network error. Please check your connection and try again.')
+      } else {
+        setSubmitError(error.message || 'Failed to send message. Please try again.')
+      }
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-background via-muted/20 to-background">
       <Navigation />
@@ -72,61 +162,134 @@ export default function ContactPage() {
                     <CardDescription className="text-lg">We typically respond within 2-4 hours during business days.</CardDescription>
                   </CardHeader>
                   <CardContent className="pt-4">
-                    <form className="space-y-6">
+                    {submitSuccess && (
+                      <Alert className="mb-6 border-green-200 bg-green-50">
+                        <CheckCircle className="h-4 w-4 text-green-600" />
+                        <AlertDescription className="text-green-800">
+                          Thank you for your message! We'll get back to you within 2-4 hours.
+                        </AlertDescription>
+                      </Alert>
+                    )}
+
+                    {submitError && (
+                      <Alert className="mb-6 border-red-200 bg-red-50">
+                        <AlertDescription className="text-red-800">
+                          {submitError}
+                        </AlertDescription>
+                      </Alert>
+                    )}
+
+                    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6" noValidate>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="space-y-2">
-                          <Label htmlFor="firstName" className="text-sm font-semibold">First Name</Label>
+                          <Label htmlFor="firstName" className="text-sm font-semibold">First Name *</Label>
                           <Input
                             id="firstName"
+                            {...register("firstName", {
+                              required: "First name is required",
+                              minLength: { value: 2, message: "Must be at least 2 characters" }
+                            })}
                             placeholder="John"
-                            className="border border-border focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all duration-200 rounded-xl h-12"
+                            className={`border border-border focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all duration-200 rounded-xl h-12 ${errors.firstName ? "border-red-500" : ""}`}
                           />
+                          {errors.firstName && <p className="text-sm text-red-600">{errors.firstName.message}</p>}
                         </div>
                         <div className="space-y-2">
-                          <Label htmlFor="lastName" className="text-sm font-semibold">Last Name</Label>
+                          <Label htmlFor="lastName" className="text-sm font-semibold">Last Name *</Label>
                           <Input
                             id="lastName"
+                            {...register("lastName", {
+                              required: "Last name is required",
+                              minLength: { value: 2, message: "Must be at least 2 characters" }
+                            })}
                             placeholder="Doe"
-                            className="border border-border focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all duration-200 rounded-xl h-12"
+                            className={`border border-border focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all duration-200 rounded-xl h-12 ${errors.lastName ? "border-red-500" : ""}`}
                           />
+                          {errors.lastName && <p className="text-sm text-red-600">{errors.lastName.message}</p>}
                         </div>
                       </div>
 
                       <div className="space-y-2">
-                        <Label htmlFor="email" className="text-sm font-semibold">Email Address</Label>
+                        <Label htmlFor="email" className="text-sm font-semibold">Email Address *</Label>
                         <Input
                           id="email"
                           type="email"
+                          {...register("email", {
+                            required: "Email is required",
+                            pattern: {
+                              value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+                              message: "Enter a valid email address"
+                            }
+                          })}
                           placeholder="john@example.com"
-                          className="border border-border focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all duration-200 rounded-xl h-12"
+                          className={`border border-border focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all duration-200 rounded-xl h-12 ${errors.email ? "border-red-500" : ""}`}
                         />
+                        {errors.email && <p className="text-sm text-red-600">{errors.email.message}</p>}
                       </div>
 
                       <div className="space-y-2">
-                        <Label htmlFor="subject" className="text-sm font-semibold">Subject</Label>
+                        <Label htmlFor="subject" className="text-sm font-semibold">Subject *</Label>
                         <Input
                           id="subject"
+                          {...register("subject", {
+                            required: "Subject is required",
+                            minLength: { value: 5, message: "Subject must be at least 5 characters" }
+                          })}
                           placeholder="How can we help you?"
-                          className="border border-border focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all duration-200 rounded-xl h-12"
+                          className={`border border-border focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all duration-200 rounded-xl h-12 ${errors.subject ? "border-red-500" : ""}`}
                         />
+                        {errors.subject && <p className="text-sm text-red-600">{errors.subject.message}</p>}
                       </div>
 
                       <div className="space-y-2">
-                        <Label htmlFor="message" className="text-sm font-semibold">Message</Label>
+                        <Label htmlFor="message" className="text-sm font-semibold">Message *</Label>
                         <Textarea
                           id="message"
+                          {...register("message", {
+                            required: "Message is required",
+                            minLength: { value: 10, message: "Message must be at least 10 characters" },
+                            maxLength: { value: 1000, message: "Message must be less than 1000 characters" }
+                          })}
                           placeholder="Tell us more about your inquiry, certification goals, or how we can assist you..."
                           rows={5}
-                          className="border border-border focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all duration-200 rounded-xl min-h-32"
+                          className={`border border-border focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all duration-200 rounded-xl min-h-32 ${errors.message ? "border-red-500" : ""}`}
+                          aria-describedby={errors.message ? "message-error" : undefined}
                         />
+                        {errors.message && (
+                          <p id="message-error" className="text-sm text-red-600" role="alert">
+                            {errors.message.message}
+                          </p>
+                        )}
+                        <p className="text-xs text-muted-foreground">Minimum 10 characters, maximum 1000 characters</p>
                       </div>
+
+                      {/* Honeypot field for spam prevention */}
+                      <input
+                        type="text"
+                        name="website"
+                        value={honeypot}
+                        onChange={(e) => setHoneypot(e.target.value)}
+                        style={{ display: 'none' }}
+                        tabIndex={-1}
+                        autoComplete="off"
+                      />
 
                       <Button
                         type="submit"
-                        className="w-full bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 text-primary-foreground font-semibold py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 group"
+                        disabled={isSubmitting}
+                        className="w-full bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 text-primary-foreground font-semibold py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 group disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        <Send className="h-4 w-4 mr-2 group-hover:translate-x-1 transition-transform" />
-                        Send Message
+                        {isSubmitting ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Sending...
+                          </>
+                        ) : (
+                          <>
+                            <Send className="h-4 w-4 mr-2 group-hover:translate-x-1 transition-transform" />
+                            Send Message
+                          </>
+                        )}
                       </Button>
                     </form>
                   </CardContent>

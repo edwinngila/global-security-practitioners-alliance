@@ -8,6 +8,7 @@ import { Users, FileText, Award, CreditCard, TrendingUp, Activity, Menu, Shield 
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
+import { hasRoleAsync, roles } from "@/lib/rbac"
 
 interface Stats {
   totalUsers: number
@@ -47,7 +48,7 @@ export default function AdminDashboardPage() {
       }
 
       // Check if admin
-      if (authUser.email !== 'admin@gmail.com') {
+      if (!(await hasRoleAsync(roles.admin))) {
         router.push("/dashboard")
         return
       }
@@ -141,7 +142,7 @@ export default function AdminDashboardPage() {
         />
       </div>
 
-      <main className="flex-1 overflow-y-auto md:ml-64">
+      <main className="flex-1 overflow-y-auto md:ml-1">
         {/* Mobile Header */}
         <div className="md:hidden bg-background border-b border-border p-4 flex items-center justify-between">
           <Button

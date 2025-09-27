@@ -48,12 +48,12 @@ export default function SignupPage() {
     setError(null)
 
     try {
-      const { error: authError } = await supabase.auth.signUp({
+      // Store signup data temporarily and redirect to registration
+      // User account will be created during registration submission
+      localStorage.setItem('temp-signup-data', JSON.stringify({
         email: data.email,
-        password: data.password,
-      })
-
-      if (authError) throw authError
+        password: data.password
+      }))
 
       // Redirect to registration form
       router.push("/register")

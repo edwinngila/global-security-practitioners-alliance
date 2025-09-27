@@ -79,7 +79,7 @@ export default function RegisterStep3() {
 
       // Remove non-serializable data for localStorage
       const localStorageData = { ...dataToSave }
-      delete localStorageData.passportPhotoFile // Files can't be stored in localStorage
+      delete (localStorageData as any).passportPhotoFile // Files can't be stored in localStorage
 
       localStorage.setItem("registration-step-3", JSON.stringify(localStorageData))
 
@@ -114,8 +114,8 @@ export default function RegisterStep3() {
     <div className="min-h-screen bg-background">
       <RegistrationProgress currentStep={3} totalSteps={4} stepTitles={stepTitles} />
 
-      <div className="py-8 px-4">
-        <div className="max-w-3xl mx-auto">
+      <div className="py-6 px-4 sm:py-8">
+        <div className="max-w-sm sm:max-w-md md:max-w-2xl lg:max-w-3xl mx-auto">
           <Card className="shadow-lg">
             <CardHeader className="text-center pb-6 md:pb-8">
               <CardTitle className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
@@ -126,15 +126,15 @@ export default function RegisterStep3() {
               </CardDescription>
             </CardHeader>
 
-            <CardContent className="space-y-6 md:space-y-8">
-              <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 md:space-y-8">
+            <CardContent className="space-y-4 sm:space-y-6 md:space-y-8 px-4 sm:px-6">
+              <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 sm:space-y-6 md:space-y-8">
                 {/* Document Information */}
                 <div className="bg-muted rounded-xl p-6 space-y-6">
                   <h3 className="text-lg font-semibold text-foreground border-b border-border pb-2">
                     Document Information
                   </h3>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                     <div className="space-y-2">
                       <Label>Document Type *</Label>
                       <Controller
