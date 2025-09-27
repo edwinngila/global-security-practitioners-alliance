@@ -5,7 +5,8 @@ import { DashboardSidebar } from "@/components/dashboard-sidebar"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Users, FileText, Award, CreditCard, TrendingUp, Activity, Menu, Shield } from "lucide-react"
-import { createClient } from "@/lib/supabase/client"
+import { useSession } from "next-auth/react"
+// import { prisma } from "@/lib/prisma" // Removed: prisma should not be imported in client components
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { hasRoleAsync, roles } from "@/lib/rbac"
@@ -34,65 +35,27 @@ export default function AdminDashboardPage() {
   const [userEmail, setUserEmail] = useState("")
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const router = useRouter()
-  const supabase = createClient()
+  const { data: session, status } = useSession()
 
   useEffect(() => {
-    const checkAdminAndLoadStats = async () => {
-      const {
-        data: { user: authUser },
-      } = await supabase.auth.getUser()
-
-      if (!authUser) {
+    const loadStats = async () => {
+      if (status === "loading") return
+      if (!session || !session.user) {
         router.push("/auth/login")
         return
       }
-
-      // Check if admin
-      if (!(await hasRoleAsync(roles.admin))) {
+      if (!(session.user.role === roles.admin)) {
         router.push("/dashboard")
         return
       }
-
       setIsAdmin(true)
-      setUserName(`${authUser.user_metadata?.first_name || ''} ${authUser.user_metadata?.last_name || ''}`.trim() || 'Admin')
-      setUserEmail(authUser.email || '')
-
-      // Load stats
-      const { data: profiles, error } = await supabase
-        .from("profiles")
-        .select("*")
-
-      if (!error && profiles) {
-        const totalUsers = profiles.length
-        const activeMembers = profiles.filter(p => p.membership_fee_paid).length
-        const testCompleted = profiles.filter(p => p.test_completed).length
-        const certificatesIssued = profiles.filter(p => p.certificate_issued).length
-
-        // Calculate revenue (simplified - assuming $50 membership + $50 test fee)
-        const totalRevenue = (activeMembers * 50) + (testCompleted * 50)
-
-        // Recent activity (users registered in last 30 days)
-        const thirtyDaysAgo = new Date()
-        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
-        const recentActivity = profiles.filter(p =>
-          new Date(p.created_at) > thirtyDaysAgo
-        ).length
-
-        setStats({
-          totalUsers,
-          activeMembers,
-          testCompleted,
-          certificatesIssued,
-          totalRevenue,
-          recentActivity,
-        })
-      }
-
+      setUserName(session.user.name || 'Admin')
+      setUserEmail(session.user.email || '')
+      // TODO: Replace with API call to fetch stats from localDB/Prisma
       setIsLoading(false)
     }
-
-    checkAdminAndLoadStats()
-  }, [supabase, router])
+    loadStats()
+  }, [session, status, router])
 
   if (isLoading) {
     return (

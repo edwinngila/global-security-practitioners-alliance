@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Progress } from "@/components/ui/progress"
 import { Award, Download, CheckCircle, XCircle, Clock, FileText, User, Calendar, BookOpen } from "lucide-react"
-import { createClient } from "@/lib/supabase/client"
+import { fetchJson, apiFetch } from '@/lib/api/client'
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 
@@ -62,31 +62,22 @@ export default function PractitionerDashboardPage() {
    const [moduleEnrollments, setModuleEnrollments] = useState<ModuleEnrollment[]>([])
    const [isLoading, setIsLoading] = useState(true)
    const router = useRouter()
-   const supabase = createClient()
+  // use REST API client
 
   useEffect(() => {
     const getUserData = async () => {
-      const {
-        data: { user: authUser },
-      } = await supabase.auth.getUser()
-
-      if (!authUser) {
-        router.push("/auth/login")
+      // Get current auth user + profile
+      const authRes = await fetch('/api/auth/user')
+      if (authRes.status === 401) {
+        router.push('/auth/login')
         return
       }
-
-      // Get user profile
-      const { data: profile, error: profileError } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", authUser.id)
-        .single()
-
-      if (profileError || !profile) {
-        router.push("/register")
+      const authData = await authRes.json()
+      const profile = authData.profile
+      if (!profile) {
+        router.push('/register')
         return
       }
-
       setUser(profile)
 
       // Check and issue certificate if available
@@ -94,76 +85,54 @@ export default function PractitionerDashboardPage() {
 
       // Get latest test attempt if test completed
       if (profile.test_completed) {
-        const { data: attempt, error: attemptError } = await supabase
-          .from("test_attempts")
-          .select("*")
-          .eq("user_id", authUser.id)
-          .order("completed_at", { ascending: false })
-          .limit(1)
-          .single()
-
-        if (!attemptError && attempt) {
-          setTestAttempt(attempt)
+        try {
+          const attempts = await fetchJson(`/api/tests/attempts`)
+          if (Array.isArray(attempts) && attempts.length > 0) {
+            setTestAttempt(attempts[0])
+          }
+        } catch (err) {
+          console.error('Error fetching attempts', err)
         }
       } else {
         // Check for ongoing test
-        const { data: ongoing, error: ongoingError } = await supabase
-          .from("ongoing_tests")
-          .select("*")
-          .eq("user_id", authUser.id)
-          .single()
-
-        if (!ongoingError && ongoing) {
-          setOngoingTest(ongoing)
+        try {
+          const ongoing = await fetchJson('/api/tests/ongoing')
+          if (ongoing) setOngoingTest(ongoing)
+        } catch (err) {
+          // not found or none
         }
       }
 
-      // Get user's module enrollments with module details
-      const { data: enrollments, error: enrollmentsError } = await supabase
-        .from("module_enrollments")
-        .select(`
-          id,
-          module_id,
-          progress_percentage,
-          payment_status,
-          completed_at
-        `)
-        .eq("user_id", authUser.id)
-        .eq("payment_status", "completed")
-
-      if (!enrollmentsError && enrollments) {
-        // Get module titles separately to avoid join issues
-        const moduleIds = enrollments.map(e => e.module_id)
-        if (moduleIds.length > 0) {
-          const { data: modules, error: modulesError } = await supabase
-            .from("modules")
-            .select("id, title")
-            .in("id", moduleIds)
-
-          if (!modulesError && modules) {
-            const moduleMap = modules.reduce((acc, module) => {
-              acc[module.id] = module.title
-              return acc
-            }, {} as Record<string, string>)
-
-            const formattedEnrollments = enrollments.map(enrollment => ({
-              id: enrollment.id,
-              module_id: enrollment.module_id,
-              module_title: moduleMap[enrollment.module_id] || 'Unknown Module',
-              progress_percentage: enrollment.progress_percentage,
-              payment_status: enrollment.payment_status,
-              completed_at: enrollment.completed_at
-            }))
-            setModuleEnrollments(formattedEnrollments)
+      // Get user's module enrollments with module details (only completed payments)
+      try {
+        const enrollments = await fetchJson('/api/modules') // modules list includes enrollments
+        // filter enrollments for this user's completed ones
+        const myEnrollments: ModuleEnrollment[] = []
+        for (const m of enrollments) {
+          if (!m.enrollments) continue
+          for (const e of m.enrollments) {
+            if (e.userId === profile.id && e.paymentStatus === 'COMPLETED') {
+              myEnrollments.push({
+                id: e.id,
+                module_id: m.id,
+                module_title: m.title,
+                progress_percentage: e.progressPercentage,
+                payment_status: e.paymentStatus,
+                completed_at: e.completedAt
+              })
+            }
           }
         }
+        setModuleEnrollments(myEnrollments)
+      } catch (err) {
+        console.error('Error fetching enrollments', err)
       }
 
       setIsLoading(false)
     }
 
     getUserData()
-  }, [supabase, router])
+  }, [router])
 
   const checkAndIssueCertificate = async () => {
     if (!user || !user.certificate_available_at) return
@@ -173,20 +142,11 @@ export default function PractitionerDashboardPage() {
 
     if (now >= availableAt && !user.certificate_issued) {
       try {
-        const { error } = await supabase
-          .from("profiles")
-          .update({
-            certificate_issued: true,
-            certificate_url: `certificate-${user.id}.pdf`, // Placeholder URL
-          })
-          .eq("id", user.id)
-
-        if (error) throw error
+        const res = await apiFetch(`/api/profiles/${user.id}`, { method: 'PATCH', body: JSON.stringify({ certificateIssued: true, certificateUrl: `certificate-${user.id}.pdf` }), headers: { 'Content-Type': 'application/json' } })
+        if (!res.ok) throw new Error('Failed to update certificate')
 
         // Update local state
-        setUser((prev) =>
-          prev ? { ...prev, certificate_issued: true, certificate_url: `certificate-${user.id}.pdf` } : null,
-        )
+        setUser((prev) => prev ? { ...prev, certificate_issued: true, certificate_url: `certificate-${user.id}.pdf` } : null)
       } catch (error) {
         console.error("Certificate issuance error:", error)
       }

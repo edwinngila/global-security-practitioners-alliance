@@ -10,7 +10,8 @@ export async function updateSession(request: NextRequest) {
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
   if (!supabaseUrl || !supabaseAnonKey) {
-    console.error("[v0] Missing Supabase environment variables:", {
+    // Supabase not configured in this environment — warn and continue with default response.
+    console.warn('[v0] Supabase env vars missing; middleware will continue without Supabase checks', {
       url: !!supabaseUrl,
       key: !!supabaseAnonKey,
     })
@@ -49,50 +50,49 @@ export async function updateSession(request: NextRequest) {
     // Redirect authenticated users away from auth pages
     if (request.nextUrl.pathname.startsWith("/auth/") && user) {
       // Check user role and redirect accordingly
-      if (user.email === "admin@gmail.com") {
-        const url = request.nextUrl.clone()
-        url.pathname = "/admin"
-        return NextResponse.redirect(url)
-      } else {
-        // Check user role first
-        try {
-          const { data: profile } = await supabase
-            .from("profiles")
-            .select("membership_fee_paid, role_id")
-            .eq("id", user.id)
+      try {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("membership_fee_paid, role_id")
+          .eq("id", user.id)
+          .single()
+
+        // If admin role, send to admin root
+        if (profile?.role_id) {
+          const { data: role } = await supabase
+            .from("roles")
+            .select("name")
+            .eq("id", profile.role_id)
             .single()
 
-          if (profile?.role_id) {
-            // Check if user is master practitioner
-            const { data: role } = await supabase
-              .from("roles")
-              .select("name")
-              .eq("id", profile.role_id)
-              .single()
-
-            if (role?.name === "master_practitioner") {
-              const url = request.nextUrl.clone()
-              url.pathname = "/admin/master-dashboard"
-              return NextResponse.redirect(url)
-            }
+          if (role?.name === "admin") {
+            const url = request.nextUrl.clone()
+            url.pathname = "/admin"
+            return NextResponse.redirect(url)
           }
 
-          // For regular users, check if they have completed registration
-          const url = request.nextUrl.clone()
-          if (!profile) {
-            url.pathname = "/register/step-1"
-          } else if (!profile.membership_fee_paid) {
-            url.pathname = "/payment"
-          } else {
-            url.pathname = "/dashboard"
+          if (role?.name === "master_practitioner") {
+            const url = request.nextUrl.clone()
+            url.pathname = "/admin/master-dashboard"
+            return NextResponse.redirect(url)
           }
-          return NextResponse.redirect(url)
-        } catch (error) {
-          // If profile check fails, redirect to dashboard as fallback
-          const url = request.nextUrl.clone()
-          url.pathname = "/dashboard"
-          return NextResponse.redirect(url)
         }
+
+        // For regular users, check if they have completed registration
+        const url = request.nextUrl.clone()
+        if (!profile) {
+          url.pathname = "/register/step-1"
+        } else if (!profile.membership_fee_paid) {
+          url.pathname = "/payment"
+        } else {
+          url.pathname = "/dashboard"
+        }
+        return NextResponse.redirect(url)
+      } catch (error) {
+        // If profile check fails, redirect to dashboard as fallback
+        const url = request.nextUrl.clone()
+        url.pathname = "/dashboard"
+        return NextResponse.redirect(url)
       }
     }
   } catch (error) {

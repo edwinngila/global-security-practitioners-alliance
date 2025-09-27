@@ -55,177 +55,102 @@ export default function RegisterStep4() {
   // Improved upload function
   const uploadImageToStorage = async (base64Data: string, folder: string, fileName: string, mimeType: string = 'image/jpeg') => {
     try {
-      if (!base64Data) {
-        console.log(`[v0] No ${folder} data found`)
-        return null
-      }
+      if (!base64Data) return null
 
-      console.log(`[v0] Starting ${folder} upload`)
-      
-      // Convert base64 to blob
       const blob = base64ToBlob(base64Data, mimeType)
       const file = new File([blob], fileName, { type: mimeType })
 
-      // Upload to Supabase Storage
       const { data, error } = await supabase.storage
-        .from("documents")
-        .upload(`${folder}/${fileName}`, file, {
-          cacheControl: '3600',
-          upsert: false
-        })
+        .from('documents')
+        .upload(`${folder}/${fileName}`, file, { cacheControl: '3600', upsert: true })
 
       if (error) {
         console.error(`[v0] ${folder} upload error:`, error)
-        throw new Error(`Failed to upload ${folder}: ${error.message}`)
+        throw error
       }
 
-      console.log(`[v0] ${folder} uploaded successfully:`, data)
-
-      // Get public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from("documents")
-        .getPublicUrl(`${folder}/${fileName}`)
-
-      console.log(`[v0] ${folder} public URL:`, publicUrl)
-      return publicUrl
-
-    } catch (error) {
-      console.error(`[v0] ${folder} processing error:`, error)
-      throw error
+      const { data: urlData } = supabase.storage.from('documents').getPublicUrl(`${folder}/${fileName}`)
+      return urlData?.publicUrl || null
+    } catch (err) {
+      console.error(`[v0] ${folder} processing error:`, err)
+      throw err
     }
   }
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (e?: React.SyntheticEvent) => {
+    if (e && typeof (e as any).preventDefault === 'function') (e as any).preventDefault()
     setIsSubmitting(true)
     setError(null)
 
     try {
-      console.log("[v0] Starting registration process")
-      console.log("[v0] Registration data:", allData)
+      console.log('[v0] Starting registration process')
+      console.log('[v0] Registration data:', allData)
 
-      // Create new auth user first
-      const { data: authData, error: authError } = await supabase.auth.signUp({
+      // Upload images first (if any)
+      let passportPhotoUrl: string | null = null
+      let signatureUrl: string | null = null
+
+      try {
+        const tempPhoto = localStorage.getItem('temp-passport-photo')
+        if (tempPhoto) {
+          passportPhotoUrl = await uploadImageToStorage(tempPhoto, 'passports', `passport-${Date.now()}.jpg`, 'image/jpeg')
+        }
+      } catch (photoErr) {
+        console.error('[v0] Passport upload failed, continuing without it', photoErr)
+      }
+
+      try {
+        const tempSignature = localStorage.getItem('temp-signature')
+        if (tempSignature) {
+          signatureUrl = await uploadImageToStorage(tempSignature, 'signatures', `signature-${Date.now()}.png`, 'image/png')
+        }
+      } catch (sigErr) {
+        console.error('[v0] Signature upload failed, continuing without it', sigErr)
+      }
+
+      // Call REST signup endpoint
+      const signupPayload = {
         email: allData.email,
         password: allData.password,
-        options: {
-          data: {
-            first_name: allData.firstName,
-            last_name: allData.lastName,
-          },
-          emailRedirectTo: `${window.location.origin}/auth/confirm`
-        }
-      })
-
-      if (authError) {
-        console.error("[v0] Auth signup error:", authError)
-        throw new Error(`Failed to create account: ${authError.message}`)
-      }
-
-      if (!authData.user) {
-        throw new Error("Failed to create user account")
-      }
-
-      const userId = authData.user.id
-      console.log("[v0] Created auth user ID:", userId)
-
-      // Upload documents after user creation
-      let passportPhotoUrl = null
-      let signatureUrl = null
-
-      try {
-        // Upload passport photo
-        const tempPhoto = localStorage.getItem("temp-passport-photo")
-        if (tempPhoto) {
-          passportPhotoUrl = await uploadImageToStorage(
-            tempPhoto, 
-            "passports", 
-            `passport-${userId}.jpg`,
-            'image/jpeg'
-          )
-        }
-      } catch (photoError) {
-        console.error("[v0] Passport photo upload failed, continuing without photo:", photoError)
-        // Continue registration even if photo upload fails
-      }
-
-      try {
-        // Upload signature
-        const tempSignature = localStorage.getItem("temp-signature")
-        if (tempSignature) {
-          signatureUrl = await uploadImageToStorage(
-            tempSignature,
-            "signatures",
-            `signature-${userId}.png`,
-            'image/png'
-          )
-        }
-      } catch (signatureError) {
-        console.error("[v0] Signature upload failed, continuing without signature:", signatureError)
-        // Continue registration even if signature upload fails
-      }
-
-      // Store registration data temporarily for after email confirmation
-      localStorage.setItem("pending-registration", JSON.stringify({
-        userId,
-        ...allData,
-        passportPhotoUrl,
-        signatureUrl
-      }))
-
-      console.log("[v0] User account created, email confirmation sent")
-
-      // Insert profile data in Supabase
-      const profileData = {
-        id: userId,
-        first_name: allData.firstName,
-        last_name: allData.lastName,
-        email: allData.email,
-        phone_number: allData.phone,
-        date_of_birth: allData.dateOfBirth,
+        firstName: allData.firstName,
+        lastName: allData.lastName,
+        phoneNumber: allData.phone,
+        dateOfBirth: allData.dateOfBirth,
         nationality: allData.nationality,
         gender: allData.gender,
         designation: allData.designation,
-        organization_name: allData.organization,
-        document_type: allData.documentType,
-        document_number: allData.documentNumber,
-        declaration_accepted: allData.declarationAccepted || false,
-        passport_photo_url: passportPhotoUrl,
-        signature_data: signatureUrl,
-        membership_fee_paid: false,
-        payment_status: "pending",
-        test_completed: false,
-        certificate_issued: false,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+        organizationName: allData.organization,
+        documentType: allData.documentType,
+        documentNumber: allData.documentNumber,
+        declarationAccepted: !!allData.declarationAccepted,
+        passportPhotoUrl,
+        signatureUrl
       }
 
-      console.log("[v0] Inserting profile data:", profileData)
+      const res = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(signupPayload)
+      })
 
-      // Insert or update the profile
-      const { data, error: insertError } = await supabase
-        .from("profiles")
-        .upsert(profileData)
-        .select()
-
-      if (insertError) {
-        console.error("[v0] Database insert error:", insertError)
-        throw new Error(`Failed to save registration: ${insertError.message}`)
+      const result = await res.json()
+      if (!res.ok) {
+        console.error('[v0] Signup failed', result)
+        setError(result?.error || 'Registration failed')
+        return
       }
 
-      console.log("[v0] Registration saved successfully:", data)
+      // persist pending registration (for email confirmation flow)
+      localStorage.setItem('pending-registration', JSON.stringify({ id: result.id, ...allData, passportPhotoUrl, signatureUrl }))
 
-      // Store user ID for payment process
-      localStorage.setItem("registration-user-id", userId)
-
-      // Clean up temporary storage
-      localStorage.removeItem("temp-passport-photo")
-      localStorage.removeItem("temp-signature")
+      // cleanup temp images
+      localStorage.removeItem('temp-passport-photo')
+      localStorage.removeItem('temp-signature')
 
       setSubmitSuccess(true)
-
-    } catch (error: any) {
-      console.error("[v0] Registration submission error:", error)
-      setError(error.message || "Registration failed. Please try again.")
+    } catch (err: any) {
+      console.error('[v0] Registration submission error:', err)
+      setError(err?.message || 'Registration failed. Please try again.')
     } finally {
       setIsSubmitting(false)
     }

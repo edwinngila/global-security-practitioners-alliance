@@ -247,7 +247,7 @@ export default function ContactPage() {
                           id="message"
                           {...register("message", {
                             required: "Message is required",
-                            minLength: { value: 10, message: "Message must be at least 10 characters" },
+                            minLength: { value: 5, message: "Message must be at least 5 characters" },
                             maxLength: { value: 1000, message: "Message must be less than 1000 characters" }
                           })}
                           placeholder="Tell us more about your inquiry, certification goals, or how we can assist you..."

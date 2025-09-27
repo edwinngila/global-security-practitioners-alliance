@@ -36,30 +36,27 @@ export default function AdminSettingsPage() {
 
   useEffect(() => {
     const checkAdmin = async () => {
-      const {
-        data: { user: authUser },
-      } = await supabase.auth.getUser()
+      try {
+        const userRes = await fetch('/api/auth/user')
+        if (!userRes.ok) {
+          router.push('/auth/login')
+          return
+        }
+        const data = await userRes.json()
+        const roleName = data?.profile?.role?.name
+        if (roleName !== 'admin') {
+          router.push('/dashboard')
+          return
+        }
+        setIsAdmin(true)
+        setUserName(`${data?.profile?.first_name || ''} ${data?.profile?.last_name || ''}`.trim() || 'Admin')
+        setUserEmail(data?.email || '')
 
-      if (!authUser) {
-        router.push("/auth/login")
-        return
-      }
-
-      // Check if admin
-      if (authUser.email !== 'admin@gmail.com') {
-        router.push("/dashboard")
-        return
-      }
-
-      setIsAdmin(true)
-      setUserName(`${authUser.user_metadata?.first_name || ''} ${authUser.user_metadata?.last_name || ''}`.trim() || 'Admin')
-      setUserEmail(authUser.email || '')
-
-      // Load settings from database
-      const { data: siteSettings } = await supabase
-        .from("site_settings")
-        .select("*")
-        .single()
+        // Load settings from database
+        const { data: siteSettings } = await supabase
+          .from("site_settings")
+          .select("*")
+          .single()
 
       if (siteSettings) {
         setSettings({
@@ -83,8 +80,8 @@ export default function AdminSettingsPage() {
         .eq("is_active", true)
 
       if (legalDocs) {
-        const privacyDoc = legalDocs.find(doc => doc.document_type === 'privacy_policy')
-        const termsDoc = legalDocs.find(doc => doc.document_type === 'terms_of_service')
+        const privacyDoc = legalDocs.find((doc: any) => doc.document_type === 'privacy_policy')
+        const termsDoc = legalDocs.find((doc: any) => doc.document_type === 'terms_of_service')
 
         setSettings(prev => ({
           ...prev,
@@ -94,6 +91,11 @@ export default function AdminSettingsPage() {
       }
 
       setIsLoading(false)
+      } catch (error) {
+        console.error('Error checking admin:', error)
+        router.push('/auth/login')
+        return
+      }
     }
 
     checkAdmin()

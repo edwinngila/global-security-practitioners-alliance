@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Button } from "@/components/ui/button"
 import { Award, X, Star, Shield, Globe, Rocket } from "lucide-react"
 import { useRouter } from "next/navigation"
-import { createClient } from "@/lib/supabase/client"
+import { fetchJson } from '@/lib/api/client'
 
 interface ExamPopupProps {
   isOpen: boolean
@@ -17,15 +17,17 @@ export default function ExamPopup({ isOpen, onClose, isRegisteredUser = false }:
   const [user, setUser] = useState<any>(null)
   const [isVisible, setIsVisible] = useState(false)
   const router = useRouter()
-  const supabase = createClient()
-
   useEffect(() => {
     const getUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      setUser(user)
+      try {
+        const res = await fetch('/api/auth/user')
+        if (!res.ok) return
+        const data = await res.json()
+        setUser(data.profile || null)
+      } catch {}
     }
     getUser()
-  }, [supabase])
+  }, [])
 
   useEffect(() => {
     if (isOpen) {

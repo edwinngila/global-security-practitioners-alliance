@@ -83,8 +83,8 @@ export default function EnrolledPage() {
 
         if (!enrollmentsError && enrollments) {
           // Mark enrolled modules
-          const modulesWithEnrollment = modulesData.map(module => {
-            const isEnrolled = enrollments.some(e => e.module_id === module.id)
+          const modulesWithEnrollment = modulesData.map((module: any) => {
+            const isEnrolled = enrollments.some((e: any) => e.module_id === module.id)
             return {
               ...module,
               is_enrolled: isEnrolled

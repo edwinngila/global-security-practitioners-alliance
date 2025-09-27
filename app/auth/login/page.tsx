@@ -1,41 +1,38 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { useForm } from "react-hook-form"
-import { zodResolver } from "@hookform/resolvers/zod"
-import * as z from "zod"
-import { Footer } from "@/components/footer"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Shield, AlertCircle, Eye, EyeOff, Lock, Mail } from "lucide-react"
-import { createClient } from "@/lib/supabase/client"
-import { useRouter } from "next/navigation"
-import Link from "next/link"
-import Navigation from "@/components/navigation"
-import { emailValidation, rateLimiting } from "@/lib/validationUtils"
-import { useUser } from "@/components/user-context"
-import { UserRole } from "@/lib/rbac"
+import { signIn, useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import { Footer } from "@/components/footer";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Shield, AlertCircle, Eye, EyeOff, Lock, Mail } from "lucide-react";
+import Link from "next/link";
+import Navigation from "@/components/navigation";
+import { emailValidation, rateLimiting } from "@/lib/validationUtils";
 
 const loginSchema = z.object({
   email: emailValidation,
   password: z.string().min(1, "Password is required").max(128, "Password is too long"),
-})
+});
 
-type LoginForm = z.infer<typeof loginSchema>
+type LoginForm = z.infer<typeof loginSchema>;
 
 export default function LoginPage() {
-  const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [showPassword, setShowPassword] = useState(false)
-  const [attemptCount, setAttemptCount] = useState(0)
-  const [isBlocked, setIsBlocked] = useState(false)
-  const [blockTimeRemaining, setBlockTimeRemaining] = useState(0)
-  const router = useRouter()
-  const supabase = createClient()
-  const { setProfile, setRole } = useUser()
+  const router = useRouter();
+  const { data: session, status } = useSession();
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [attemptCount, setAttemptCount] = useState(0);
+  const [isBlocked, setIsBlocked] = useState(false);
+  const [blockTimeRemaining, setBlockTimeRemaining] = useState(0);
 
   const {
     register,
@@ -46,113 +43,75 @@ export default function LoginPage() {
     resolver: zodResolver(loginSchema),
   })
 
-  const email = watch("email")
+  const email = watch("email");
 
   useEffect(() => {
-    let interval: NodeJS.Timeout
+    let interval: NodeJS.Timeout;
     if (isBlocked && blockTimeRemaining > 0) {
       interval = setInterval(() => {
         setBlockTimeRemaining((prev) => {
           if (prev <= 1) {
-            setIsBlocked(false)
-            setAttemptCount(0)
-            return 0
+            setIsBlocked(false);
+            setAttemptCount(0);
+            return 0;
           }
-          return prev - 1
-        })
-      }, 1000)
+          return prev - 1;
+        });
+      }, 1000);
     }
-    return () => clearInterval(interval)
-  }, [isBlocked, blockTimeRemaining])
+    return () => clearInterval(interval);
+  }, [isBlocked, blockTimeRemaining]);
 
-  const onSubmit = async (data: LoginForm) => {
-    const clientId = `login_${data.email}_${window.navigator.userAgent.slice(0, 50)}`
-    const rateCheck = rateLimiting.checkRateLimit(clientId, 5, 15 * 60 * 1000) // 5 attempts per 15 minutes
+  const onSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setError(""); // Clear previous errors
+    setLoading(true);
 
-    if (!rateCheck.allowed) {
-      setError(rateCheck.message || "Too many login attempts. Please try again later.")
-      setIsBlocked(true)
-      setBlockTimeRemaining(Math.ceil((rateCheck.resetTime! - Date.now()) / 1000))
-      return
+    const formData = new FormData(event.currentTarget);
+    const email = formData.get("email") as string;
+    const password = formData.get("password") as string;
+
+    const result = await signIn("credentials", {
+      redirect: false, // Important: handle redirect manually
+      email,
+      password,
+    });
+
+    setLoading(false);
+
+    if (result?.error) {
+      // Handle sign-in errors (e.g., invalid credentials)
+      setError("Invalid email or password. Please try again.");
+      console.error(result.error);
+    } else if (result?.ok) {
+      // The session will update, triggering the useEffect below
     }
+  };
 
-    setIsLoading(true)
-    setError(null)
+  useEffect(() => {
+    // This effect runs when the session status changes
+    if (status === "authenticated" && session?.user?.role) {
+      const { role } = session.user;
 
-    try {
-      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-        email: data.email,
-        password: data.password,
-      })
-
-      if (authError) {
-        setAttemptCount((prev) => prev + 1)
-
-        if (authError.message.includes("Invalid login credentials")) {
-          setError("Invalid email or password. Please check your credentials and try again.")
-        } else if (authError.message.includes("Email not confirmed")) {
-          setError("Please check your email and click the confirmation link before signing in.")
-        } else if (authError.message.includes("Too many requests")) {
-          setError("Too many login attempts. Please wait a few minutes before trying again.")
-          setIsBlocked(true)
-          setBlockTimeRemaining(300) // 5 minutes
-        } else {
-          setError(authError.message || "Login failed. Please try again.")
-        }
-        throw authError
+      // Redirect based on role
+      if (role === "admin") {
+        router.push("/admin/dashboard");
+      } else if (role === "master_practitioner") {
+        router.push("/master-practitioner");
+      } else if (role === "practitioner") {
+        router.push("/dashboard");
+      } else {
+        router.push("/dashboard"); // Default dashboard
       }
-
-      rateLimiting.clearAttempts(clientId)
-      setAttemptCount(0)
-
-      if (authData.user) {
-        const { data: profile, error: profileError } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("id", authData.user.id)
-          .single()
-
-        if (profileError || !profile) {
-          router.push("/register/step-1")
-          return
-        }
-
-        setProfile(profile)
-
-        let userRole: UserRole = 'practitioner'
-        // Special case for admin email
-        if (authData.user.email === 'admin@gmail.com') {
-          userRole = 'admin'
-        } else if (profile.role_id) {
-          const { data: roleData, error: roleError } = await supabase
-            .from("roles")
-            .select("name")
-            .eq("id", profile.role_id)
-            .single()
-
-          if (!roleError && roleData?.name) {
-            userRole = roleData.name as UserRole
-          }
-        }
-
-        setRole(userRole)
-
-        if (userRole === 'admin') {
-          router.push('/admin/master-dashboard')
-        } else if (userRole === 'master_practitioner') {
-          router.push('/master-practitioner')
-        } else if (profile.membership_fee_paid) {
-          router.push('/practitioner')
-        } else {
-          router.push('/payment')
-        }
-      }
-    } catch (error: any) {
-      console.error("[v0] Login error:", error)
-    } finally {
-      setIsLoading(false)
     }
-  }
+  }, [status, session, router]);
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (status === "authenticated") {
+      // Optional: redirect immediately if already logged in
+    }
+  }, [status]);
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-background via-muted/10 to-background">
@@ -212,7 +171,7 @@ export default function LoginPage() {
                 </Alert>
               )}
 
-              <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+              <form onSubmit={onSubmit} className="space-y-6">
                 <div className="space-y-2">
                   <Label
                     htmlFor="email"
@@ -283,9 +242,9 @@ export default function LoginPage() {
                 <Button
                   type="submit"
                   className="w-full h-12 text-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
-                  disabled={isLoading || isBlocked}
+                  disabled={loading || isBlocked}
                 >
-                  {isLoading ? "Signing in..." : isBlocked ? "Account Locked" : "Sign In"}
+                  {loading ? "Logging in..." : isBlocked ? "Account Locked" : "Log in"}
                 </Button>
               </form>
 

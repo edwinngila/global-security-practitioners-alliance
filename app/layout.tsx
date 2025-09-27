@@ -5,9 +5,8 @@ import { GeistMono } from "geist/font/mono"
 import { Analytics } from "@vercel/analytics/next"
 import { Suspense } from "react"
 import ExamPopupWrapper from "@/components/exam-popup-wrapper"
-import { ThemeProvider } from "@/components/theme-provider"
 import { SkipLinks } from "@/components/skip-links"
-import { UserProvider } from "@/components/user-context"
+import { Providers } from "@/components/providers"
 import "./globals.css"
 
 export const metadata: Metadata = {
@@ -97,22 +96,15 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`font-sans ${GeistSans.variable} ${GeistMono.variable}`}>
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
-        >
-          <UserProvider>
-            <SkipLinks />
-            <Suspense fallback={null}>
-              <ExamPopupWrapper>
-                {children}
-              </ExamPopupWrapper>
-            </Suspense>
-            <Analytics />
-          </UserProvider>
-        </ThemeProvider>
+        <Providers>
+          <SkipLinks />
+          <Suspense fallback={null}>
+            <ExamPopupWrapper>
+              {children}
+            </ExamPopupWrapper>
+          </Suspense>
+          <Analytics />
+        </Providers>
       </body>
     </html>
   )

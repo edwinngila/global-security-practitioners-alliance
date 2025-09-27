@@ -117,24 +117,25 @@ export default function AdminTestsPage() {
 
   useEffect(() => {
     const checkAdminAndLoadData = async () => {
-      const {
-        data: { user: authUser },
-      } = await supabase.auth.getUser()
-
-      if (!authUser) {
-        router.push("/auth/login")
+      try {
+        const userRes = await fetch('/api/auth/user')
+        if (!userRes.ok) {
+          router.push('/auth/login')
+          return
+        }
+        const data = await userRes.json()
+        const roleName = data?.profile?.role?.name
+        if (roleName !== 'admin') {
+          router.push('/dashboard')
+          return
+        }
+        setIsAdmin(true)
+        setUserName(`${data?.profile?.first_name || ''} ${data?.profile?.last_name || ''}`.trim() || 'Admin')
+        setUserEmail(data?.email || '')
+      } catch (err) {
+        router.push('/auth/login')
         return
       }
-
-      // Check if admin
-      if (authUser.email !== 'admin@gmail.com') {
-        router.push("/dashboard")
-        return
-      }
-
-      setIsAdmin(true)
-      setUserName(`${authUser.user_metadata?.first_name || ''} ${authUser.user_metadata?.last_name || ''}`.trim() || 'Admin')
-      setUserEmail(authUser.email || '')
 
       // Load test questions
       const { data: questionsData, error: questionsError } = await supabase

@@ -1,0 +1,123 @@
+import NextAuth, { NextAuthOptions } from "next-auth";
+import CredentialsProvider from "next-auth/providers/credentials";
+import { PrismaAdapter } from "@auth/prisma-adapter";
+import { prisma } from "@/lib/prisma/client";
+import bcrypt from "bcryptjs";
+import { JWT } from "next-auth/jwt";
+
+const authOptions: NextAuthOptions = {
+  secret: process.env.NEXTAUTH_SECRET,
+  // Credentials provider doesn't require an adapter
+  // adapter: PrismaAdapter(prisma), // Only needed if using OAuth or Email providers
+  session: {
+    strategy: "jwt",
+    maxAge: 30 * 24 * 60 * 60, // 30 days
+    updateAge: 24 * 60 * 60, // 24 hours
+  },
+  providers: [
+    CredentialsProvider({
+      name: "Credentials",
+      credentials: {
+        email: { label: "Email", type: "email" },
+        password: { label: "Password", type: "password" },
+      },
+      async authorize(credentials) {
+        if (!credentials?.email || !credentials?.password) {
+          throw new Error("Email and password are required");
+        }
+
+        try {
+          // Find user in database
+          const user = await prisma.user.findUnique({
+            where: { email: credentials.email },
+            include: {
+              profile: {
+                include: {
+                  role: true,
+                },
+              },
+            },
+          });
+
+          if (!user || !user.password) {
+            console.log("No user found with this email");
+            throw new Error("Invalid credentials");
+          }
+
+          // Validate password
+          const passwordsMatch = await bcrypt.compare(credentials.password, user.password);
+          if (!passwordsMatch) {
+            console.log("Invalid password");
+            throw new Error("Invalid credentials");
+          }
+
+          // Log successful login and update profile
+          await Promise.all([
+            // Update user's profile with login information
+            prisma.profile.update({
+              where: { id: user.id },
+              data: {
+                lastLoginAt: new Date(),
+                loginCount: { increment: 1 },
+              },
+            }).catch(() => {/* Ignore if profile doesn't exist yet */}),
+          ]);
+
+          // Return user without sensitive data
+          const { password, ...userWithoutPassword } = user;
+          return {
+            ...userWithoutPassword,
+            role: user.profile?.role?.name || "user",
+            profileComplete: !!user.profile,
+            membershipPaid: !!user.profile?.membershipFeePaid,
+          };
+        } catch (error) {
+          console.error("Auth error:", error);
+          throw new Error("An error occurred during authentication");
+        }
+      },
+    }),
+  ],
+  callbacks: {
+    async jwt({ token, user, trigger, session }) {
+      if (user) {
+        token.id = user.id;
+        token.role = user.role;
+        token.profileComplete = user.profileComplete;
+        token.membershipPaid = user.membershipPaid;
+      }
+
+      // Handle user updates
+      if (trigger === "update" && session) {
+        // Update token with new session data
+        return { ...token, ...session };
+      }
+
+      return token;
+    },
+    async session({ session, token }) {
+      if (session.user) {
+        session.user.id = token.id;
+        session.user.email = token.email;
+        session.user.role = token.role;
+        session.user.profileComplete = token.profileComplete;
+        session.user.membershipPaid = token.membershipPaid;
+      }
+      return session;
+    },
+  },
+  pages: {
+    signIn: "/auth/login",
+    error: "/auth/error",
+    verifyRequest: "/auth/verify-request",
+  },
+  debug: process.env.NODE_ENV === "development",
+};
+
+// Create the handler from the options
+const handler = NextAuth(authOptions);
+
+// Export the handler and options
+export { authOptions };
+export const GET = handler;
+export const POST = handler;

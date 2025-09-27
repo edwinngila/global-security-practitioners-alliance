@@ -22,7 +22,7 @@ import {
   GraduationCap,
   Mail,
 } from "lucide-react"
-import { createClient } from "@/lib/supabase/client"
+import { fetchJson } from '@/lib/api/client'
 import { useRouter } from "next/navigation"
 import { getNavigationItems, getCurrentUserRole, type UserRole } from "@/lib/rbac"
 
@@ -131,8 +131,6 @@ export function DashboardSidebar({
   const [actualUserRole, setActualUserRole] = useState<UserRole>('practitioner')
   const pathname = usePathname()
   const router = useRouter()
-  const supabase = createClient()
-
   useEffect(() => {
     const fetchUserRole = async () => {
       const role = await getCurrentUserRole()
@@ -172,7 +170,9 @@ export function DashboardSidebar({
   const menuItems = getMenuItems()
 
   const handleLogout = async () => {
-    await supabase.auth.signOut()
+    try {
+      await fetch('/api/auth/signout', { method: 'POST' })
+    } catch {}
     router.push("/")
   }
 

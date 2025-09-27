@@ -130,7 +130,7 @@ export default function MasterPractitionerDashboardPage() {
     if (!error && modulesData) {
       // Get question count for each module
       const modulesWithCounts = await Promise.all(
-        modulesData.map(async (module) => {
+        modulesData.map(async (module: any) => {
           const { count } = await supabase
             .from("test_questions")
             .select("*", { count: 'exact', head: true })
@@ -166,14 +166,14 @@ export default function MasterPractitionerDashboardPage() {
 
     if (!error && profiles) {
       const totalStudents = profiles.length
-      const activeStudents = profiles.filter(p => p.membership_fee_paid).length
-      const completedTests = profiles.filter(p => p.test_completed).length
+      const activeStudents = profiles.filter((p: any) => p.membership_fee_paid).length
+      const completedTests = profiles.filter((p: any) => p.test_completed).length
       const scores = profiles
-        .filter(p => p.test_completed && p.test_score)
-        .map(p => p.test_score)
-      const avgScore = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0
+        .filter((p: any) => p.test_completed && p.test_score)
+        .map((p: any) => p.test_score as number)
+      const avgScore = scores.length > 0 ? scores.reduce((a: number, b: number) => a + b, 0) / scores.length : 0
       const passRate = completedTests > 0 ?
-        (profiles.filter(p => p.test_completed && p.test_score && p.test_score >= 70).length / completedTests) * 100 : 0
+        (profiles.filter((p: any) => p.test_completed && p.test_score && p.test_score >= 70).length / completedTests) * 100 : 0
 
       setStats({
         totalStudents,

@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Progress } from "@/components/ui/progress"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Clock, AlertCircle, Loader2 } from "lucide-react"
-import { createClient } from "@/lib/supabase/client"
+import { fetchJson, apiFetch } from '@/lib/api/client'
 import { useRouter } from "next/navigation"
 
 interface Question {
@@ -47,7 +47,7 @@ export default function TestPage() {
   const [ongoingTestId, setOngoingTestId] = useState<string | null>(null)
   const [showTimeWarning, setShowTimeWarning] = useState(false)
   const router = useRouter()
-  const supabase = createClient()
+  // REST API replaced supabase client usage
 
   const getRandomQuestions = (allQuestions: Question[], count = 30): Question[] => {
     const shuffled = [...allQuestions].sort(() => 0.5 - Math.random())
@@ -75,45 +75,26 @@ export default function TestPage() {
 
     try {
       if (ongoingTestId) {
-        const { error } = await supabase
-          .from('ongoing_tests')
-          .update(testData)
-          .eq('id', ongoingTestId)
-        if (error) console.error('Error updating ongoing test:', error)
+        await apiFetch('/api/tests/ongoing', { method: 'PATCH', body: JSON.stringify({ questionsData: testData.questions_data, answersData: testData.answers_data, currentQuestion: testData.current_question, timeLeft: testData.time_left, testStarted: testData.test_started }) })
       } else {
-        const { data, error } = await supabase
-          .from('ongoing_tests')
-          .insert(testData)
-          .select('id')
-          .single()
-        if (error) {
-          console.error('Error inserting ongoing test:', error)
-        } else {
-          setOngoingTestId(data.id)
+        const res = await apiFetch('/api/tests/ongoing', { method: 'POST', body: JSON.stringify({ questionsData: testData.questions_data, answersData: testData.answers_data, currentQuestion: testData.current_question, timeLeft: testData.time_left, testStarted: testData.test_started }) })
+        if (res.ok) {
+          const created = await res.json()
+          setOngoingTestId(created.id)
         }
       }
     } catch (error) {
       console.error('Error saving ongoing test:', error)
-      // Fallback to localStorage
       localStorage.setItem('ongoing-test-backup', JSON.stringify(testData))
     }
   }
 
   const loadOngoingTest = async () => {
     if (!user) return null
-
     try {
-      const { data, error } = await supabase
-        .from('ongoing_tests')
-        .select('*')
-        .eq('user_id', user.id)
-        .single()
-
-      if (error && error.code !== 'PGRST116') { // PGRST116 is "not found"
-        console.error('Error loading ongoing test:', error)
-        return null
-      }
-
+      const res = await apiFetch('/api/tests/ongoing')
+      if (!res.ok) return null
+      const data = await res.json()
       return data
     } catch (error) {
       console.error('Error loading ongoing test:', error)
@@ -123,13 +104,8 @@ export default function TestPage() {
 
   const deleteOngoingTest = async () => {
     if (!ongoingTestId) return
-
     try {
-      const { error } = await supabase
-        .from('ongoing_tests')
-        .delete()
-        .eq('id', ongoingTestId)
-      if (error) console.error('Error deleting ongoing test:', error)
+      await apiFetch('/api/tests/ongoing', { method: 'DELETE' })
     } catch (error) {
       console.error('Error deleting ongoing test:', error)
     }
@@ -175,126 +151,69 @@ export default function TestPage() {
       const paidUserId = localStorage.getItem("paid-user-id")
 
       if (paidUserId) {
-        const { data: profile, error: profileError } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("id", paidUserId)
-          .single()
+        try {
+          const profile = await fetchJson(`/api/profiles/${paidUserId}`)
+          if (profile && profile.membershipFeePaid && profile.paymentStatus === 'COMPLETED') {
+            setUser(profile as any)
+            if (profile.testCompleted) { router.push('/dashboard/results'); return }
 
-        if (profile && profile.membership_fee_paid && profile.payment_status === "completed") {
-          setUser(profile)
+            // Get questions
+            const questionsData = await fetchJson('/api/tests/questions')
+            const randomQuestions = getRandomQuestions(questionsData || [], 30)
+            setQuestions(randomQuestions)
 
-          if (profile.test_completed) {
-            router.push("/dashboard/results")
-            return
-          }
-
-          // Get all questions and select 50 random ones
-          const { data: questionsData, error: questionsError } = await supabase
-            .from("test_questions")
-            .select("*")
-            .eq("is_active", true)
-
-          if (questionsError) {
-            console.error("Error fetching questions:", questionsError)
-            return
-          }
-
-          const randomQuestions = getRandomQuestions(questionsData || [], 30)
-          setQuestions(randomQuestions)
-
-          // Load ongoing test if exists
-          const ongoingTest = await loadOngoingTest()
-          if (ongoingTest && ongoingTest.questions_data.length === randomQuestions.length) {
-            let adjustedTimeLeft = ongoingTest.time_left || 3600
-            if (ongoingTest.started_at) {
-              const elapsed = (Date.now() - new Date(ongoingTest.started_at).getTime()) / 1000
-              const consumed = 60 * 60 - adjustedTimeLeft // total time - remaining
-              if (consumed >= 20 * 60) {
-                adjustedTimeLeft = Math.max(0, adjustedTimeLeft - 20 * 60)
-              }
+            const ongoingTest = await loadOngoingTest()
+            if (ongoingTest && ongoingTest.questionsData && ongoingTest.questionsData.length === randomQuestions.length) {
+              let adjustedTimeLeft = ongoingTest.timeLeft || 3600
+              setAnswers(ongoingTest.answersData || {})
+              setCurrentQuestion(ongoingTest.currentQuestion || 0)
+              setTimeLeft(adjustedTimeLeft)
+              setTestStarted(ongoingTest.testStarted || false)
+              setOngoingTestId(ongoingTest.id)
             }
-            setAnswers(ongoingTest.answers_data || {})
-            setCurrentQuestion(ongoingTest.current_question || 0)
-            setTimeLeft(adjustedTimeLeft)
-            setTestStarted(ongoingTest.test_started || false)
-            setOngoingTestId(ongoingTest.id)
+            setIsLoading(false)
+            return
           }
-
-          setIsLoading(false)
-          return
+        } catch (err) {
+          // fallback to authenticated flow
         }
       }
 
       // Fallback to authenticated user flow
-      const {
-        data: { user: authUser },
-      } = await supabase.auth.getUser()
+      try {
+        const authRes = await fetch('/api/auth/user')
+        if (!authRes.ok) { router.push('/auth/login'); return }
+        const authData = await authRes.json()
+        const authUser = authData?.profile
+        if (!authUser) { router.push('/register'); return }
+        const profile = authUser
+        setUser(profile)
+        if (profile.testCompleted) { router.push('/dashboard/results'); return }
+        if (!profile.membershipFeePaid || profile.paymentStatus !== 'COMPLETED') { router.push('/payment'); return }
 
-      if (!authUser) {
-        router.push("/auth/login")
-        return
-      }
+        const questionsData = await fetchJson('/api/tests/questions')
+        const randomQuestions = getRandomQuestions(questionsData || [], 30)
+        setQuestions(randomQuestions)
 
-      const { data: profile, error: profileError } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", authUser.id)
-        .single()
-
-      if (profileError || !profile) {
-        router.push("/register")
-        return
-      }
-
-      setUser(profile)
-
-      if (profile.test_completed) {
-        router.push("/dashboard/results")
-        return
-      }
-
-      if (!profile.membership_fee_paid || profile.payment_status !== "completed") {
-        router.push("/payment")
-        return
-      }
-
-      const { data: questionsData, error: questionsError } = await supabase
-        .from("test_questions")
-        .select("*")
-        .eq("is_active", true)
-
-      if (questionsError) {
-        console.error("Error fetching questions:", questionsError)
-        return
-      }
-
-      const randomQuestions = getRandomQuestions(questionsData || [], 30)
-      setQuestions(randomQuestions)
-
-      // Load ongoing test if exists
-      const ongoingTest = await loadOngoingTest()
-      if (ongoingTest && ongoingTest.questions_data.length === randomQuestions.length) {
-        let adjustedTimeLeft = ongoingTest.time_left || 3600
-        if (ongoingTest.started_at) {
-          const elapsed = (Date.now() - new Date(ongoingTest.started_at).getTime()) / 1000
-          const consumed = 60 * 60 - adjustedTimeLeft // total time - remaining
-          if (consumed >= 20 * 60) {
-            adjustedTimeLeft = Math.max(0, adjustedTimeLeft - 20 * 60)
-          }
+        const ongoingTest = await loadOngoingTest()
+        if (ongoingTest && ongoingTest.questionsData && ongoingTest.questionsData.length === randomQuestions.length) {
+          let adjustedTimeLeft = ongoingTest.timeLeft || 3600
+          setAnswers(ongoingTest.answersData || {})
+          setCurrentQuestion(ongoingTest.currentQuestion || 0)
+          setTimeLeft(adjustedTimeLeft)
+          setTestStarted(ongoingTest.testStarted || false)
+          setOngoingTestId(ongoingTest.id)
         }
-        setAnswers(ongoingTest.answers_data || {})
-        setCurrentQuestion(ongoingTest.current_question || 0)
-        setTimeLeft(adjustedTimeLeft)
-        setTestStarted(ongoingTest.test_started || false)
-        setOngoingTestId(ongoingTest.id)
-      }
 
-      setIsLoading(false)
+        setIsLoading(false)
+      } catch (err) {
+        console.error('Error fetching auth/profile:', err)
+        router.push('/auth/login')
+      }
     }
 
     getUserAndQuestions()
-  }, [supabase, router])
+  }, [router])
 
   // Timer effect
   useEffect(() => {
@@ -378,31 +297,15 @@ export default function TestPage() {
       const score = Math.round((correctAnswers / questions.length) * 100)
       const passed = score >= 70 // 70% passing score
 
-      // Save test attempt
-      const { error: attemptError } = await supabase.from("test_attempts").insert({
-        user_id: user.id,
-        questions_data: questionsData,
-        answers_data: answersData,
-        score: score,
-        total_questions: questions.length,
-        passed: passed,
-      })
+      // Save test attempt via API
+      const attemptRes = await apiFetch('/api/tests/attempts', { method: 'POST', body: JSON.stringify({ answersData: answersData, questionsData: questionsData, score }) })
+      if (!attemptRes.ok) throw new Error('Failed to save attempt')
 
-      if (attemptError) throw attemptError
-
-      // Update profile
+      // Profile update is handled server-side by attempts route; but update certificate availability locally too
       const certificateAvailableAt = passed ? new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString() : null
-      const { error: profileError } = await supabase
-        .from("profiles")
-        .update({
-          test_completed: true,
-          test_score: score,
-          certificate_issued: false, // Will be issued after 48 hours
-          certificate_available_at: certificateAvailableAt,
-        })
-        .eq("id", user.id)
-
-      if (profileError) throw profileError
+      try {
+        await apiFetch(`/api/profiles/${user.id}`, { method: 'PATCH', body: JSON.stringify({ testCompleted: true, testScore: score, certificateAvailableAt }) })
+      } catch {}
 
       localStorage.setItem(
         "test-results",

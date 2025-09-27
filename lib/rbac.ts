@@ -1,5 +1,3 @@
-import { createClient } from "@/lib/supabase/client"
-
 export const roles = {
   admin: 'admin',
   user: 'user',
@@ -30,36 +28,31 @@ export interface Permission {
 
 /**
  * Get the current user's role
+ * This implementation calls the server REST API `/api/auth/user` which returns the profile with role.
+ * Falls back to 'practitioner' when unavailable.
  */
 export async function getCurrentUserRole(): Promise<UserRole> {
   // Check stored role first
-  const storedRole = localStorage.getItem('userRole')
-  if (storedRole) return JSON.parse(storedRole) as UserRole
+  try {
+    const storedRole = typeof localStorage !== 'undefined' ? localStorage.getItem('userRole') : null
+    if (storedRole) return JSON.parse(storedRole) as UserRole
+  } catch {}
 
   try {
-    const supabase = createClient()
+    const headers: any = {}
+    try {
+      const token = typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : null
+      if (token) headers['Authorization'] = `Bearer ${token}`
+    } catch {}
 
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return 'practitioner'
-
-    // Temporary: if email is admin@gmail.com, treat as admin
-    if (user.email === 'admin@gmail.com') return 'admin'
-
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role_id')
-      .eq('id', user.id)
-      .single()
-
-    if (!profile?.role_id) return 'practitioner'
-
-    const { data: role } = await supabase
-      .from('roles')
-      .select('name')
-      .eq('id', profile.role_id)
-      .single()
-
-    return (role?.name as UserRole) || 'practitioner'
+    const res = await fetch('/api/auth/user', { headers })
+    if (!res.ok) return 'practitioner'
+    const data = await res.json()
+    const roleName = data?.profile?.role?.name
+    if (!roleName) return 'practitioner'
+    if (roleName === 'admin') return 'admin'
+    if (roleName === 'master_practitioner') return 'master_practitioner'
+    return 'practitioner'
   } catch (error) {
     console.error('Error getting user role:', error)
     return 'practitioner'
@@ -104,18 +97,14 @@ export async function isPractitioner(): Promise<boolean> {
 }
 
 /**
- * Get all available roles
+ * Get all available roles from server
  */
 export async function getAllRoles(): Promise<RoleInfo[]> {
   try {
-    const supabase = createClient()
-
-    const { data: roles } = await supabase
-      .from('roles')
-      .select('*')
-      .order('name')
-
-    return roles || []
+    const res = await fetch('/api/roles')
+    if (!res.ok) return []
+    const data = await res.json()
+    return data || []
   } catch (error) {
     console.error('Error getting roles:', error)
     return []
@@ -127,20 +116,12 @@ export async function getAllRoles(): Promise<RoleInfo[]> {
  */
 export async function updateUserRole(userId: string, roleId: string): Promise<boolean> {
   try {
-    const supabase = createClient()
-
-    // Check if current user is admin
-    if (!(await isAdmin())) {
-      throw new Error('Unauthorized: Admin access required')
-    }
-
-    const { error } = await supabase
-      .from('profiles')
-      .update({ role_id: roleId })
-      .eq('id', userId)
-
-    if (error) throw error
-    return true
+    const res = await fetch(`/api/users/${userId}/role`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ roleId })
+    })
+    return res.ok
   } catch (error) {
     console.error('Error updating user role:', error)
     return false
@@ -162,7 +143,7 @@ export function getNavigationItems(userRole: UserRole) {
   ]
 
   const masterPractitionerItems = [
-    { href: '/admin/master-dashboard', label: 'Dashboard', icon: 'LayoutDashboard' },
+    { href: '/master-practitioner', label: 'Dashboard', icon: 'LayoutDashboard' },
     { href: '/admin/modules', label: 'Manage Modules', icon: 'BookOpen' },
     { href: '/admin/tests', label: 'Manage Tests', icon: 'FileText' },
     { href: '/admin/certificates', label: 'Certificates', icon: 'Award' },
@@ -170,9 +151,12 @@ export function getNavigationItems(userRole: UserRole) {
   ]
 
   const adminItems = [
-    { href: '/admin/messages', label: 'Messages', icon: 'Mail' },
+    { href: '/admin', label: 'Dashboard', icon: 'LayoutDashboard' },
+    { href: '/admin/profile', label: 'Profile', icon: 'User' },
     { href: '/admin/users', label: 'User Management', icon: 'Users' },
-    { href: '/admin/student-results', label: 'Student Results', icon: 'FileText' },
+    { href: '/admin/roles', label: 'Roles & Permissions', icon: 'Shield' },
+    { href: '/admin/modules', label: 'Manage Modules', icon: 'BookOpen' },
+    { href: '/admin/messages', label: 'Messages', icon: 'Mail' },
     { href: '/admin/reports', label: 'Reports', icon: 'BarChart3' },
     { href: '/admin/settings', label: 'Settings', icon: 'Settings' },
   ]
@@ -189,7 +173,9 @@ export function getNavigationItems(userRole: UserRole) {
   }
 
   if (userRole === 'admin') {
-    items = [...items, ...adminItems]
+    // Remove any dashboard links except the admin one
+    items = items.filter(item => item.href !== '/dashboard' && item.href !== '/master-practitioner' && item.href !== '/dashboard/profile')
+    items = [...adminItems]
   }
 
   return items
@@ -213,18 +199,23 @@ export function canAccessPage(userRole: UserRole, pathname: string): boolean {
       '/dashboard/profile',
       '/dashboard/results',
       '/dashboard/certificate',
-      '/dashboard/payment'
+      '/dashboard/payment',
+      '/modules'
     ],
     master_practitioner: [
-      '/admin/master-dashboard',
+      '/master-practitioner',
       '/admin/modules',
       '/admin/tests',
       '/admin/certificates',
       '/admin/student-results'
     ],
     admin: [
-      '/admin/messages',
+      '/admin',
+      '/admin/profile',
       '/admin/users',
+      '/admin/roles',
+      '/admin/modules',
+      '/admin/messages',
       '/admin/student-results',
       '/admin/reports',
       '/admin/settings'

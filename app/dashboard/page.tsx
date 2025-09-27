@@ -133,7 +133,7 @@ export default function DashboardPage() {
 
       if (!enrollmentsError && enrollments) {
         // Get module titles separately to avoid join issues
-        const moduleIds = enrollments.map(e => e.module_id)
+  const moduleIds = enrollments.map((e: any) => e.module_id)
         if (moduleIds.length > 0) {
           const { data: modules, error: modulesError } = await supabase
             .from("modules")
@@ -141,12 +141,12 @@ export default function DashboardPage() {
             .in("id", moduleIds)
 
           if (!modulesError && modules) {
-            const moduleMap = modules.reduce((acc, module) => {
+            const moduleMap = modules.reduce((acc: Record<string, string>, module: any) => {
               acc[module.id] = module.title
               return acc
             }, {} as Record<string, string>)
 
-            const formattedEnrollments = enrollments.map(enrollment => ({
+            const formattedEnrollments = enrollments.map((enrollment: any) => ({
               id: enrollment.id,
               module_id: enrollment.module_id,
               module_title: moduleMap[enrollment.module_id] || 'Unknown Module',

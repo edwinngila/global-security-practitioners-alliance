@@ -16,15 +16,15 @@ import { useRouter } from "next/navigation"
 
 interface ContactMessage {
   id: string
-  first_name: string
-  last_name: string
+  firstName: string
+  lastName: string
   email: string
   subject: string
   message: string
-  status: 'unread' | 'read' | 'responded'
-  admin_response?: string
-  responded_at?: string
-  created_at: string
+  status: 'UNREAD' | 'READ' | 'RESPONDED'
+  adminResponse?: string
+  respondedAt?: string
+  createdAt: string
 }
 
 export default function AdminMessagesPage() {
@@ -45,26 +45,27 @@ export default function AdminMessagesPage() {
 
   useEffect(() => {
     const checkAdminAndLoadMessages = async () => {
-      const {
-        data: { user: authUser },
-      } = await supabase.auth.getUser()
+      try {
+        const userRes = await fetch('/api/auth/user')
+        if (!userRes.ok) {
+          router.push('/auth/login')
+          return
+        }
+        const data = await userRes.json()
+        const roleName = data?.profile?.role?.name
+        if (roleName !== 'admin') {
+          router.push('/dashboard')
+          return
+        }
+        setIsAdmin(true)
+        setUserName(`${data?.profile?.first_name || ''} ${data?.profile?.last_name || ''}`.trim() || 'Admin')
+        setUserEmail(data?.email || '')
 
-      if (!authUser) {
-        router.push("/auth/login")
+        fetchMessages()
+      } catch (err) {
+        router.push('/auth/login')
         return
       }
-
-      // Check if admin
-      if (authUser.email !== 'admin@gmail.com') {
-        router.push("/dashboard")
-        return
-      }
-
-      setIsAdmin(true)
-      setUserName(`${authUser.user_metadata?.first_name || ''} ${authUser.user_metadata?.last_name || ''}`.trim() || 'Admin')
-      setUserEmail(authUser.email || '')
-
-      fetchMessages()
     }
 
     checkAdminAndLoadMessages()
@@ -72,12 +73,10 @@ export default function AdminMessagesPage() {
 
   const fetchMessages = async () => {
     try {
-      const { data, error } = await supabase
-        .from('contact_messages')
-        .select('*')
-        .order('created_at', { ascending: false })
+      const response = await fetch('/api/contact-messages')
+      if (!response.ok) throw new Error('Failed to fetch messages')
 
-      if (error) throw error
+      const data = await response.json()
       setMessages(data || [])
     } catch (error) {
       console.error('Error fetching messages:', error)
@@ -88,15 +87,16 @@ export default function AdminMessagesPage() {
 
   const markAsRead = async (messageId: string) => {
     try {
-      const { error } = await supabase
-        .from('contact_messages')
-        .update({ status: 'read' })
-        .eq('id', messageId)
+      const response = await fetch('/api/contact-messages', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: messageId, status: 'READ' })
+      })
 
-      if (error) throw error
+      if (!response.ok) throw new Error('Failed to update message status')
 
       setMessages(messages.map(msg =>
-        msg.id === messageId ? { ...msg, status: 'read' as const } : msg
+        msg.id === messageId ? { ...msg, status: 'READ' } : msg
       ))
     } catch (error) {
       console.error('Error updating message status:', error)
@@ -108,29 +108,42 @@ export default function AdminMessagesPage() {
 
     setIsSendingResponse(true)
     try {
-      // Send email response (placeholder - would integrate with email service)
-      console.log('Sending response to:', selectedMessage.email, 'Response:', responseText)
-
-      // For now, just update the database
-      const { error } = await supabase
-        .from('contact_messages')
-        .update({
-          status: 'responded',
-          admin_response: responseText,
-          responded_at: new Date().toISOString(),
-          responded_by: (await supabase.auth.getUser()).data.user?.id
+      // Update the database with response
+      const response = await fetch('/api/contact-messages', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: selectedMessage.id,
+          adminResponse: responseText
         })
-        .eq('id', selectedMessage.id)
+      })
 
-      if (error) throw error
+      if (!response.ok) throw new Error('Failed to send response')
+
+      // Send email response if Resend is configured
+      try {
+        await fetch('/api/contact-messages/send-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            to: selectedMessage.email,
+            subject: `Re: ${selectedMessage.subject}`,
+            message: responseText,
+            originalMessage: selectedMessage.message
+          })
+        })
+      } catch (emailError) {
+        console.error('Email sending error:', emailError)
+        // Don't fail if email fails
+      }
 
       setMessages(messages.map(msg =>
         msg.id === selectedMessage.id
           ? {
               ...msg,
-              status: 'responded' as const,
-              admin_response: responseText,
-              responded_at: new Date().toISOString()
+              status: 'RESPONDED',
+              adminResponse: responseText,
+              respondedAt: new Date().toISOString()
             }
           : msg
       ))
@@ -248,7 +261,7 @@ export default function AdminMessagesPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">
-                    {messages.filter(m => m.status === 'unread').length}
+                    {messages.filter(m => m.status === 'UNREAD').length}
                   </div>
                 </CardContent>
               </Card>
@@ -260,7 +273,7 @@ export default function AdminMessagesPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">
-                    {messages.filter(m => m.status === 'responded').length}
+                    {messages.filter(m => m.status === 'RESPONDED').length}
                   </div>
                 </CardContent>
               </Card>
@@ -272,7 +285,7 @@ export default function AdminMessagesPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">
-                    {messages.length > 0 ? Math.round((messages.filter(m => m.status === 'responded').length / messages.length) * 100) : 0}%
+                    {messages.length > 0 ? Math.round((messages.filter(m => m.status === 'RESPONDED').length / messages.length) * 100) : 0}%
                   </div>
                 </CardContent>
               </Card>
@@ -303,19 +316,19 @@ export default function AdminMessagesPage() {
                       {messages.map((message) => (
                         <TableRow key={message.id}>
                           <TableCell className="font-medium">
-                            {message.first_name} {message.last_name}
+                            {message.firstName} {message.lastName}
                           </TableCell>
                           <TableCell>{message.email}</TableCell>
                           <TableCell className="max-w-xs truncate" title={message.subject}>
                             {message.subject}
                           </TableCell>
                           <TableCell>
-                            <Badge className={getStatusColor(message.status)}>
-                              {message.status}
+                            <Badge className={getStatusColor(message.status.toLowerCase())}>
+                              {message.status.toLowerCase()}
                             </Badge>
                           </TableCell>
                           <TableCell>
-                            {new Date(message.created_at).toLocaleDateString()}
+                            {new Date(message.createdAt).toLocaleDateString()}
                           </TableCell>
                           <TableCell>
                             <div className="flex items-center gap-2">
@@ -326,7 +339,7 @@ export default function AdminMessagesPage() {
                                     size="sm"
                                     onClick={() => {
                                       setSelectedMessage(message)
-                                      if (message.status === 'unread') {
+                                      if (message.status === 'UNREAD') {
                                         markAsRead(message.id)
                                       }
                                     }}
@@ -335,37 +348,37 @@ export default function AdminMessagesPage() {
                                   </Button>
                                 </DialogTrigger>
                                 <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-                                  <DialogHeader>
-                                    <DialogTitle>{message.subject}</DialogTitle>
-                                    <DialogDescription>
-                                      From {message.first_name} {message.last_name} ({message.email})
-                                      <br />
-                                      Sent on {new Date(message.created_at).toLocaleString()}
-                                    </DialogDescription>
-                                  </DialogHeader>
-                                  <div className="space-y-4">
-                                    <div>
-                                      <Label className="font-semibold">Message:</Label>
-                                      <div className="mt-2 p-3 bg-muted rounded-lg whitespace-pre-wrap">
-                                        {message.message}
-                                      </div>
+                                <DialogHeader>
+                                  <DialogTitle>{message.subject}</DialogTitle>
+                                  <DialogDescription>
+                                    From {message.firstName} {message.lastName} ({message.email})
+                                    <br />
+                                    Sent on {new Date(message.createdAt).toLocaleString()}
+                                  </DialogDescription>
+                                </DialogHeader>
+                                <div className="space-y-4">
+                                  <div>
+                                    <Label className="font-semibold">Message:</Label>
+                                    <div className="mt-2 p-3 bg-muted rounded-lg whitespace-pre-wrap">
+                                      {message.message}
                                     </div>
-                                    {message.admin_response && (
-                                      <div>
-                                        <Label className="font-semibold">Your Response:</Label>
-                                        <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded-lg whitespace-pre-wrap">
-                                          {message.admin_response}
-                                        </div>
-                                        <p className="text-sm text-muted-foreground mt-1">
-                                          Responded on {message.responded_at ? new Date(message.responded_at).toLocaleString() : 'Unknown'}
-                                        </p>
-                                      </div>
-                                    )}
                                   </div>
-                                </DialogContent>
+                                  {message.adminResponse && (
+                                    <div>
+                                      <Label className="font-semibold">Your Response:</Label>
+                                      <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded-lg whitespace-pre-wrap">
+                                        {message.adminResponse}
+                                      </div>
+                                      <p className="text-sm text-muted-foreground mt-1">
+                                        Responded on {message.respondedAt ? new Date(message.respondedAt).toLocaleString() : 'Unknown'}
+                                      </p>
+                                    </div>
+                                  )}
+                                </div>
+                              </DialogContent>
                               </Dialog>
 
-                              {message.status !== 'responded' && (
+                              {message.status !== 'RESPONDED' && (
                                 <Dialog open={responseDialogOpen && selectedMessage?.id === message.id} onOpenChange={(open) => {
                                   setResponseDialogOpen(open)
                                   if (!open) {
@@ -391,7 +404,7 @@ export default function AdminMessagesPage() {
                                     <DialogHeader>
                                       <DialogTitle>Respond to Message</DialogTitle>
                                       <DialogDescription>
-                                        Send a response to {message.first_name} {message.last_name}
+                                        Send a response to {message.firstName} {message.lastName}
                                       </DialogDescription>
                                     </DialogHeader>
                                     <div className="space-y-4">

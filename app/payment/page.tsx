@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { CreditCard, CheckCircle, AlertCircle, Loader2 } from "lucide-react"
-import { createClient } from "@/lib/supabase/client"
+import { fetchJson, apiFetch } from '@/lib/api/client'
 import { useRouter } from "next/navigation"
 
 const PaystackButton = dynamic(() => import("react-paystack").then((mod) => mod.PaystackButton), { ssr: false })
@@ -36,7 +36,7 @@ export default function PaymentPage() {
    const [paymentSuccess, setPaymentSuccess] = useState(false)
    const [paymentType, setPaymentType] = useState<'membership' | 'test' | 'retake' | 'module'>('membership')
    const router = useRouter()
-   const supabase = createClient()
+  // use REST API client
 
    const PAYSTACK_PUBLIC_KEY = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || "pk_test_your_key_here"
    const MEMBERSHIP_FEE = 910000 // 9100 KES in cents
@@ -49,66 +49,55 @@ export default function PaymentPage() {
       const requestedType = urlParams.get('type') as 'membership' | 'test' | 'retake' | 'module' | null
       const moduleId = urlParams.get('moduleId')
 
-      const registrationUserId = localStorage.getItem("registration-user-id")
+      const registrationUserId = localStorage.getItem('registration-user-id')
 
       if (registrationUserId) {
-        const { data: profile, error } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("id", registrationUserId)
-          .single()
+        try {
+          const profile = await fetchJson(`/api/profiles/${registrationUserId}`)
+          if (profile) {
+            setUser(profile)
 
-        if (profile) {
-          setUser(profile)
+            if (profile.membership_fee_paid && profile.payment_status === 'COMPLETED' && !requestedType) {
+              router.push('/test')
+              return
+            }
 
-          if (profile.membership_fee_paid && profile.payment_status === "completed" && !requestedType) {
-            router.push("/test")
+            setPaymentType(requestedType || (profile.membership_fee_paid ? 'test' : 'membership'))
+            setIsLoading(false)
             return
           }
-
-          setPaymentType(requestedType || (profile.membership_fee_paid ? 'test' : 'membership'))
-          setIsLoading(false)
-          return
+        } catch (err) {
+          // continue to auth flow
         }
       }
 
-      const {
-        data: { user: authUser },
-      } = await supabase.auth.getUser()
-
-      if (!authUser) {
-        router.push("/auth/login")
+      const authRes = await fetch('/api/auth/user')
+      if (authRes.status === 401) {
+        router.push('/auth/login')
         return
       }
-
-      const { data: profile, error } = await supabase.from("profiles").select("*").eq("id", authUser.id).single()
-
-      if (error || !profile) {
-        router.push("/register")
+      const authData = await authRes.json()
+      const profile = authData.profile
+      if (!profile) {
+        router.push('/register')
         return
       }
-
       setUser(profile)
 
       // Handle module payment - fetch module details
       if (requestedType === 'module' && moduleId) {
-        const { data: moduleData, error: moduleError } = await supabase
-          .from('modules')
-          .select('id, title, price_kes, price_usd')
-          .eq('id', moduleId)
-          .single()
-
-        if (moduleError || !moduleData) {
+        try {
+          const moduleData = await fetchJson(`/api/modules/${moduleId}`)
+          setModule(moduleData)
+          setPaymentType('module')
+        } catch (err) {
           alert('Module not found')
           router.push('/modules')
           return
         }
-
-        setModule(moduleData)
-        setPaymentType('module')
       } else {
-        if (profile.membership_fee_paid && profile.payment_status === "completed" && !requestedType) {
-          router.push("/test")
+        if (profile.membership_fee_paid && profile.payment_status === 'COMPLETED' && !requestedType) {
+          router.push('/test')
         }
 
         setPaymentType(requestedType || (profile.membership_fee_paid ? 'test' : 'membership'))
@@ -118,13 +107,13 @@ export default function PaymentPage() {
     }
 
     getUserProfile()
-  }, [supabase, router])
+  }, [router])
 
   const handlePaymentSuccess = async (reference: any) => {
     if (!user) return
 
     try {
-      if (paymentType === 'module' && module) {
+  if (paymentType === 'module' && module) {
         // Handle module enrollment
         const urlParams = new URLSearchParams(window.location.search)
         const examDate = urlParams.get('examDate')
@@ -137,11 +126,8 @@ export default function PaymentPage() {
           exam_date: examDate || null
         }
 
-        const { error: enrollmentError } = await supabase
-          .from('module_enrollments')
-          .insert(enrollmentData)
-
-        if (enrollmentError) throw enrollmentError
+        const res = await apiFetch('/api/modules/' + module.id + '/enroll', { method: 'POST', body: JSON.stringify({ examDate: enrollmentData.exam_date }), headers: { 'Content-Type': 'application/json' } })
+        if (!res.ok) throw new Error('Enrollment failed')
 
         setPaymentSuccess(true)
 
@@ -165,12 +151,8 @@ export default function PaymentPage() {
           updateData.payment_reference = reference.reference
         }
 
-        const { error } = await supabase
-          .from("profiles")
-          .update(updateData)
-          .eq("id", user.id)
-
-        if (error) throw error
+        const res = await apiFetch(`/api/profiles/${user.id}`, { method: 'PATCH', body: JSON.stringify(updateData), headers: { 'Content-Type': 'application/json' } })
+        if (!res.ok) throw new Error('Failed to update profile after payment')
 
         setPaymentSuccess(true)
 

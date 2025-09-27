@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Award, Users, BookOpen, Shield, X } from "lucide-react"
-import { createClient } from "@/lib/supabase/client"
+import { fetchJson } from '@/lib/api/client'
 
 export function UserAdvertisement() {
   const [isVisible, setIsVisible] = useState(false)
@@ -14,8 +14,6 @@ export function UserAdvertisement() {
     hasCompletedTest: boolean
     hasPaid: boolean
   }>({ isAuthenticated: false, hasCompletedTest: false, hasPaid: false })
-  const supabase = createClient()
-
   useEffect(() => {
     const checkUserStatus = async () => {
       const hasSeenAd = localStorage.getItem("user-ad-seen")
@@ -27,53 +25,42 @@ export function UserAdvertisement() {
       }
 
       try {
-        // Check if user is authenticated
-        const { data: { user } } = await supabase.auth.getUser()
-
-        if (user) {
-          // Get user profile
-          const { data: profile } = await supabase
-            .from("profiles")
-            .select("payment_status, test_completed")
-            .eq("id", user.id)
-            .single()
-
-          if (profile) {
-            const status = {
-              isAuthenticated: true,
-              hasCompletedTest: profile.test_completed || false,
-              hasPaid: profile.payment_status === "completed"
-            }
-            setUserStatus(status)
-
-            // Don't show popup if user has completed payment
-            if (status.hasPaid) {
-              setShouldShow(false)
-              return
-            }
-
-            // Show popup for authenticated users who haven't paid
-            setShouldShow(true)
-          } else {
-            // Show popup for users without profile
-            setUserStatus({ isAuthenticated: true, hasCompletedTest: false, hasPaid: false })
-            setShouldShow(true)
-          }
-        } else {
-          // Show popup for non-authenticated users
+        const res = await fetch('/api/auth/user')
+        if (res.status === 401) {
           setUserStatus({ isAuthenticated: false, hasCompletedTest: false, hasPaid: false })
+          setShouldShow(true)
+          return
+        }
+        const data = await res.json()
+        const profile = data.profile
+
+        if (profile) {
+          const status = {
+            isAuthenticated: true,
+            hasCompletedTest: profile.test_completed || false,
+            hasPaid: profile.payment_status === 'COMPLETED' || profile.payment_status === 'completed'
+          }
+          setUserStatus(status)
+
+          if (status.hasPaid) {
+            setShouldShow(false)
+            return
+          }
+
+          setShouldShow(true)
+        } else {
+          setUserStatus({ isAuthenticated: true, hasCompletedTest: false, hasPaid: false })
           setShouldShow(true)
         }
       } catch (error) {
         console.error("Error checking user status:", error)
-        // Show popup on error to be safe
         setUserStatus({ isAuthenticated: false, hasCompletedTest: false, hasPaid: false })
         setShouldShow(true)
       }
     }
 
     checkUserStatus()
-  }, [supabase])
+  }, [])
 
   useEffect(() => {
     if (shouldShow) {

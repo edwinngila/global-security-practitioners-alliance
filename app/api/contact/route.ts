@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { prisma } from '@/lib/prisma/client'
 import { Resend } from 'resend'
 
 export async function POST(request: NextRequest) {
@@ -31,74 +31,47 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-    const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
     const resendApiKey = process.env.RESEND_API_KEY
 
-    if (!supabaseUrl || !supabaseServiceRoleKey) {
-      throw new Error("Missing Supabase configuration")
-    }
-
-    if (!resendApiKey) {
-      throw new Error("Missing Resend API key")
-    }
-
-    // Use service role client to bypass RLS for inserting contact messages
-    const supabase = createClient(supabaseUrl, supabaseServiceRoleKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false
+    // Insert contact message using Prisma
+    const contactMessage = await prisma.contactMessage.create({
+      data: {
+        firstName,
+        lastName,
+        email,
+        subject,
+        message,
+        status: 'UNREAD'
       }
     })
 
-    // Insert contact message
-    const { data, error } = await supabase
-      .from('contact_messages')
-      .insert({
-        first_name: firstName,
-        last_name: lastName,
-        email: email,
-        subject: subject,
-        message: message,
-        status: 'unread'
-      })
-      .select()
-      .single()
-
-    if (error) {
-      console.error('Database error:', error)
-      return NextResponse.json(
-        { error: 'Failed to save message' },
-        { status: 500 }
-      )
-    }
-
-    // Send email notification
-    const resend = new Resend(resendApiKey)
-
-    try {
-      await resend.emails.send({
-        from: 'noreply@gspa.org',
-        to: 'info@gspa.org',
-        subject: `New Contact Form Submission: ${subject}`,
-        html: `
-          <h2>New Contact Message</h2>
-          <p><strong>Name:</strong> ${firstName} ${lastName}</p>
-          <p><strong>Email:</strong> ${email}</p>
-          <p><strong>Subject:</strong> ${subject}</p>
-          <p><strong>Message:</strong></p>
-          <p>${message.replace(/\n/g, '<br>')}</p>
-        `,
-      })
-    } catch (emailError) {
-      console.error('Email sending error:', emailError)
-      // Don't fail the request if email fails, but log it
+    // Send email notification if Resend is configured
+    if (resendApiKey) {
+      try {
+        const resend = new Resend(resendApiKey)
+        await resend.emails.send({
+          from: 'noreply@gspa.org',
+          to: 'info@gspa.org',
+          subject: `New Contact Form Submission: ${subject}`,
+          html: `
+            <h2>New Contact Message</h2>
+            <p><strong>Name:</strong> ${firstName} ${lastName}</p>
+            <p><strong>Email:</strong> ${email}</p>
+            <p><strong>Subject:</strong> ${subject}</p>
+            <p><strong>Message:</strong></p>
+            <p>${message.replace(/\n/g, '<br>')}</p>
+          `,
+        })
+      } catch (emailError) {
+        console.error('Email sending error:', emailError)
+        // Don't fail the request if email fails, but log it
+      }
     }
 
     return NextResponse.json({
       success: true,
       message: 'Message sent successfully',
-      data: data
+      data: contactMessage
     })
 
   } catch (error) {

@@ -93,31 +93,28 @@ export default function AdminCertificatesPage() {
 
   useEffect(() => {
     const checkAdminAndLoadData = async () => {
-      const {
-        data: { user: authUser },
-      } = await supabase.auth.getUser()
+      try {
+        const userRes = await fetch('/api/auth/user')
+        if (!userRes.ok) {
+          router.push('/auth/login')
+          return
+        }
+        const data = await userRes.json()
+        const roleName = data?.profile?.role?.name
+        if (roleName !== 'admin') {
+          router.push('/dashboard')
+          return
+        }
+        setIsAdmin(true)
+        setUserName(`${data?.profile?.first_name || ''} ${data?.profile?.last_name || ''}`.trim() || 'Admin')
+        setUserEmail(data?.email || '')
 
-      if (!authUser) {
-        router.push("/auth/login")
-        return
-      }
-
-      // Check if admin
-      if (authUser.email !== 'admin@gmail.com') {
-        router.push("/dashboard")
-        return
-      }
-
-      setIsAdmin(true)
-      setUserName(`${authUser.user_metadata?.first_name || ''} ${authUser.user_metadata?.last_name || ''}`.trim() || 'Admin')
-      setUserEmail(authUser.email || '')
-
-      // Load users with certificates
-      const { data: users, error: usersError } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("certificate_issued", true)
-        .order("created_at", { ascending: false })
+        // Load users with certificates
+        const { data: users, error: usersError } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("certificate_issued", true)
+          .order("created_at", { ascending: false })
 
       if (!usersError && users) {
         setCertifiedUsers(users)
@@ -132,8 +129,8 @@ export default function AdminCertificatesPage() {
       if (!templatesError && templates) {
         setCertificateTemplates(templates)
 
-        // Load the active template into the form
-        const activeTemplate = templates.find(t => t.is_active) || templates[0]
+  // Load the active template into the form
+  const activeTemplate = templates.find((t: CertificateTemplate) => t.is_active) || templates[0]
         if (activeTemplate) {
           setTemplateForm({
             template_name: activeTemplate.template_name,
@@ -160,6 +157,11 @@ export default function AdminCertificatesPage() {
       }
 
       setIsLoading(false)
+      } catch (error) {
+        console.error('Error checking admin:', error)
+        router.push('/auth/login')
+        return
+      }
     }
 
     checkAdminAndLoadData()

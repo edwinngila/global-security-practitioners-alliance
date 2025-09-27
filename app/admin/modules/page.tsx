@@ -19,16 +19,16 @@ interface Module {
   id: string
   title: string
   description: string
-  short_description: string
+  shortDescription?: string
   category: string
-  difficulty: string
-  duration_hours: number
-  price_kes: number
-  price_usd: number
-  is_active: boolean
-  max_students: number
-  instructor_name: string
-  created_at: string
+  difficultyLevel: string
+  estimatedDuration?: number
+  price: number
+  currency: string
+  isActive: boolean
+  instructorName?: string
+  maxStudents?: number
+  createdAt: string
 }
 
 export default function AdminModulesPage() {
@@ -43,15 +43,15 @@ export default function AdminModulesPage() {
   const [formData, setFormData] = useState({
     title: '',
     description: '',
-    short_description: '',
+    shortDescription: '',
     category: '',
-    difficulty: 'beginner',
-    duration_hours: 0,
-    price_kes: 0,
-    price_usd: 0,
-    max_students: 0,
-    instructor_name: '',
-    instructor_bio: '',
+    difficultyLevel: 'BEGINNER',
+    estimatedDuration: 0,
+    price: 0,
+    currency: 'USD',
+    maxStudents: 0,
+    instructorName: '',
+    instructorBio: '',
     prerequisites: '',
     syllabus: ''
   })
@@ -61,26 +61,27 @@ export default function AdminModulesPage() {
 
   useEffect(() => {
     const checkAdminAndLoadData = async () => {
-      const {
-        data: { user: authUser },
-      } = await supabase.auth.getUser()
+      try {
+        const userRes = await fetch('/api/auth/user')
+        if (!userRes.ok) {
+          router.push('/auth/login')
+          return
+        }
+        const data = await userRes.json()
+        const roleName = data?.profile?.role?.name
+        if (roleName !== 'admin') {
+          router.push('/dashboard')
+          return
+        }
+        setIsAdmin(true)
+        setUserName(`${data?.profile?.first_name || ''} ${data?.profile?.last_name || ''}`.trim() || 'Admin')
+        setUserEmail(data?.email || '')
 
-      if (!authUser) {
-        router.push("/auth/login")
+        fetchModules()
+      } catch (err) {
+        router.push('/auth/login')
         return
       }
-
-      // Check if admin
-      if (authUser.email !== 'admin@gmail.com') {
-        router.push("/dashboard")
-        return
-      }
-
-      setIsAdmin(true)
-      setUserName(`${authUser.user_metadata?.first_name || ''} ${authUser.user_metadata?.last_name || ''}`.trim() || 'Admin')
-      setUserEmail(authUser.email || '')
-
-      fetchModules()
     }
 
     checkAdminAndLoadData()
@@ -88,12 +89,10 @@ export default function AdminModulesPage() {
 
   const fetchModules = async () => {
     try {
-      const { data, error } = await supabase
-        .from('modules')
-        .select('*')
-        .order('created_at', { ascending: false })
+      const response = await fetch('/api/modules')
+      if (!response.ok) throw new Error('Failed to fetch modules')
 
-      if (error) throw error
+      const data = await response.json()
       setModules(data || [])
     } catch (error) {
       console.error('Error fetching modules:', error)
@@ -108,32 +107,45 @@ export default function AdminModulesPage() {
     try {
       const moduleData = {
         ...formData,
-        learning_objectives: [], // Will be added later
-        is_active: true
+        learningObjectives: [], // Will be added later
+        isActive: true
       }
 
       if (editingModule) {
-        const { error } = await supabase
-          .from('modules')
-          .update(moduleData)
-          .eq('id', editingModule.id)
+        const response = await fetch('/api/modules', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ id: editingModule.id, ...moduleData })
+        })
 
-        if (error) throw error
+        if (!response.ok) {
+          const errorData = await response.json()
+          throw new Error(errorData.error || 'Failed to update module')
+        }
       } else {
-        const { error } = await supabase
-          .from('modules')
-          .insert(moduleData)
+        const response = await fetch('/api/modules', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(moduleData)
+        })
 
-        if (error) throw error
+        if (!response.ok) {
+          const errorData = await response.json()
+          throw new Error(errorData.error || 'Failed to create module')
+        }
       }
 
       setIsDialogOpen(false)
       setEditingModule(null)
       resetForm()
       fetchModules()
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving module:', error)
-      alert('Error saving module. Please try again.')
+      alert(error.message || 'Error saving module. Please try again.')
     }
   }
 
@@ -142,15 +154,15 @@ export default function AdminModulesPage() {
     setFormData({
       title: module.title,
       description: module.description,
-      short_description: module.short_description || '',
+      shortDescription: module.shortDescription || '',
       category: module.category,
-      difficulty: module.difficulty,
-      duration_hours: module.duration_hours,
-      price_kes: module.price_kes,
-      price_usd: module.price_usd,
-      max_students: module.max_students || 0,
-      instructor_name: module.instructor_name,
-      instructor_bio: '',
+      difficultyLevel: module.difficultyLevel,
+      estimatedDuration: module.estimatedDuration || 0,
+      price: module.price,
+      currency: module.currency,
+      maxStudents: module.maxStudents || 0,
+      instructorName: module.instructorName || '',
+      instructorBio: '',
       prerequisites: '',
       syllabus: ''
     })
@@ -161,30 +173,41 @@ export default function AdminModulesPage() {
     if (!confirm('Are you sure you want to delete this module?')) return
 
     try {
-      const { error } = await supabase
-        .from('modules')
-        .delete()
-        .eq('id', moduleId)
+      const response = await fetch(`/api/modules?id=${moduleId}`, {
+        method: 'DELETE'
+      })
 
-      if (error) throw error
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to delete module')
+      }
+
       fetchModules()
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error deleting module:', error)
-      alert('Error deleting module. Please try again.')
+      alert(error.message || 'Error deleting module. Please try again.')
     }
   }
 
   const toggleActive = async (moduleId: string, isActive: boolean) => {
     try {
-      const { error } = await supabase
-        .from('modules')
-        .update({ is_active: !isActive })
-        .eq('id', moduleId)
+      const response = await fetch('/api/modules', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ id: moduleId, isActive: !isActive })
+      })
 
-      if (error) throw error
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to update module status')
+      }
+
       fetchModules()
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error updating module status:', error)
+      alert(error.message || 'Error updating module status. Please try again.')
     }
   }
 
@@ -192,22 +215,22 @@ export default function AdminModulesPage() {
     setFormData({
       title: '',
       description: '',
-      short_description: '',
+      shortDescription: '',
       category: '',
-      difficulty: 'beginner',
-      duration_hours: 0,
-      price_kes: 0,
-      price_usd: 0,
-      max_students: 0,
-      instructor_name: '',
-      instructor_bio: '',
+      difficultyLevel: 'BEGINNER',
+      estimatedDuration: 0,
+      price: 0,
+      currency: 'USD',
+      maxStudents: 0,
+      instructorName: '',
+      instructorBio: '',
       prerequisites: '',
       syllabus: ''
     })
   }
 
   const getDifficultyColor = (difficulty: string) => {
-    switch (difficulty) {
+    switch (difficulty.toLowerCase()) {
       case 'beginner': return 'bg-green-100 text-green-800'
       case 'intermediate': return 'bg-yellow-100 text-yellow-800'
       case 'advanced': return 'bg-red-100 text-red-800'
@@ -308,11 +331,11 @@ export default function AdminModulesPage() {
                   />
                 </div>
                 <div className="col-span-2">
-                  <Label htmlFor="short_description">Short Description</Label>
+                  <Label htmlFor="shortDescription">Short Description</Label>
                   <Input
-                    id="short_description"
-                    value={formData.short_description}
-                    onChange={(e) => setFormData({ ...formData, short_description: e.target.value })}
+                    id="shortDescription"
+                    value={formData.shortDescription}
+                    onChange={(e) => setFormData({ ...formData, shortDescription: e.target.value })}
                   />
                 </div>
                 <div className="col-span-2">
@@ -335,64 +358,67 @@ export default function AdminModulesPage() {
                   />
                 </div>
                 <div>
-                  <Label htmlFor="difficulty">Difficulty</Label>
-                  <Select value={formData.difficulty} onValueChange={(value) => setFormData({ ...formData, difficulty: value })}>
+                  <Label htmlFor="difficultyLevel">Difficulty</Label>
+                  <Select value={formData.difficultyLevel} onValueChange={(value) => setFormData({ ...formData, difficultyLevel: value })}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="beginner">Beginner</SelectItem>
-                      <SelectItem value="intermediate">Intermediate</SelectItem>
-                      <SelectItem value="advanced">Advanced</SelectItem>
+                      <SelectItem value="BEGINNER">Beginner</SelectItem>
+                      <SelectItem value="INTERMEDIATE">Intermediate</SelectItem>
+                      <SelectItem value="ADVANCED">Advanced</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div>
-                  <Label htmlFor="duration_hours">Duration (Hours)</Label>
+                  <Label htmlFor="estimatedDuration">Duration (Hours)</Label>
                   <Input
-                    id="duration_hours"
+                    id="estimatedDuration"
                     type="number"
-                    value={formData.duration_hours}
-                    onChange={(e) => setFormData({ ...formData, duration_hours: parseInt(e.target.value) })}
+                    value={formData.estimatedDuration}
+                    onChange={(e) => setFormData({ ...formData, estimatedDuration: parseInt(e.target.value) })}
                     required
                   />
                 </div>
                 <div>
-                  <Label htmlFor="max_students">Max Students</Label>
+                  <Label htmlFor="maxStudents">Max Students</Label>
                   <Input
-                    id="max_students"
+                    id="maxStudents"
                     type="number"
-                    value={formData.max_students}
-                    onChange={(e) => setFormData({ ...formData, max_students: parseInt(e.target.value) })}
+                    value={formData.maxStudents}
+                    onChange={(e) => setFormData({ ...formData, maxStudents: parseInt(e.target.value) })}
                   />
                 </div>
                 <div>
-                  <Label htmlFor="price_kes">Price (KES)</Label>
+                  <Label htmlFor="price">Price</Label>
                   <Input
-                    id="price_kes"
-                    type="number"
-                    value={formData.price_kes}
-                    onChange={(e) => setFormData({ ...formData, price_kes: parseInt(e.target.value) })}
-                    required
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="price_usd">Price (USD)</Label>
-                  <Input
-                    id="price_usd"
+                    id="price"
                     type="number"
                     step="0.01"
-                    value={formData.price_usd}
-                    onChange={(e) => setFormData({ ...formData, price_usd: parseFloat(e.target.value) })}
+                    value={formData.price}
+                    onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) })}
                     required
                   />
                 </div>
+                <div>
+                  <Label htmlFor="currency">Currency</Label>
+                  <Select value={formData.currency} onValueChange={(value) => setFormData({ ...formData, currency: value })}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="USD">USD</SelectItem>
+                      <SelectItem value="KES">KES</SelectItem>
+                      <SelectItem value="EUR">EUR</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
                 <div className="col-span-2">
-                  <Label htmlFor="instructor_name">Instructor Name</Label>
+                  <Label htmlFor="instructorName">Instructor Name</Label>
                   <Input
-                    id="instructor_name"
-                    value={formData.instructor_name}
-                    onChange={(e) => setFormData({ ...formData, instructor_name: e.target.value })}
+                    id="instructorName"
+                    value={formData.instructorName}
+                    onChange={(e) => setFormData({ ...formData, instructorName: e.target.value })}
                     required
                   />
                 </div>
@@ -434,15 +460,15 @@ export default function AdminModulesPage() {
                   <TableCell className="font-medium">{module.title}</TableCell>
                   <TableCell>{module.category}</TableCell>
                   <TableCell>
-                    <Badge className={getDifficultyColor(module.difficulty)}>
-                      {module.difficulty}
+                    <Badge className={getDifficultyColor(module.difficultyLevel.toLowerCase())}>
+                      {module.difficultyLevel}
                     </Badge>
                   </TableCell>
-                  <TableCell>{module.duration_hours}h</TableCell>
-                  <TableCell>KES {module.price_kes.toLocaleString()}</TableCell>
+                  <TableCell>{module.estimatedDuration}h</TableCell>
+                  <TableCell>{module.currency} {module.price.toLocaleString()}</TableCell>
                   <TableCell>
-                    <Badge variant={module.is_active ? "default" : "secondary"}>
-                      {module.is_active ? "Active" : "Inactive"}
+                    <Badge variant={module.isActive ? "default" : "secondary"}>
+                      {module.isActive ? "Active" : "Inactive"}
                     </Badge>
                   </TableCell>
                   <TableCell>
@@ -457,7 +483,7 @@ export default function AdminModulesPage() {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => toggleActive(module.id, module.is_active)}
+                        onClick={() => toggleActive(module.id, module.isActive)}
                       >
                         <Eye className="h-4 w-4" />
                       </Button>

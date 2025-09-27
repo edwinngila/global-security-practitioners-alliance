@@ -45,30 +45,27 @@ export default function AdminReportsPage() {
 
   useEffect(() => {
     const checkAdminAndLoadData = async () => {
-      const {
-        data: { user: authUser },
-      } = await supabase.auth.getUser()
+      try {
+        const userRes = await fetch('/api/auth/user')
+        if (!userRes.ok) {
+          router.push('/auth/login')
+          return
+        }
+        const data = await userRes.json()
+        const roleName = data?.profile?.role?.name
+        if (roleName !== 'admin') {
+          router.push('/dashboard')
+          return
+        }
+        setIsAdmin(true)
+        setUserName(`${data?.profile?.first_name || ''} ${data?.profile?.last_name || ''}`.trim() || 'Admin')
+        setUserEmail(data?.email || '')
 
-      if (!authUser) {
-        router.push("/auth/login")
-        return
-      }
-
-      // Check if admin
-      if (authUser.email !== 'admin@gmail.com') {
-        router.push("/dashboard")
-        return
-      }
-
-      setIsAdmin(true)
-      setUserName(`${authUser.user_metadata?.first_name || ''} ${authUser.user_metadata?.last_name || ''}`.trim() || 'Admin')
-      setUserEmail(authUser.email || '')
-
-      // Load all users
-      const { data: profiles, error } = await supabase
-        .from("profiles")
-        .select("*")
-        .order("created_at", { ascending: false })
+        // Load all users
+        const { data: profiles, error } = await supabase
+          .from("profiles")
+          .select("*")
+          .order("created_at", { ascending: false })
 
       if (!error && profiles) {
         setUsers(profiles)
@@ -78,6 +75,11 @@ export default function AdminReportsPage() {
       }
 
       setIsLoading(false)
+      } catch (error) {
+        console.error('Error checking admin:', error)
+        router.push('/auth/login')
+        return
+      }
     }
 
     checkAdminAndLoadData()

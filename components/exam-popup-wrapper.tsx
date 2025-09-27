@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { usePathname } from "next/navigation"
 import ExamPopup from "./exam-popup"
-import { createClient } from "@/lib/supabase/client"
+import { fetchJson } from '@/lib/api/client'
 
 interface ExamPopupWrapperProps {
   children: React.ReactNode
@@ -15,36 +15,30 @@ export default function ExamPopupWrapper({ children }: ExamPopupWrapperProps) {
   const [user, setUser] = useState<any>(null)
   const [userProfile, setUserProfile] = useState<any>(null)
   const pathname = usePathname()
-  const supabase = createClient()
-
   useEffect(() => {
     const checkUserAndShowPopup = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      setUser(user)
-
-      if (user) {
-        // Check if user has paid and hasn't taken the test
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("membership_fee_paid, test_completed")
-          .eq("id", user.id)
-          .single()
-
+      try {
+        const res = await fetch('/api/auth/user')
+        if (res.status === 401) {
+          if (pathname === "/" && !localStorage.getItem("exam-popup-seen")) {
+            setTimeout(() => setShowPopup(true), 3000)
+          }
+          return
+        }
+        const data = await res.json()
+        const profile = data.profile
+        setUser(data)
         if (profile && profile.membership_fee_paid && !profile.test_completed) {
-          // User has paid but hasn't taken the test - show popup
           setIsRegisteredUser(true)
           setShowPopup(true)
         }
-      } else if (pathname === "/" && !localStorage.getItem("exam-popup-seen")) {
-        // First-time visitor on homepage - show popup after a short delay
-        setTimeout(() => {
-          setShowPopup(true)
-        }, 3000) // Show after 3 seconds
+      } catch (err) {
+        console.error('Error checking user for exam popup', err)
       }
     }
 
     checkUserAndShowPopup()
-  }, [pathname, supabase])
+  }, [pathname])
 
   const handleClosePopup = () => {
     setShowPopup(false)

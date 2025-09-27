@@ -24,8 +24,10 @@ import {
   GraduationCap,
   Target
 } from "lucide-react"
-import { createClient } from "@/lib/supabase/client"
-import { useRouter } from "next/navigation"
+import { prisma } from '@/lib/prisma/client'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/app/api/auth/[...nextauth]/route'
+import { redirect, useRouter } from 'next/navigation'
 import Link from "next/link"
 
 interface Module {
@@ -70,120 +72,94 @@ export default function MasterPractitionerDashboardPage() {
   const [userEmail, setUserEmail] = useState("")
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const router = useRouter()
-  const supabase = createClient()
-
   useEffect(() => {
-    const checkMasterPractitionerAndLoadData = async () => {
-      const {
-        data: { user: authUser },
-      } = await supabase.auth.getUser()
-
-      if (!authUser) {
-        router.push("/auth/login")
+    (async () => {
+      const session = await getServerSession(authOptions)
+      if (!session?.user) {
+        redirect('/auth/login')
         return
       }
-
-      // Check if master practitioner
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role_id')
-        .eq('id', authUser.id)
-        .single()
-
-      if (!profile?.role_id) {
-        router.push("/dashboard")
+      // Check role
+      if (session.user.role !== 'master_practitioner') {
+        redirect('/dashboard')
         return
       }
-
-      const { data: role } = await supabase
-        .from('roles')
-        .select('name')
-        .eq('id', profile.role_id)
-        .single()
-
-      if (role?.name !== 'master_practitioner') {
-        router.push("/dashboard")
-        return
-      }
-
       setIsMasterPractitioner(true)
-      setUserName(`${authUser.user_metadata?.first_name || ''} ${authUser.user_metadata?.last_name || ''}`.trim() || 'Master Practitioner')
-      setUserEmail(authUser.email || '')
-
-      // Load data
+      setUserName(session.user.name || 'Master Practitioner')
+      setUserEmail(session.user.email || '')
       await Promise.all([
-        loadModules(),
-        loadExamConfigurations(),
-        loadStats()
+        loadModules(session.user.id),
+        loadExamConfigurations(session.user.id),
+        loadStats(session.user.id)
       ])
-    }
+    })()
+  }, [])
 
-    checkMasterPractitionerAndLoadData()
-  }, [supabase, router])
-
-  const loadModules = async () => {
-    const { data: modulesData, error } = await supabase
-      .from("modules")
-      .select("*")
-      .order("created_at", { ascending: false })
-
-    if (!error && modulesData) {
-      // Get question count for each module
-      const modulesWithCounts = await Promise.all(
-        modulesData.map(async (module) => {
-          const { count } = await supabase
-            .from("test_questions")
-            .select("*", { count: 'exact', head: true })
-            .eq("module_id", module.id)
-
-          return {
-            ...module,
-            question_count: count || 0
-          }
-        })
-      )
-      setModules(modulesWithCounts)
-    }
+  const loadModules = async (userId: string) => {
+    // Only modules created by this master practitioner
+    const modulesData = await prisma.module.findMany({
+      where: { createdById: userId },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        questions: true
+      }
+    })
+    const modulesWithCounts = modulesData.map(module => ({
+      id: module.id,
+      title: module.title,
+      description: module.description,
+      created_at: module.createdAt.toISOString(),
+      question_count: module.questions.length
+    }))
+    setModules(modulesWithCounts)
   }
 
-  const loadExamConfigurations = async () => {
-    const { data: examData, error } = await supabase
-      .from("exam_configurations")
-      .select("*")
-      .order("created_at", { ascending: false })
-      .limit(10)
-
-    if (!error && examData) {
-      setExamConfigurations(examData)
-    }
+  const loadExamConfigurations = async (userId: string) => {
+    const examData = await prisma.examConfiguration.findMany({
+      where: { createdById: userId },
+      orderBy: { createdAt: 'desc' },
+      take: 10
+    })
+    const mappedExamData: ExamConfiguration[] = examData.map(exam => ({
+      id: exam.id,
+      name: exam.name,
+      description: exam.description ?? "",
+      total_questions: exam.totalQuestions,
+      passing_score: exam.passingScore,
+      is_active: exam.isActive,
+      created_at: exam.createdAt.toISOString()
+    }))
+    setExamConfigurations(mappedExamData)
   }
 
-  const loadStats = async () => {
-    // Load student statistics
-    const { data: profiles, error } = await supabase
-      .from("profiles")
-      .select("*")
-
-    if (!error && profiles) {
-      const totalStudents = profiles.length
-      const activeStudents = profiles.filter(p => p.membership_fee_paid).length
-      const completedTests = profiles.filter(p => p.test_completed).length
-      const scores = profiles
-        .filter(p => p.test_completed && p.test_score)
-        .map(p => p.test_score)
-      const avgScore = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0
-      const passRate = completedTests > 0 ?
-        (profiles.filter(p => p.test_completed && p.test_score && p.test_score >= 70).length / completedTests) * 100 : 0
-
-      setStats({
-        totalStudents,
-        activeStudents,
-        completedTests,
-        avgScore,
-        passRate
-      })
-    }
-
+  const loadStats = async (userId: string) => {
+    // Only students enrolled in this master's modules
+    const enrollments = await prisma.moduleEnrollment.findMany({
+      where: {
+        module: { createdById: userId }
+      },
+      include: {
+        user: {
+          include: { profile: true }
+        }
+      }
+    })
+    const totalStudents = enrollments.length
+    const activeStudents = enrollments.filter(e => e.user.profile?.membershipFeePaid).length
+    const completedTests = enrollments.filter(e => e.user.profile?.testCompleted).length
+    const scores = enrollments
+      .filter(e => e.user.profile?.testCompleted && e.user.profile?.testScore)
+      .map(e => e.user.profile!.testScore as number)
+    const avgScore = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0
+    const passRate = completedTests > 0 ?
+      (enrollments.filter(e => e.user.profile?.testCompleted && e.user.profile?.testScore && e.user.profile.testScore >= 70).length / completedTests) * 100 : 0
+    setStats({
+      totalStudents,
+      activeStudents,
+      completedTests,
+      avgScore,
+      passRate
+    })
     setIsLoading(false)
   }
 
