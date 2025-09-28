@@ -7,7 +7,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Users, DollarSign, FileText, Award, TrendingUp, Calendar, Menu, Download } from "lucide-react"
-import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 
 interface UserProfile {
@@ -41,7 +40,6 @@ export default function AdminReportsPage() {
   const [userEmail, setUserEmail] = useState("")
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const router = useRouter()
-  const supabase = createClient()
 
   useEffect(() => {
     const checkAdminAndLoadData = async () => {
@@ -61,18 +59,15 @@ export default function AdminReportsPage() {
         setUserName(`${data?.profile?.first_name || ''} ${data?.profile?.last_name || ''}`.trim() || 'Admin')
         setUserEmail(data?.email || '')
 
-        // Load all users
-        const { data: profiles, error } = await supabase
-          .from("profiles")
-          .select("*")
-          .order("created_at", { ascending: false })
-
-      if (!error && profiles) {
-        setUsers(profiles)
-        // Calculate monthly stats
-        const stats = calculateMonthlyStats(profiles)
-        setMonthlyStats(stats)
-      }
+        // Load all users via API
+        const profilesRes = await fetch('/api/users?all=true') // Assuming an endpoint to get all users
+        if (profilesRes.ok) {
+          const profiles = await profilesRes.json()
+          setUsers(profiles)
+          // Calculate monthly stats
+          const stats = calculateMonthlyStats(profiles)
+          setMonthlyStats(stats)
+        }
 
       setIsLoading(false)
       } catch (error) {
@@ -83,7 +78,7 @@ export default function AdminReportsPage() {
     }
 
     checkAdminAndLoadData()
-  }, [supabase, router])
+  }, [router])
 
   const calculateMonthlyStats = (profiles: UserProfile[]): MonthlyStats[] => {
     const monthlyData: { [key: string]: MonthlyStats } = {}

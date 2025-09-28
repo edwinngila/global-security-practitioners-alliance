@@ -702,7 +702,9 @@ export default function AdminRolesPage() {
                       <Table>
                         <TableHeader>
                           <TableRow>
-                            <TableHead className="min-w-[200px]">Role / Permission</TableHead>
+                            <TableHead className="min-w-[200px] sticky left-0 bg-background z-10 border-r-2 border-border shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">
+                              Role / Permission
+                            </TableHead>
                             {permissions.map((permission) => (
                               <TableHead key={permission.id} className="min-w-[120px] text-center">
                                 {permission.displayName}
@@ -713,7 +715,7 @@ export default function AdminRolesPage() {
                         <TableBody>
                           {roles.map((role) => (
                             <TableRow key={role.id}>
-                              <TableCell className="font-medium">
+                              <TableCell className="font-medium sticky left-0 bg-background z-10 border-r-2 border-border shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">
                                 {role.displayName}
                               </TableCell>
                               {permissions.map((permission) => {

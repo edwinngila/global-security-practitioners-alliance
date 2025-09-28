@@ -1,617 +1,613 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { DashboardSidebar } from "@/components/dashboard-sidebar"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Progress } from "@/components/ui/progress"
-import { Award, Download, CheckCircle, XCircle, Clock, FileText, User, Calendar, BookOpen } from "lucide-react"
-import { fetchJson, apiFetch } from '@/lib/api/client'
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import {
+  BookOpen,
+  CreditCard,
+  Calendar,
+  CheckCircle,
+  Clock,
+  Menu,
+  TrendingUp,
+  Award,
+  Play,
+  FileText,
+  DollarSign
+} from "lucide-react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 
-interface UserProfile {
+interface Module {
   id: string
-  first_name: string
-  last_name: string
-  email: string
-  membership_fee_paid: boolean
-  payment_status: string
-  test_completed: boolean
-  test_score: number | null
-  certificate_issued: boolean
-  certificate_url: string | null
-  certificate_available_at: string | null
-  created_at: string
-}
-
-interface TestAttempt {
-  id: string
-  score: number
-  total_questions: number
-  passed: boolean
-  completed_at: string
+  title: string
+  description: string
+  price: number
+  currency: string
+  category: string
+  difficultyLevel: string
+  estimatedDuration: number
+  instructorName: string
 }
 
 interface ModuleEnrollment {
   id: string
-  module_id: string
-  module_title: string
-  progress_percentage: number
-  payment_status: string
-  completed_at: string | null
+  moduleId: string
+  module: Module
+  enrollmentDate: string
+  paymentStatus: string
+  progressPercentage: number
+  examDate: string | null
+  examCompleted: boolean
+  examScore: number | null
+  completedAt: string | null
 }
 
-interface OngoingTest {
+interface UserProfile {
   id: string
-  user_id: string
-  questions_data: any[]
-  answers_data: Record<string, string>
-  current_question: number
-  time_left: number
-  test_started: boolean
-  started_at: string
-  updated_at: string
+  firstName: string
+  lastName: string
+  email: string
 }
 
 export default function PractitionerDashboardPage() {
-   const [user, setUser] = useState<UserProfile | null>(null)
-   const [testAttempt, setTestAttempt] = useState<TestAttempt | null>(null)
-   const [ongoingTest, setOngoingTest] = useState<OngoingTest | null>(null)
-   const [moduleEnrollments, setModuleEnrollments] = useState<ModuleEnrollment[]>([])
-   const [isLoading, setIsLoading] = useState(true)
-   const router = useRouter()
-  // use REST API client
+  const [user, setUser] = useState<UserProfile | null>(null)
+  const [enrollments, setEnrollments] = useState<ModuleEnrollment[]>([])
+  const [availableModules, setAvailableModules] = useState<Module[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [isMasterPractitioner, setIsMasterPractitioner] = useState(false)
+  const [userName, setUserName] = useState("")
+  const [userEmail, setUserEmail] = useState("")
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [examDate, setExamDate] = useState("")
+  const [showScheduleDialog, setShowScheduleDialog] = useState(false)
+  const [selectedEnrollment, setSelectedEnrollment] = useState<ModuleEnrollment | null>(null)
+
+  const router = useRouter()
 
   useEffect(() => {
-    const getUserData = async () => {
-      // Get current auth user + profile
-      const authRes = await fetch('/api/auth/user')
-      if (authRes.status === 401) {
-        router.push('/auth/login')
-        return
-      }
-      const authData = await authRes.json()
-      const profile = authData.profile
-      if (!profile) {
-        router.push('/register')
-        return
-      }
-      setUser(profile)
-
-      // Check and issue certificate if available
-      await checkAndIssueCertificate()
-
-      // Get latest test attempt if test completed
-      if (profile.test_completed) {
-        try {
-          const attempts = await fetchJson(`/api/tests/attempts`)
-          if (Array.isArray(attempts) && attempts.length > 0) {
-            setTestAttempt(attempts[0])
-          }
-        } catch (err) {
-          console.error('Error fetching attempts', err)
-        }
-      } else {
-        // Check for ongoing test
-        try {
-          const ongoing = await fetchJson('/api/tests/ongoing')
-          if (ongoing) setOngoingTest(ongoing)
-        } catch (err) {
-          // not found or none
-        }
-      }
-
-      // Get user's module enrollments with module details (only completed payments)
+    const checkMasterPractitionerAndLoadData = async () => {
       try {
-        const enrollments = await fetchJson('/api/modules') // modules list includes enrollments
-        // filter enrollments for this user's completed ones
-        const myEnrollments: ModuleEnrollment[] = []
-        for (const m of enrollments) {
-          if (!m.enrollments) continue
-          for (const e of m.enrollments) {
-            if (e.userId === profile.id && e.paymentStatus === 'COMPLETED') {
-              myEnrollments.push({
-                id: e.id,
-                module_id: m.id,
-                module_title: m.title,
-                progress_percentage: e.progressPercentage,
-                payment_status: e.paymentStatus,
-                completed_at: e.completedAt
-              })
-            }
-          }
-        }
-        setModuleEnrollments(myEnrollments)
-      } catch (err) {
-        console.error('Error fetching enrollments', err)
-      }
+        setIsLoading(true)
 
-      setIsLoading(false)
+        // Check authentication via API
+        const authRes = await fetch('/api/auth/user')
+        if (authRes.status === 401) {
+          router.push('/auth/login')
+          return
+        }
+
+        if (!authRes.ok) {
+          throw new Error('Failed to fetch user data')
+        }
+
+        const authData = await authRes.json()
+        const profile = authData.profile
+
+        if (!profile) {
+          router.push('/register')
+          return
+        }
+
+        // Check if master practitioner - role info should be included in profile
+        if (!profile.roleId || profile.role?.name !== 'master_practitioner') {
+          setIsMasterPractitioner(false)
+          setIsLoading(false)
+          return
+        }
+
+        setIsMasterPractitioner(true)
+        setUserName(`${profile.firstName || ''} ${profile.lastName || ''}`.trim() || 'Master Practitioner')
+        setUserEmail(profile.email || '')
+        setUser(profile)
+
+        // Load user's enrollments
+        await loadEnrollments(profile.id)
+
+        // Load available modules
+        await loadAvailableModules()
+
+      } catch (error) {
+        console.error('Error loading data:', error)
+        setIsMasterPractitioner(false)
+      } finally {
+        setIsLoading(false)
+      }
     }
 
-    getUserData()
+    checkMasterPractitionerAndLoadData()
   }, [router])
 
-  const checkAndIssueCertificate = async () => {
-    if (!user || !user.certificate_available_at) return
-
-    const now = new Date()
-    const availableAt = new Date(user.certificate_available_at)
-
-    if (now >= availableAt && !user.certificate_issued) {
-      try {
-        const res = await apiFetch(`/api/profiles/${user.id}`, { method: 'PATCH', body: JSON.stringify({ certificateIssued: true, certificateUrl: `certificate-${user.id}.pdf` }), headers: { 'Content-Type': 'application/json' } })
-        if (!res.ok) throw new Error('Failed to update certificate')
-
-        // Update local state
-        setUser((prev) => prev ? { ...prev, certificate_issued: true, certificate_url: `certificate-${user.id}.pdf` } : null)
-      } catch (error) {
-        console.error("Certificate issuance error:", error)
+  const loadEnrollments = async (userId: string) => {
+    try {
+      const response = await fetch(`/api/user-enrollments?userId=${userId}`)
+      if (response.ok) {
+        const enrollmentsData = await response.json()
+        setEnrollments(enrollmentsData)
       }
+    } catch (error) {
+      console.error('Error loading enrollments:', error)
     }
   }
 
-  const generateCertificate = async () => {
-    if (!user || !testAttempt) return
+  const loadAvailableModules = async () => {
+    try {
+      const response = await fetch('/api/modules?active=true')
+      if (response.ok) {
+        const modulesData = await response.json()
+        // Filter out already enrolled modules
+        const enrolledModuleIds = enrollments.map(e => e.moduleId)
+        const available = modulesData.filter((module: Module) =>
+          !enrolledModuleIds.includes(module.id)
+        )
+        setAvailableModules(available)
+      }
+    } catch (error) {
+      console.error('Error loading modules:', error)
+    }
+  }
+
+  const handlePurchaseModule = (module: Module) => {
+    // Redirect to payment page
+    router.push(`/payment?type=module&moduleId=${module.id}`)
+  }
+
+  const handleScheduleExam = async () => {
+    if (!selectedEnrollment || !examDate) return
 
     try {
-      // Check if certificate is available
-      await checkAndIssueCertificate()
+      const response = await fetch(`/api/user-enrollments/${selectedEnrollment.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ examDate })
+      })
 
-      if (!user.certificate_issued) {
-        alert("Certificate is not yet available. Please wait 48 hours after test completion.")
-        return
+      if (response.ok) {
+        // Reload enrollments
+        if (user) {
+          await loadEnrollments(user.id)
+        }
+        setShowScheduleDialog(false)
+        setExamDate("")
+        setSelectedEnrollment(null)
       }
-
-      // In a real implementation, you'd generate a PDF certificate
-      // For now, we'll just confirm it's issued
-      alert("Certificate is ready for download!")
     } catch (error) {
-      console.error("Certificate generation error:", error)
-      alert("Error generating certificate. Please try again.")
+      console.error('Error scheduling exam:', error)
     }
   }
 
-  const downloadCertificate = () => {
-    // In a real implementation, this would download the actual PDF
-    alert("Certificate download feature would be implemented here with a PDF generation service.")
+  const getProgressColor = (percentage: number) => {
+    if (percentage >= 80) return "text-green-600"
+    if (percentage >= 60) return "text-blue-600"
+    if (percentage >= 40) return "text-yellow-600"
+    return "text-red-600"
+  }
+
+  const CircularProgress = ({ percentage, size = 80 }: { percentage: number, size?: number }) => {
+    const radius = (size - 10) / 2
+    const circumference = radius * 2 * Math.PI
+    const strokeDasharray = circumference
+    const strokeDashoffset = circumference - (percentage / 100) * circumference
+
+    return (
+      <div className="relative inline-flex items-center justify-center">
+        <svg width={size} height={size} className="transform -rotate-90">
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            stroke="currentColor"
+            strokeWidth="4"
+            fill="transparent"
+            className="text-muted-foreground/20"
+          />
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            stroke="currentColor"
+            strokeWidth="4"
+            fill="transparent"
+            strokeDasharray={strokeDasharray}
+            strokeDashoffset={strokeDashoffset}
+            className={`${getProgressColor(percentage)} transition-all duration-300`}
+            strokeLinecap="round"
+          />
+        </svg>
+        <div className="absolute inset-0 flex items-center justify-center">
+          <span className={`text-sm font-semibold ${getProgressColor(percentage)}`}>
+            {percentage}%
+          </span>
+        </div>
+      </div>
+    )
   }
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-8">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      <div className="min-h-screen flex">
+        <div className="flex-1 flex items-center justify-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
+      </div>
+    )
+  }
+
+  if (!isMasterPractitioner) {
+    return (
+      <div className="min-h-screen flex">
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <h1 className="text-2xl font-bold mb-4">Access Denied</h1>
+            <p className="text-muted-foreground">You don't have permission to access this page.</p>
+            <Button
+              onClick={() => router.push('/dashboard')}
+              className="mt-4"
+            >
+              Go to Dashboard
+            </Button>
+          </div>
+        </div>
       </div>
     )
   }
 
   if (!user) {
     return (
-      <div className="flex items-center justify-center py-8">
-        <Alert variant="destructive">
-          <XCircle className="h-4 w-4" />
-          <AlertDescription>Please complete your registration first.</AlertDescription>
-        </Alert>
+      <div className="min-h-screen flex">
+        <div className="flex-1 flex items-center justify-center">
+          <Alert variant="destructive">
+            <AlertDescription>Please complete your registration first.</AlertDescription>
+          </Alert>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="p-4 md:p-6 bg-gradient-to-br from-muted/10 to-background min-h-screen">
-      <div className="max-w-7xl mx-auto">
-        <div className="mb-8 md:mb-12">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-4">
-            <div className="w-12 h-12 bg-gradient-to-br from-primary to-accent rounded-xl flex items-center justify-center shadow-lg flex-shrink-0">
-              <User className="h-6 w-6 text-white" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold">Practitioner Dashboard</h1>
-              <p className="text-muted-foreground text-base md:text-lg">
-                Welcome back, {user.first_name}! Here's your certification progress.
+    <div className="min-h-screen flex">
+      {/* Mobile Sidebar */}
+      <div className={`
+        fixed inset-y-0 left-0 z-50 w-64 transform transition-transform duration-300 md:hidden
+        ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
+      `}>
+        <DashboardSidebar
+          userRole="master_practitioner"
+          userName={userName}
+          userEmail={userEmail}
+          isMobileOpen={mobileMenuOpen}
+          onMobileClose={() => setMobileMenuOpen(false)}
+        />
+      </div>
+
+      {/* Desktop Sidebar */}
+      <div className="hidden md:block">
+        <DashboardSidebar
+          userRole="master_practitioner"
+          userName={userName}
+          userEmail={userEmail}
+        />
+      </div>
+
+      <main className="flex-1 overflow-y-auto">
+        {/* Mobile Header */}
+        <div className="md:hidden bg-background border-b border-border p-4 flex items-center justify-between">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setMobileMenuOpen(true)}
+            className="border-border hover:bg-muted"
+          >
+            <Menu className="h-5 w-5" />
+          </Button>
+          <h1 className="text-lg font-semibold">Practitioner Learning</h1>
+          <div className="w-8" />
+        </div>
+
+        <div className="p-4 md:p-8">
+          <div className="max-w-7xl mx-auto">
+            <div className="mb-6 md:mb-8">
+              <h1 className="text-2xl md:text-3xl font-bold mb-2">My Learning Dashboard</h1>
+              <p className="text-muted-foreground text-sm md:text-base">
+                Track your progress, access course materials, and schedule exams for your enrolled modules.
               </p>
             </div>
-          </div>
-        </div>
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-8 md:mb-12">
-          {/* Profile Card */}
-          <Card className="group hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 border-0 bg-gradient-to-br from-background to-muted/20 backdrop-blur-sm">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-              <div>
-                <CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Profile Information</CardTitle>
-                <div className="text-2xl font-bold mt-2">{user.first_name} {user.last_name}</div>
-              </div>
-              <div className="w-12 h-12 bg-gradient-to-br from-primary/10 to-primary/5 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
-                <User className="h-6 w-6 text-primary" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                <p className="text-sm text-muted-foreground">
-                  Member since {new Date(user.created_at).toLocaleDateString()}
-                </p>
-              </div>
-              <div className="mt-4 space-y-2">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">Membership</span>
-                  <Badge variant={user.membership_fee_paid ? "default" : "secondary"}>
-                    {user.membership_fee_paid ? "Active" : "Pending"}
-                  </Badge>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">Test Access</span>
-                  <Badge variant={user.payment_status === "completed" ? "default" : "secondary"}>
-                    {user.payment_status === "completed" ? "Paid" : "Pending"}
-                  </Badge>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+            {/* Stats Overview */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-8">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Enrolled Modules</CardTitle>
+                  <BookOpen className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{enrollments.length}</div>
+                </CardContent>
+              </Card>
 
-          {/* Test Status Card */}
-          <Card className="group hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 border-0 bg-gradient-to-br from-background to-muted/20 backdrop-blur-sm">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-              <div>
-                <CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Test Status</CardTitle>
-                <div className="text-2xl font-bold mt-2">
-                  {ongoingTest ? "In Progress" : user.test_completed ? "Completed" : "Not Started"}
-                </div>
-              </div>
-              <div className="w-12 h-12 bg-gradient-to-br from-primary/10 to-primary/5 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
-                <FileText className="h-6 w-6 text-primary" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-2 mb-4">
-                {ongoingTest ? (
-                  <>
-                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
-                    <p className="text-sm text-muted-foreground">
-                      Question {ongoingTest.current_question + 1} of {ongoingTest.questions_data.length}
-                    </p>
-                  </>
-                ) : user.test_completed ? (
-                  <>
-                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                    <p className="text-sm text-muted-foreground">
-                      Completed {testAttempt ? new Date(testAttempt.completed_at).toLocaleDateString() : ''}
-                    </p>
-                  </>
-                ) : user.payment_status === "completed" ? (
-                  <>
-                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                    <p className="text-sm text-muted-foreground">
-                      Ready to start
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                    <p className="text-sm text-muted-foreground">
-                      Payment required
-                    </p>
-                  </>
-                )}
-              </div>
-
-              {ongoingTest && (
-                <div className="space-y-3">
-                  <div className="flex justify-between text-sm">
-                    <span>Progress</span>
-                    <span>{Math.round((ongoingTest.current_question / ongoingTest.questions_data.length) * 100)}%</span>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Completed Modules</CardTitle>
+                  <CheckCircle className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">
+                    {enrollments.filter(e => e.completedAt).length}
                   </div>
-                  <Progress value={(ongoingTest.current_question / ongoingTest.questions_data.length) * 100} />
-                  {ongoingTest.test_started && (
-                    <p className="text-xs text-muted-foreground">
-                      Time: {Math.floor(ongoingTest.time_left / 60)}:{(ongoingTest.time_left % 60).toString().padStart(2, '0')} remaining
-                    </p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Average Progress</CardTitle>
+                  <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">
+                    {enrollments.length > 0
+                      ? Math.round(enrollments.reduce((sum, e) => sum + e.progressPercentage, 0) / enrollments.length)
+                      : 0
+                    }%
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Scheduled Exams</CardTitle>
+                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">
+                    {enrollments.filter(e => e.examDate).length}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Enrolled Modules */}
+            {enrollments.length > 0 && (
+              <div className="mb-8">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>My Enrolled Modules</CardTitle>
+                    <CardDescription>Track your progress and access course materials</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {enrollments.map((enrollment) => (
+                        <Card key={enrollment.id} className="group hover:shadow-lg transition-all duration-300">
+                          <CardContent className="p-6">
+                            <div className="flex items-start justify-between mb-4">
+                              <div className="flex-1">
+                                <h3 className="font-semibold text-lg mb-2 group-hover:text-primary transition-colors">
+                                  {enrollment.module.title}
+                                </h3>
+                                <p className="text-sm text-muted-foreground mb-3">
+                                  {enrollment.module.category} • {enrollment.module.difficultyLevel}
+                                </p>
+                              </div>
+                              <div className="ml-4">
+                                <CircularProgress percentage={enrollment.progressPercentage} />
+                              </div>
+                            </div>
+
+                            <div className="space-y-3">
+                              <div className="flex justify-between text-sm">
+                                <span>Progress</span>
+                                <span className={getProgressColor(enrollment.progressPercentage)}>
+                                  {enrollment.progressPercentage}%
+                                </span>
+                              </div>
+                              <Progress value={enrollment.progressPercentage} className="h-2" />
+
+                              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                <Clock className="h-4 w-4" />
+                                <span>{enrollment.module.estimatedDuration} hours</span>
+                              </div>
+
+                              {enrollment.examDate && (
+                                <div className="flex items-center gap-2 text-sm">
+                                  <Calendar className="h-4 w-4 text-blue-500" />
+                                  <span className="text-blue-600">
+                                    Exam: {new Date(enrollment.examDate).toLocaleDateString()}
+                                  </span>
+                                </div>
+                              )}
+
+                              {enrollment.examCompleted && (
+                                <div className="flex items-center gap-2 text-sm">
+                                  <Award className="h-4 w-4 text-green-500" />
+                                  <span className="text-green-600">
+                                    Score: {enrollment.examScore}%
+                                  </span>
+                                </div>
+                              )}
+
+                              <div className="flex gap-2 pt-2">
+                                <Button asChild size="sm" className="flex-1">
+                                  <Link href={`/dashboard/my-modules/${enrollment.moduleId}`}>
+                                    <Play className="h-4 w-4 mr-2" />
+                                    Continue Learning
+                                  </Link>
+                                </Button>
+
+                                {!enrollment.examDate && !enrollment.examCompleted && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => {
+                                      setSelectedEnrollment(enrollment)
+                                      setShowScheduleDialog(true)
+                                    }}
+                                  >
+                                    <Calendar className="h-4 w-4" />
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+
+            {/* Available Modules */}
+            <div className="mb-8">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Available Modules</CardTitle>
+                  <CardDescription>Explore and enroll in new training modules</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {availableModules.length === 0 ? (
+                    <div className="text-center py-8">
+                      <BookOpen className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                      <p className="text-muted-foreground">No additional modules available at this time.</p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {availableModules.slice(0, 6).map((module) => (
+                        <Card key={module.id} className="group hover:shadow-lg transition-all duration-300">
+                          <CardContent className="p-6">
+                            <div className="mb-4">
+                              <h3 className="font-semibold text-lg mb-2 group-hover:text-primary transition-colors">
+                                {module.title}
+                              </h3>
+                              <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
+                                {module.description}
+                              </p>
+                              <div className="flex items-center gap-2 text-sm text-muted-foreground mb-3">
+                                <Clock className="h-4 w-4" />
+                                <span>{module.estimatedDuration} hours</span>
+                                <Badge variant="outline" className="ml-auto">
+                                  {module.difficultyLevel}
+                                </Badge>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center justify-between mb-4">
+                              <div className="text-2xl font-bold text-primary">
+                                {module.currency} {module.price}
+                              </div>
+                              <div className="text-sm text-muted-foreground">
+                                {module.instructorName}
+                              </div>
+                            </div>
+
+                            <div className="flex gap-2">
+                              <Dialog>
+                                <DialogTrigger asChild>
+                                  <Button variant="outline" size="sm" className="flex-1">
+                                    <FileText className="h-4 w-4 mr-2" />
+                                    Details
+                                  </Button>
+                                </DialogTrigger>
+                                <DialogContent>
+                                  <DialogHeader>
+                                    <DialogTitle>{module.title}</DialogTitle>
+                                    <DialogDescription>{module.description}</DialogDescription>
+                                  </DialogHeader>
+                                  <div className="space-y-4">
+                                    <div className="grid grid-cols-2 gap-4 text-sm">
+                                      <div>
+                                        <strong>Duration:</strong> {module.estimatedDuration} hours
+                                      </div>
+                                      <div>
+                                        <strong>Difficulty:</strong> {module.difficultyLevel}
+                                      </div>
+                                      <div>
+                                        <strong>Category:</strong> {module.category}
+                                      </div>
+                                      <div>
+                                        <strong>Instructor:</strong> {module.instructorName}
+                                      </div>
+                                    </div>
+                                    <div className="border-t pt-4">
+                                      <div className="flex items-center justify-between">
+                                        <div className="text-xl font-bold text-primary">
+                                          {module.currency} {module.price}
+                                        </div>
+                                        <Button onClick={() => handlePurchaseModule(module)}>
+                                          <CreditCard className="h-4 w-4 mr-2" />
+                                          Purchase Module
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </DialogContent>
+                              </Dialog>
+
+                              <Button size="sm" onClick={() => handlePurchaseModule(module)}>
+                                <DollarSign className="h-4 w-4 mr-2" />
+                                Buy
+                              </Button>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
                   )}
-                </div>
-              )}
 
-              {user.test_completed && testAttempt && (
-                <div className="space-y-3">
-                  <div className="flex justify-between text-sm">
-                    <span>Score</span>
-                    <span>{Math.round((testAttempt.score / testAttempt.total_questions) * 100)}%</span>
-                  </div>
-                  <Progress value={(testAttempt.score / testAttempt.total_questions) * 100} />
-                  <p className="text-xs text-muted-foreground">
-                    {testAttempt.score}/{testAttempt.total_questions} - {testAttempt.passed ? "Passed" : "Failed"}
-                  </p>
-                </div>
-              )}
-
-              <div className="mt-4">
-                {ongoingTest ? (
-                  <Button asChild className="w-full">
-                    <Link href="/practitioner/test">Continue Test</Link>
-                  </Button>
-                ) : user.test_completed ? (
-                  !testAttempt?.passed && (
-                    <Button asChild variant="outline" className="w-full">
-                      <Link href="/practitioner/payment?type=retake">Retake Test ($35)</Link>
-                    </Button>
-                  )
-                ) : !user.membership_fee_paid ? (
-                  <Button asChild variant="outline" className="w-full">
-                    <Link href="/practitioner/payment">Complete Membership</Link>
-                  </Button>
-                ) : user.payment_status === "completed" ? (
-                  <Button asChild className="w-full">
-                    <Link href="/practitioner/test">Start Test</Link>
-                  </Button>
-                ) : (
-                  <Button asChild variant="outline" className="w-full">
-                    <Link href="/practitioner/payment">Complete Payment</Link>
-                  </Button>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Certificate Card */}
-          <Card className="group hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 border-0 bg-gradient-to-br from-background to-muted/20 backdrop-blur-sm">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-              <div>
-                <CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Certificate</CardTitle>
-                <div className="text-2xl font-bold mt-2">
-                  {user.certificate_issued ? "Issued" : user.test_completed && testAttempt?.passed ? "Available" : "Pending"}
-                </div>
-              </div>
-              <div className="w-12 h-12 bg-gradient-to-br from-primary/10 to-primary/5 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
-                <Award className="h-6 w-6 text-primary" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-2 mb-4">
-                {user.certificate_issued ? (
-                  <>
-                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                    <p className="text-sm text-muted-foreground">
-                      Certificate issued and ready for download
-                    </p>
-                  </>
-                ) : user.test_completed && testAttempt?.passed ? (
-                  <>
-                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                    <p className="text-sm text-muted-foreground">
-                      Ready to generate certificate
-                    </p>
-                  </>
-                ) : user.test_completed && testAttempt && !testAttempt.passed ? (
-                  <>
-                    <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                    <p className="text-sm text-muted-foreground">
-                      Test failed - minimum 70% required
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    <div className="w-2 h-2 bg-gray-500 rounded-full"></div>
-                    <p className="text-sm text-muted-foreground">
-                      Complete test to earn certificate
-                    </p>
-                  </>
-                )}
-              </div>
-
-              <div className="mt-4">
-                {user.certificate_issued ? (
-                  <Button onClick={downloadCertificate} className="w-full">
-                    <Download className="h-4 w-4 mr-2" />
-                    Download Certificate
-                  </Button>
-                ) : user.test_completed && testAttempt?.passed ? (
-                  <Button onClick={generateCertificate} className="w-full">
-                    Generate Certificate
-                  </Button>
-                ) : null}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Modules Section */}
-        {moduleEnrollments.length > 0 && (
-          <div className="mb-8 md:mb-12">
-            <Card className="border-0 bg-gradient-to-br from-background to-muted/20 backdrop-blur-sm">
-              <CardHeader className="pb-6">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-gradient-to-br from-primary/10 to-primary/5 rounded-lg flex items-center justify-center">
-                    <BookOpen className="h-5 w-5 text-primary" />
-                  </div>
-                  <div>
-                    <CardTitle className="text-xl">My Modules</CardTitle>
-                    <CardDescription>Your enrolled training modules</CardDescription>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {moduleEnrollments.map((enrollment) => (
-                    <Card key={enrollment.id} className="group hover:shadow-lg hover:-translate-y-1 transition-all duration-300 border border-border/50">
-                      <CardContent className="p-4">
-                        <div className="flex items-start justify-between mb-3">
-                          <h4 className="font-semibold text-sm line-clamp-2 group-hover:text-primary transition-colors">
-                            {enrollment.module_title}
-                          </h4>
-                          {enrollment.completed_at && (
-                            <CheckCircle className="h-4 w-4 text-green-500 flex-shrink-0 ml-2" />
-                          )}
-                        </div>
-
-                        <div className="space-y-3">
-                          <div className="flex justify-between text-xs text-muted-foreground">
-                            <span>Progress</span>
-                            <span>{enrollment.progress_percentage}%</span>
-                          </div>
-                          <Progress value={enrollment.progress_percentage} className="h-2" />
-
-                          <Button
-                            asChild
-                            size="sm"
-                            className="w-full text-xs"
-                            variant={enrollment.progress_percentage === 100 ? "outline" : "default"}
-                          >
-                            <Link href={`/practitioner/my-modules/${enrollment.module_id}`}>
-                              {enrollment.progress_percentage === 100 ? 'Review Module' : 'Continue Learning'}
-                            </Link>
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
-        {/* Quick Actions & Next Steps */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8 mt-8 md:mt-12">
-          <Card className="border-0 bg-gradient-to-br from-background to-muted/20 backdrop-blur-sm shadow-xl">
-            <CardHeader className="pb-6">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-primary/10 to-primary/5 rounded-lg flex items-center justify-center">
-                  <FileText className="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <CardTitle className="text-xl">Next Steps</CardTitle>
-                  <CardDescription>Your certification journey</CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 gap-4">
-                {!user.test_completed && user.payment_status === "completed" && (
-                  <div className="group p-4 bg-gradient-to-br from-muted/20 to-muted/10 rounded-xl border border-border/50 hover:shadow-lg hover:-translate-y-1 transition-all duration-300">
-                    <div className="flex items-start gap-4">
-                      <div className="w-10 h-10 bg-gradient-to-br from-primary/10 to-primary/5 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform duration-300 flex-shrink-0">
-                        <FileText className="h-5 w-5 text-primary" />
-                      </div>
-                      <div className="flex-1">
-                        <div className="font-semibold text-base mb-1">Take the Test</div>
-                        <div className="text-sm text-muted-foreground mb-3 leading-relaxed">
-                          Complete the security aptitude assessment to earn your certification.
-                        </div>
-                        <Button asChild size="sm">
-                          <Link href="/practitioner/test">Start Test</Link>
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {user.test_completed && testAttempt?.passed && !user.certificate_issued && (
-                  <div className="group p-4 bg-gradient-to-br from-muted/20 to-muted/10 rounded-xl border border-border/50 hover:shadow-lg hover:-translate-y-1 transition-all duration-300">
-                    <div className="flex items-start gap-4">
-                      <div className="w-10 h-10 bg-gradient-to-br from-primary/10 to-primary/5 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform duration-300 flex-shrink-0">
-                        <Award className="h-5 w-5 text-primary" />
-                      </div>
-                      <div className="flex-1">
-                        <div className="font-semibold text-base mb-1">Get Certified</div>
-                        <div className="text-sm text-muted-foreground mb-3 leading-relaxed">
-                          Generate your official GSPA certificate.
-                        </div>
-                        <Button onClick={generateCertificate} size="sm">
-                          Generate Certificate
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {user.certificate_issued && (
-                  <div className="group p-4 bg-gradient-to-br from-muted/20 to-muted/10 rounded-xl border border-border/50 hover:shadow-lg hover:-translate-y-1 transition-all duration-300">
-                    <div className="flex items-start gap-4">
-                      <div className="w-10 h-10 bg-gradient-to-br from-green-500/10 to-green-500/5 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform duration-300 flex-shrink-0">
-                        <CheckCircle className="h-5 w-5 text-green-600" />
-                      </div>
-                      <div className="flex-1">
-                        <div className="font-semibold text-base mb-1">Share Your Achievement</div>
-                        <div className="text-sm text-muted-foreground mb-3 leading-relaxed">
-                          Share your certification on LinkedIn and other professional networks.
-                        </div>
-                        <Button variant="outline" size="sm">
-                          Share on LinkedIn
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Module Enrollment Suggestion */}
-                <div className="group p-4 bg-gradient-to-br from-blue-50/50 to-purple-50/50 dark:from-blue-950/20 dark:to-purple-950/20 rounded-xl border border-blue-200/50 dark:border-blue-800/50 hover:shadow-lg hover:-translate-y-1 transition-all duration-300">
-                  <div className="flex items-start gap-4">
-                    <div className="w-10 h-10 bg-gradient-to-br from-blue-500/10 to-purple-500/10 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform duration-300 flex-shrink-0">
-                      <BookOpen className="h-5 w-5 text-blue-600" />
-                    </div>
-                    <div className="flex-1">
-                      <div className="font-semibold text-base mb-1">Explore Training Modules</div>
-                      <div className="text-sm text-muted-foreground mb-3 leading-relaxed">
-                        Enhance your skills with our comprehensive training modules covering various cybersecurity topics.
-                      </div>
-                      <Button asChild size="sm" variant="outline">
-                        <Link href="/modules">Browse Modules</Link>
+                  {availableModules.length > 6 && (
+                    <div className="text-center mt-6">
+                      <Button asChild variant="outline">
+                        <Link href="/modules">
+                          View All Modules
+                        </Link>
                       </Button>
                     </div>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-0 bg-gradient-to-br from-background to-muted/20 backdrop-blur-sm shadow-xl">
-            <CardHeader className="pb-6">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-primary/10 to-primary/5 rounded-lg flex items-center justify-center">
-                  <User className="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <CardTitle className="text-xl">Community & Resources</CardTitle>
-                  <CardDescription>Connect and learn more</CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="group p-4 bg-gradient-to-br from-muted/20 to-muted/10 rounded-xl border border-border/50 hover:shadow-lg hover:-translate-y-1 transition-all duration-300">
-                  <div className="flex items-start gap-4">
-                    <div className="w-10 h-10 bg-gradient-to-br from-blue-500/10 to-blue-500/5 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform duration-300 flex-shrink-0">
-                      <User className="h-5 w-5 text-blue-600" />
-                    </div>
-                    <div className="flex-1">
-                      <div className="font-semibold text-base mb-1">Join the Community</div>
-                      <div className="text-sm text-muted-foreground leading-relaxed">
-                        Connect with other certified security professionals worldwide.
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="group p-4 bg-gradient-to-br from-muted/20 to-muted/10 rounded-xl border border-border/50 hover:shadow-lg hover:-translate-y-1 transition-all duration-300">
-                  <div className="flex items-start gap-4">
-                    <div className="w-10 h-10 bg-gradient-to-br from-purple-500/10 to-purple-500/5 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform duration-300 flex-shrink-0">
-                      <FileText className="h-5 w-5 text-purple-600" />
-                    </div>
-                    <div className="flex-1">
-                      <div className="font-semibold text-base mb-1">Learning Resources</div>
-                      <div className="text-sm text-muted-foreground leading-relaxed">
-                        Access additional training materials and security best practices.
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </div>
         </div>
-      </div>
+      </main>
+
+      {/* Exam Scheduling Dialog */}
+      <Dialog open={showScheduleDialog} onOpenChange={setShowScheduleDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Schedule Final Exam</DialogTitle>
+            <DialogDescription>
+              Choose a date for your final exam for {selectedEnrollment?.module.title}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="exam-date">Exam Date</Label>
+              <Input
+                id="exam-date"
+                type="date"
+                value={examDate}
+                onChange={(e) => setExamDate(e.target.value)}
+                min={new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0]}
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setShowScheduleDialog(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleScheduleExam} disabled={!examDate}>
+                <Calendar className="h-4 w-4 mr-2" />
+                Schedule Exam
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

@@ -7,9 +7,9 @@ import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Progress } from "@/components/ui/progress"
 import { Award, Download, CheckCircle, XCircle, Clock, FileText, User, Calendar, BookOpen } from "lucide-react"
-import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
+import error from "next/error"
 
 interface UserProfile {
   id: string
@@ -62,108 +62,45 @@ export default function DashboardPage() {
    const [moduleEnrollments, setModuleEnrollments] = useState<ModuleEnrollment[]>([])
    const [isLoading, setIsLoading] = useState(true)
    const router = useRouter()
-   const supabase = createClient()
 
   useEffect(() => {
     const getUserData = async () => {
-      const {
-        data: { user: authUser },
-      } = await supabase.auth.getUser()
-
-      if (!authUser) {
+      const res = await fetch('/api/auth/user-dashboard');
+      if (res.status === 401) {
         router.push("/auth/login")
         return
       }
-
-      // Get user profile
-      const { data: profile, error: profileError } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", authUser.id)
-        .single()
-
-      if (profileError || !profile) {
+      if (!res.ok) {
         router.push("/register")
         return
       }
 
+      const { profile, testAttempt, ongoingTest, enrollments } = await res.json();
+
       setUser(profile)
+      setTestAttempt(testAttempt)
+      setOngoingTest(ongoingTest)
+
+      if (enrollments) {
+        const formattedEnrollments = enrollments.map((enrollment: any) => ({
+          id: enrollment.id,
+          module_id: enrollment.moduleId,
+          module_title: enrollment.module.title || 'Unknown Module',
+          progress_percentage: enrollment.progressPercentage,
+          payment_status: enrollment.paymentStatus,
+          completed_at: enrollment.completedAt
+        }))
+        setModuleEnrollments(formattedEnrollments)
+      }
 
       // Check and issue certificate if available
       await checkAndIssueCertificate()
-
-      // Get latest test attempt if test completed
-      if (profile.test_completed) {
-        const { data: attempt, error: attemptError } = await supabase
-          .from("test_attempts")
-          .select("*")
-          .eq("user_id", authUser.id)
-          .order("completed_at", { ascending: false })
-          .limit(1)
-          .single()
-
-        if (!attemptError && attempt) {
-          setTestAttempt(attempt)
-        }
-      } else {
-        // Check for ongoing test
-        const { data: ongoing, error: ongoingError } = await supabase
-          .from("ongoing_tests")
-          .select("*")
-          .eq("user_id", authUser.id)
-          .single()
-
-        if (!ongoingError && ongoing) {
-          setOngoingTest(ongoing)
-        }
-      }
-
-      // Get user's module enrollments with module details
-      const { data: enrollments, error: enrollmentsError } = await supabase
-        .from("module_enrollments")
-        .select(`
-          id,
-          module_id,
-          progress_percentage,
-          payment_status,
-          completed_at
-        `)
-        .eq("user_id", authUser.id)
-        .eq("payment_status", "completed")
-
-      if (!enrollmentsError && enrollments) {
-        // Get module titles separately to avoid join issues
-  const moduleIds = enrollments.map((e: any) => e.module_id)
-        if (moduleIds.length > 0) {
-          const { data: modules, error: modulesError } = await supabase
-            .from("modules")
-            .select("id, title")
-            .in("id", moduleIds)
-
-          if (!modulesError && modules) {
-            const moduleMap = modules.reduce((acc: Record<string, string>, module: any) => {
-              acc[module.id] = module.title
-              return acc
-            }, {} as Record<string, string>)
-
-            const formattedEnrollments = enrollments.map((enrollment: any) => ({
-              id: enrollment.id,
-              module_id: enrollment.module_id,
-              module_title: moduleMap[enrollment.module_id] || 'Unknown Module',
-              progress_percentage: enrollment.progress_percentage,
-              payment_status: enrollment.payment_status,
-              completed_at: enrollment.completed_at
-            }))
-            setModuleEnrollments(formattedEnrollments)
-          }
-        }
-      }
 
       setIsLoading(false)
     }
 
     getUserData()
-  }, [supabase, router])
+  }, [router])
 
   const checkAndIssueCertificate = async () => {
     if (!user || !user.certificate_available_at) return
@@ -173,14 +110,12 @@ export default function DashboardPage() {
 
     if (now >= availableAt && !user.certificate_issued) {
       try {
-        const { error } = await supabase
-          .from("profiles")
-          .update({
-            certificate_issued: true,
-            certificate_url: `certificate-${user.id}.pdf`, // Placeholder URL
-          })
-          .eq("id", user.id)
-
+        const res = await fetch(`/api/users/${user.id}/issue-certificate`, {
+          method: 'POST'
+        });
+        if (!res.ok) {
+          throw new Error('Failed to issue certificate');
+        }
         if (error) throw error
 
         // Update local state

@@ -23,6 +23,15 @@ const ROLE_PATHS = {
   practitioner: ["/dashboard", "/test"],
 }
 
+// Define specific master practitioner sub-routes that should be protected
+const MASTER_PRACTITIONER_PATHS = [
+  "/master-practitioner/modules",
+  "/master-practitioner/levels",
+  "/master-practitioner/certificates",
+  "/master-practitioner/tests",
+  "/master-practitioner/students"
+]
+
 export default withAuth(
   function middleware(req) {
     const { pathname } = req.nextUrl
@@ -70,6 +79,11 @@ export default withAuth(
             req.url
           ))
         }
+      }
+
+      // Additional check for master practitioner sub-routes
+      if (MASTER_PRACTITIONER_PATHS.some(path => pathname.startsWith(path)) && userRole !== "master_practitioner") {
+        return NextResponse.redirect(new URL("/dashboard", req.url))
       }
 
       // Handle API routes protection

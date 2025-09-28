@@ -1,8 +1,9 @@
 "use client"
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
-import { fetchJson } from '@/lib/api/client'
+import { signOut } from 'next-auth/react'
 import { UserRole } from '@/lib/rbac'
+import { SessionManager } from '@/lib/auth/session-manager'
 
 interface UserProfile {
   id: string
@@ -46,10 +47,15 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
   const [role, setRoleState] = useState<UserRole | null>(null)
 
   useEffect(() => {
-    const storedProfile = typeof localStorage !== 'undefined' ? localStorage.getItem('userProfile') : null
-    const storedRole = typeof localStorage !== 'undefined' ? localStorage.getItem('userRole') : null
-    if (storedProfile) setProfileState(JSON.parse(storedProfile))
-    if (storedRole) setRoleState(JSON.parse(storedRole))
+    // Load data from SessionManager
+    const userData = SessionManager.getUserData()
+    if (userData) {
+      if (userData.profile) setProfileState(userData.profile)
+      if (userData.role) setRoleState(userData.role)
+    }
+
+    // Initialize session tracking
+    SessionManager.initializeSessionTracking()
 
     // fetch latest profile using refresh
     ;(async () => {
@@ -63,44 +69,82 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 
   const setProfile = (p: UserProfile | null) => {
     setProfileState(p)
-    if (p) localStorage.setItem('userProfile', JSON.stringify(p))
-    else localStorage.removeItem('userProfile')
+    if (p) {
+      SessionManager.setUserData({ profile: p })
+    } else {
+      // Clear user data when profile is null
+      const currentData = SessionManager.getUserData() || {}
+      delete currentData.profile
+      SessionManager.setUserData(currentData)
+    }
   }
 
   const setRole = (r: UserRole | null) => {
     setRoleState(r)
-    if (r) localStorage.setItem('userRole', JSON.stringify(r))
-    else localStorage.removeItem('userRole')
+    if (r) {
+      const currentData = SessionManager.getUserData() || {}
+      SessionManager.setUserData({ ...currentData, role: r })
+    } else {
+      // Clear role when null
+      const currentData = SessionManager.getUserData() || {}
+      delete currentData.role
+      SessionManager.setUserData(currentData)
+    }
   }
 
   const refresh = async () => {
     try {
-      const data = await fetchJson('/api/auth/user')
-      if (data?.profile) {
-        setProfileState(data.profile)
-        localStorage.setItem('userProfile', JSON.stringify(data.profile))
+      const response = await fetch('/api/auth/user')
+      const data = await response.json()
+
+      if (response.status === 404) {
+        // User not found - session is invalid, perform complete logout
+        console.log('User session invalid (404), performing complete logout...')
+        await performCompleteLogout()
+        return
       }
-      if (data?.profile?.role?.name) {
-        setRoleState(data.profile.role.name)
-        localStorage.setItem('userRole', JSON.stringify(data.profile.role.name))
+
+      if (response.ok && data?.profile) {
+        setProfileState(data.profile)
+
+        // Store session data using SessionManager
+        SessionManager.setSessionData({
+          userId: data.profile.id,
+          email: data.profile.email,
+          role: data.profile.role?.name,
+          profileComplete: !!data.profile,
+          membershipPaid: !!data.profile.membership_fee_paid
+        })
+
+        // Store user data
+        SessionManager.setUserData({
+          profile: data.profile,
+          role: data.profile.role?.name
+        })
+      } else {
+        // Other errors - clear local data
+        setProfileState(null)
+        setRoleState(null)
+        SessionManager.clearLocalStorage()
       }
     } catch (err) {
-      // unauthenticated or error - clear local
+      // Network or other errors - clear local data
       setProfileState(null)
       setRoleState(null)
-      localStorage.removeItem('userProfile')
-      localStorage.removeItem('userRole')
+      SessionManager.clearLocalStorage()
     }
   }
 
+  const performCompleteLogout = async () => {
+    // Clear local state
+    setProfileState(null)
+    setRoleState(null)
+    // Use NextAuth's signOut for a clean logout. It handles cookie removal.
+    await signOut({ callbackUrl: '/auth/login' })
+  }
+
   const logout = async () => {
-    setProfile(null)
-    setRole(null)
-    localStorage.removeItem('userProfile')
-    localStorage.removeItem('userRole')
-    try {
-      await fetch('/api/auth/signout', { method: 'POST' })
-    } catch {}
+    await performCompleteLogout()
   }
 
   return (

@@ -4,6 +4,8 @@ import { prisma } from '@/lib/prisma/client'
 import { authOptions } from '../[...nextauth]/route'
 import bcrypt from 'bcryptjs'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET() {
   try {
     const session = await getServerSession(authOptions)

@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Progress } from "@/components/ui/progress"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
   BookOpen,
   FileText,
@@ -22,9 +23,9 @@ import {
   Clock,
   AlertCircle,
   GraduationCap,
-  Target
+  Target,
+  X
 } from "lucide-react"
-import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 
@@ -34,6 +35,19 @@ interface Module {
   description: string
   created_at: string
   question_count: number
+  level_count?: number
+}
+
+interface Level {
+  id: string
+  title: string
+  description: string
+  orderIndex: number
+  isActive: boolean
+  estimatedDuration: number
+  created_at: string
+  content_count?: number
+  has_test?: boolean
 }
 
 interface ExamConfiguration {
@@ -56,6 +70,7 @@ interface StudentStats {
 
 export default function MasterPractitionerDashboardPage() {
   const [modules, setModules] = useState<Module[]>([])
+  const [levels, setLevels] = useState<Level[]>([])
   const [examConfigurations, setExamConfigurations] = useState<ExamConfiguration[]>([])
   const [stats, setStats] = useState<StudentStats>({
     totalStudents: 0,
@@ -70,121 +85,157 @@ export default function MasterPractitionerDashboardPage() {
   const [userEmail, setUserEmail] = useState("")
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const router = useRouter()
-  const supabase = createClient()
 
   useEffect(() => {
     const checkMasterPractitionerAndLoadData = async () => {
-      const {
-        data: { user: authUser },
-      } = await supabase.auth.getUser()
+      try {
+        setIsLoading(true)
+        
+        // Check authentication via API
+        const authRes = await fetch('/api/auth/user')
+        if (authRes.status === 401) {
+          router.push('/auth/login')
+          return
+        }
+        
+        if (!authRes.ok) {
+          throw new Error('Failed to fetch user data')
+        }
+        
+        const authData = await authRes.json()
+        const profile = authData.profile
+        
+        if (!profile) {
+          router.push('/register')
+          return
+        }
 
-      if (!authUser) {
-        router.push("/auth/login")
-        return
+        // Check if master practitioner - role info should be included in profile
+        if (!profile.roleId || profile.role?.name !== 'master_practitioner') {
+          setIsMasterPractitioner(false)
+          setIsLoading(false)
+          return
+        }
+
+        setIsMasterPractitioner(true)
+        setUserName(`${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'Master Practitioner')
+        setUserEmail(profile.email || '')
+
+        // Load data
+        await Promise.all([
+          loadModules(),
+          loadLevels(),
+          loadExamConfigurations(),
+          loadStats()
+        ])
+      } catch (error) {
+        console.error('Error loading data:', error)
+        setIsMasterPractitioner(false)
+      } finally {
+        setIsLoading(false)
       }
-
-      // Check if master practitioner
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role_id')
-        .eq('id', authUser.id)
-        .single()
-
-      if (!profile?.role_id) {
-        router.push("/practitioner")
-        return
-      }
-
-      const { data: role } = await supabase
-        .from('roles')
-        .select('name')
-        .eq('id', profile.role_id)
-        .single()
-
-      if (role?.name !== 'master_practitioner') {
-        router.push("/practitioner")
-        return
-      }
-
-      setIsMasterPractitioner(true)
-      setUserName(`${authUser.user_metadata?.first_name || ''} ${authUser.user_metadata?.last_name || ''}`.trim() || 'Master Practitioner')
-      setUserEmail(authUser.email || '')
-
-      // Load data
-      await Promise.all([
-        loadModules(),
-        loadExamConfigurations(),
-        loadStats()
-      ])
     }
 
     checkMasterPractitionerAndLoadData()
-  }, [supabase, router])
+  }, [router])
 
   const loadModules = async () => {
-    const { data: modulesData, error } = await supabase
-      .from("modules")
-      .select("*")
-      .order("created_at", { ascending: false })
+    try {
+      const response = await fetch('/api/modules')
+      if (response.ok) {
+        const modulesData = await response.json()
+        // Get question count and level count for each module
+        const modulesWithCounts = await Promise.all(
+          modulesData.map(async (module: any) => {
+            // For now, we'll use the questions count from the include
+            const questionCount = module.questions?.length || 0
 
-    if (!error && modulesData) {
-      // Get question count for each module
-      const modulesWithCounts = await Promise.all(
-        modulesData.map(async (module: any) => {
-          const { count } = await supabase
-            .from("test_questions")
-            .select("*", { count: 'exact', head: true })
-            .eq("module_id", module.id)
+            // Try to get level count - handle gracefully if API doesn't exist yet
+            let levelCount = 0
+            try {
+              const levelsResponse = await fetch(`/api/levels?moduleId=${module.id}`)
+              if (levelsResponse.ok) {
+                const levelsData = await levelsResponse.json()
+                levelCount = levelsData.length
+              }
+            } catch (error) {
+              console.warn('Levels API not available yet')
+            }
 
-          return {
-            ...module,
-            question_count: count || 0
-          }
-        })
-      )
-      setModules(modulesWithCounts)
+            return {
+              ...module,
+              question_count: questionCount,
+              level_count: levelCount
+            }
+          })
+        )
+        setModules(modulesWithCounts)
+      } else {
+        console.warn('Modules API not available yet')
+        setModules([])
+      }
+    } catch (error) {
+      console.error('Error loading modules:', error)
+      setModules([])
+    }
+  }
+
+  const loadLevels = async () => {
+    try {
+      const response = await fetch('/api/levels')
+      if (response.ok) {
+        const levelsData = await response.json()
+        // The API already includes content and test info
+        const levelsWithCounts = levelsData.map((level: any) => ({
+          ...level,
+          content_count: level.contents?.length || 0,
+          has_test: !!level.levelTest,
+          module_title: level.module?.title || 'Unknown Module'
+        }))
+        setLevels(levelsWithCounts)
+      } else {
+        // API not available yet, set empty array
+        console.warn('Levels API not available yet')
+        setLevels([])
+      }
+    } catch (error) {
+      console.warn('Levels API not available yet, setting empty levels')
+      setLevels([])
     }
   }
 
   const loadExamConfigurations = async () => {
-    const { data: examData, error } = await supabase
-      .from("exam_configurations")
-      .select("*")
-      .order("created_at", { ascending: false })
-      .limit(10)
-
-    if (!error && examData) {
-      setExamConfigurations(examData)
+    try {
+      // For now, set empty array since exam configurations API might not exist
+      // You can implement this later when the API is ready
+      setExamConfigurations([])
+    } catch (error) {
+      console.warn('Exam configurations not available yet')
+      setExamConfigurations([])
     }
   }
 
   const loadStats = async () => {
-    // Load student statistics
-    const { data: profiles, error } = await supabase
-      .from("profiles")
-      .select("*")
-
-    if (!error && profiles) {
-      const totalStudents = profiles.length
-      const activeStudents = profiles.filter((p: any) => p.membership_fee_paid).length
-      const completedTests = profiles.filter((p: any) => p.test_completed).length
-      const scores = profiles
-        .filter((p: any) => p.test_completed && p.test_score)
-        .map((p: any) => p.test_score as number)
-      const avgScore = scores.length > 0 ? scores.reduce((a: number, b: number) => a + b, 0) / scores.length : 0
-      const passRate = completedTests > 0 ?
-        (profiles.filter((p: any) => p.test_completed && p.test_score && p.test_score >= 70).length / completedTests) * 100 : 0
-
+    try {
+      // Load basic stats - for now use placeholder data
+      // You can implement actual API call here when ready
       setStats({
-        totalStudents,
-        activeStudents,
-        completedTests,
-        avgScore,
-        passRate
+        totalStudents: 0,
+        activeStudents: 0,
+        completedTests: 0,
+        avgScore: 0,
+        passRate: 0
+      })
+    } catch (error) {
+      console.error('Error loading stats:', error)
+      setStats({
+        totalStudents: 0,
+        activeStudents: 0,
+        completedTests: 0,
+        avgScore: 0,
+        passRate: 0
       })
     }
-
-    setIsLoading(false)
   }
 
   if (isLoading) {
@@ -204,6 +255,12 @@ export default function MasterPractitionerDashboardPage() {
           <div className="text-center">
             <h1 className="text-2xl font-bold mb-4">Access Denied</h1>
             <p className="text-muted-foreground">You don't have permission to access this page.</p>
+            <Button 
+              onClick={() => router.push('/dashboard')} 
+              className="mt-4"
+            >
+              Go to Dashboard
+            </Button>
           </div>
         </div>
       </div>
@@ -227,11 +284,13 @@ export default function MasterPractitionerDashboardPage() {
       </div>
 
       {/* Desktop Sidebar */}
-      <DashboardSidebar
-        userRole="master_practitioner"
-        userName={userName}
-        userEmail={userEmail}
-      />
+      <div className="hidden md:block">
+        <DashboardSidebar
+          userRole="master_practitioner"
+          userName={userName}
+          userEmail={userEmail}
+        />
+      </div>
 
       <main className="flex-1 overflow-y-auto">
         {/* Mobile Header */}
@@ -258,7 +317,7 @@ export default function MasterPractitionerDashboardPage() {
             </div>
 
             {/* Key Statistics */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 md:gap-6 mb-8">
               <Card className="group hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 border-0 bg-gradient-to-br from-background to-muted/20 backdrop-blur-sm">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Total Modules</CardTitle>
@@ -268,6 +327,19 @@ export default function MasterPractitionerDashboardPage() {
                   <div className="text-3xl font-bold">{modules.length}</div>
                   <p className="text-xs text-muted-foreground">
                     Available for students
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card className="group hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 border-0 bg-gradient-to-br from-background to-muted/20 backdrop-blur-sm">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Total Levels</CardTitle>
+                  <GraduationCap className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-3xl font-bold">{levels.length}</div>
+                  <p className="text-xs text-muted-foreground">
+                    Learning levels created
                   </p>
                 </CardContent>
               </Card>
@@ -312,6 +384,7 @@ export default function MasterPractitionerDashboardPage() {
               </Card>
             </div>
 
+            {/* Rest of your JSX remains the same */}
             {/* Quick Actions */}
             <Card className="mb-8">
               <CardHeader>
@@ -320,7 +393,7 @@ export default function MasterPractitionerDashboardPage() {
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                  <Link href="/admin/modules" className="group p-4 bg-gradient-to-br from-blue-50 to-blue-25 rounded-xl border border-blue-200 hover:shadow-lg hover:-translate-y-1 transition-all duration-300 block">
+                  <Link href="/master-practitioner/modules" className="group p-4 bg-gradient-to-br from-blue-50 to-blue-25 rounded-xl border border-blue-200 hover:shadow-lg hover:-translate-y-1 transition-all duration-300 block">
                     <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
                       <BookOpen className="h-5 w-5 text-blue-600" />
                     </div>
@@ -328,15 +401,15 @@ export default function MasterPractitionerDashboardPage() {
                     <div className="text-xs text-muted-foreground">Create and edit learning modules</div>
                   </Link>
 
-                  <Link href="/admin/tests" className="group p-4 bg-gradient-to-br from-green-50 to-green-25 rounded-xl border border-green-200 hover:shadow-lg hover:-translate-y-1 transition-all duration-300 block">
-                    <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
-                      <FileText className="h-5 w-5 text-green-600" />
+                  <Link href="/master-practitioner/levels" className="group p-4 bg-gradient-to-br from-indigo-50 to-indigo-25 rounded-xl border border-indigo-200 hover:shadow-lg hover:-translate-y-1 transition-all duration-300 block">
+                    <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+                      <GraduationCap className="h-5 w-5 text-indigo-600" />
                     </div>
-                    <div className="font-semibold text-sm mb-1">Create Exams</div>
-                    <div className="text-xs text-muted-foreground">Configure exam settings</div>
+                    <div className="font-semibold text-sm mb-1">Manage Levels</div>
+                    <div className="text-xs text-muted-foreground">Create and organize learning levels</div>
                   </Link>
 
-                  <Link href="/admin/certificates" className="group p-4 bg-gradient-to-br from-purple-50 to-purple-25 rounded-xl border border-purple-200 hover:shadow-lg hover:-translate-y-1 transition-all duration-300 block">
+                  <Link href="/master-practitioner/certificates" className="group p-4 bg-gradient-to-br from-purple-50 to-purple-25 rounded-xl border border-purple-200 hover:shadow-lg hover:-translate-y-1 transition-all duration-300 block">
                     <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
                       <Award className="h-5 w-5 text-purple-600" />
                     </div>
@@ -344,7 +417,15 @@ export default function MasterPractitionerDashboardPage() {
                     <div className="text-xs text-muted-foreground">Manage student certifications</div>
                   </Link>
 
-                  <Link href="/admin/student-results" className="group p-4 bg-gradient-to-br from-orange-50 to-orange-25 rounded-xl border border-orange-200 hover:shadow-lg hover:-translate-y-1 transition-all duration-300 block">
+                  <Link href="/master-practitioner/tests" className="group p-4 bg-gradient-to-br from-green-50 to-green-25 rounded-xl border border-green-200 hover:shadow-lg hover:-translate-y-1 transition-all duration-300 block">
+                    <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+                      <FileText className="h-5 w-5 text-green-600" />
+                    </div>
+                    <div className="font-semibold text-sm mb-1">Create Exams</div>
+                    <div className="text-xs text-muted-foreground">Configure exam settings</div>
+                  </Link>
+
+                  <Link href="/master-practitioner/students" className="group p-4 bg-gradient-to-br from-orange-50 to-orange-25 rounded-xl border border-orange-200 hover:shadow-lg hover:-translate-y-1 transition-all duration-300 block">
                     <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
                       <Users className="h-5 w-5 text-orange-600" />
                     </div>
@@ -355,8 +436,8 @@ export default function MasterPractitionerDashboardPage() {
               </CardContent>
             </Card>
 
-            {/* Recent Modules and Tests */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* Recent Modules, Levels and Tests */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               {/* Recent Modules */}
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
@@ -364,7 +445,7 @@ export default function MasterPractitionerDashboardPage() {
                     <CardTitle>Recent Modules</CardTitle>
                     <CardDescription>Modules you've created or modified</CardDescription>
                   </div>
-                  <Link href="/admin/modules">
+                  <Link href="/master-practitioner/modules">
                     <Button variant="outline" size="sm">
                       <Plus className="h-4 w-4 mr-2" />
                       Add Module
@@ -378,16 +459,16 @@ export default function MasterPractitionerDashboardPage() {
                         <div className="flex-1">
                           <div className="font-medium text-sm">{module.title}</div>
                           <div className="text-xs text-muted-foreground">
-                            {module.question_count} questions • Created {new Date(module.created_at).toLocaleDateString()}
+                            {module.level_count} levels • {module.question_count} questions • Created {new Date(module.created_at).toLocaleDateString()}
                           </div>
                         </div>
                         <div className="flex gap-2">
-                          <Link href={`/admin/modules/content?module=${module.id}`}>
+                          <Link href={`/master-practitioner/modules/${module.id}/content`}>
                             <Button variant="ghost" size="sm">
                               <Edit className="h-4 w-4" />
                             </Button>
                           </Link>
-                          <Link href={`/admin/modules/${module.id}`}>
+                          <Link href={`/master-practitioner/modules/${module.id}`}>
                             <Button variant="ghost" size="sm">
                               <Eye className="h-4 w-4" />
                             </Button>
@@ -399,8 +480,57 @@ export default function MasterPractitionerDashboardPage() {
                       <div className="text-center py-8 text-muted-foreground">
                         <BookOpen className="h-12 w-12 mx-auto mb-4 opacity-50" />
                         <p>No modules created yet</p>
-                        <Link href="/admin/modules">
+                        <Link href="/master-practitioner/modules">
                           <Button className="mt-2">Create Your First Module</Button>
+                        </Link>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Recent Levels */}
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <div>
+                    <CardTitle>Recent Levels</CardTitle>
+                    <CardDescription>Learning levels you've created</CardDescription>
+                  </div>
+                  <Link href="/master-practitioner/levels">
+                    <Button variant="outline" size="sm">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Level
+                    </Button>
+                  </Link>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {levels.slice(0, 5).map((level) => (
+                      <div key={level.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                        <div className="flex-1">
+                          <div className="font-medium text-sm">{level.title}</div>
+                          <div className="text-xs text-muted-foreground">
+                            Level {level.orderIndex + 1} • {level.content_count} contents • {level.has_test ? 'Has test' : 'No test'} • Created {new Date(level.created_at).toLocaleDateString()}
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <Badge variant={level.isActive ? "default" : "secondary"}>
+                            {level.isActive ? "Active" : "Inactive"}
+                          </Badge>
+                          <Link href={`/master-practitioner/levels/${level.id}`}>
+                            <Button variant="ghost" size="sm">
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                          </Link>
+                        </div>
+                      </div>
+                    ))}
+                    {levels.length === 0 && (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <GraduationCap className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                        <p>No levels created yet</p>
+                        <Link href="/master-practitioner/levels">
+                          <Button className="mt-2">Create Your First Level</Button>
                         </Link>
                       </div>
                     )}
@@ -471,7 +601,7 @@ export default function MasterPractitionerDashboardPage() {
                       <span>Active Students</span>
                       <span className="font-medium">{stats.activeStudents}/{stats.totalStudents}</span>
                     </div>
-                    <Progress value={(stats.activeStudents / stats.totalStudents) * 100} className="h-2" />
+                    <Progress value={(stats.activeStudents / Math.max(stats.totalStudents, 1)) * 100} className="h-2" />
                     <p className="text-xs text-muted-foreground">
                       Students with active memberships
                     </p>
@@ -480,9 +610,9 @@ export default function MasterPractitionerDashboardPage() {
                   <div className="space-y-2">
                     <div className="flex justify-between text-sm">
                       <span>Test Completion</span>
-                      <span className="font-medium">{stats.completedTests}/{stats.activeStudents}</span>
+                      <span className="font-medium">{stats.completedTests}/{Math.max(stats.activeStudents, 1)}</span>
                     </div>
-                    <Progress value={(stats.completedTests / stats.activeStudents) * 100} className="h-2" />
+                    <Progress value={(stats.completedTests / Math.max(stats.activeStudents, 1)) * 100} className="h-2" />
                     <p className="text-xs text-muted-foreground">
                       Students who completed tests
                     </p>
@@ -504,6 +634,7 @@ export default function MasterPractitionerDashboardPage() {
           </div>
         </div>
       </main>
+
     </div>
   )
 }

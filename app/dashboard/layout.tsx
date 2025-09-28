@@ -4,7 +4,6 @@ import { useState, useEffect } from "react"
 import { DashboardSidebar } from "@/components/dashboard-sidebar"
 import { Button } from "@/components/ui/button"
 import { Menu } from "lucide-react"
-import { createClient } from "@/lib/supabase/client"
 import { useRouter, usePathname } from "next/navigation"
 
 export default function DashboardLayout({
@@ -18,54 +17,30 @@ export default function DashboardLayout({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const router = useRouter()
   const pathname = usePathname()
-  const supabase = createClient()
 
   useEffect(() => {
     const getUser = async () => {
-      const { data: { user: authUser } } = await supabase.auth.getUser()
-
-      if (!authUser) {
+      const res = await fetch('/api/auth/user')
+      if (res.status === 401) {
         router.push("/auth/login")
         return
       }
-
-      // Set basic user info from auth
-      setUserName(authUser.user_metadata?.first_name && authUser.user_metadata?.last_name
-        ? `${authUser.user_metadata.first_name} ${authUser.user_metadata.last_name}`
-        : authUser.email?.split('@')[0] || 'User')
-      setUserEmail(authUser.email || '')
-
-      // Get profile for additional info
-      const { data: profile, error: profileError } = await supabase
-        .from("profiles")
-        .select("first_name, last_name, email, role_id")
-        .eq("id", authUser.id)
-        .single()
-
-      if (!profileError && profile) {
-        // Update with profile data if available
-        setUserName(`${profile.first_name || authUser.user_metadata?.first_name || 'User'} ${profile.last_name || authUser.user_metadata?.last_name || ''}`.trim())
-        setUserEmail(profile.email || authUser.email || '')
-
-        // Get role if role_id exists
-        if (profile.role_id) {
-          const { data: roleData } = await supabase
-            .from("roles")
-            .select("name")
-            .eq("id", profile.role_id)
-            .single()
-
-          setUserRole(roleData?.name || "practitioner")
-        } else {
-          setUserRole("practitioner") // default
-        }
-      } else {
-        setUserRole("practitioner") // default
+      if (!res.ok) {
+        // Handle other errors, maybe show an error page
+        return
       }
+      const data = await res.json()
+      const profile = data.profile
+      const authUser = data
+
+      // Set user info from the unified API response
+      setUserName(profile?.firstName && profile?.lastName ? `${profile.firstName} ${profile.lastName}` : (authUser.email?.split('@')[0] || 'User'))
+      setUserEmail(profile?.email || authUser.email || '')
+      setUserRole(profile?.role?.name || "practitioner")
     }
 
     getUser()
-  }, [supabase, router])
+  }, [router, pathname])
 
   const getPageTitle = () => {
     switch (pathname) {

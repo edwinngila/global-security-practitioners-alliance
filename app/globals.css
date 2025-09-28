@@ -468,6 +468,43 @@
   @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2;
 }
 
+/* Rich Text Editor Styles */
+.rich-text-editor ul {
+  padding-left: 1.5rem;
+  margin: 0.5rem 0;
+}
+
+.rich-text-editor ol {
+  padding-left: 1.5rem;
+  margin: 0.5rem 0;
+}
+
+.rich-text-editor li {
+  margin: 0.25rem 0;
+}
+
+.rich-text-editor ul li {
+  list-style-type: disc;
+}
+
+.rich-text-editor ol li {
+  list-style-type: decimal;
+}
+
+.rich-text-editor ul ul li {
+  list-style-type: circle;
+}
+
+.rich-text-editor ul ul ul li {
+  list-style-type: square;
+}
+
+/* Ensure lists are visible in contentEditable */
+.rich-text-editor[contenteditable] ul,
+.rich-text-editor[contenteditable] ol {
+  list-style-position: inside;
+}
+
 /* Responsive text sizing */
 @media (max-width: 640px) {
   h1 {

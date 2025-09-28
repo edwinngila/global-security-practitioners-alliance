@@ -9,7 +9,13 @@ export async function GET(request: Request) {
     const session = await getServerSession(authOptions)
     if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+    const url = new URL(request.url)
+    const active = url.searchParams.get('active')
+
+    const whereClause = active === 'true' ? { isActive: true } : {}
+
     const modules = await prisma.module.findMany({
+      where: whereClause,
       orderBy: { createdAt: 'desc' },
       include: { questions: { select: { id: true } }, enrollments: true }
     })

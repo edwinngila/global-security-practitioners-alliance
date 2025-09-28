@@ -9,7 +9,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { FileText, Search, Award, XCircle, CheckCircle, Menu, Eye, Edit, Trash2 } from "lucide-react"
-import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 
 interface StudentResult {
@@ -35,7 +34,6 @@ export default function AdminStudentResultsPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
   const router = useRouter()
-  const supabase = createClient()
 
   useEffect(() => {
     const checkAdminAndLoadData = async () => {
@@ -62,19 +60,19 @@ export default function AdminStudentResultsPage() {
     }
 
     checkAdminAndLoadData()
-  }, [supabase, router])
+  }, [router])
 
   useEffect(() => {
     filterStudents()
   }, [students, searchTerm, statusFilter])
 
   const loadStudentResults = async () => {
-    const { data: profiles, error } = await supabase
-      .from("profiles")
-      .select("*")
-      .order("created_at", { ascending: false })
-
-    if (!error && profiles) {
+    try {
+      const res = await fetch('/api/users?results=true'); // Assuming an endpoint for student results
+      if (!res.ok) {
+        throw new Error('Failed to fetch student results');
+      }
+      const profiles = await res.json();
       const studentResults: StudentResult[] = profiles.map((profile: any) => ({
         id: profile.id,
         first_name: profile.first_name || '',
@@ -87,9 +85,11 @@ export default function AdminStudentResultsPage() {
         created_at: profile.created_at
       }))
       setStudents(studentResults)
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsLoading(false)
     }
-
-    setIsLoading(false)
   }
 
   const filterStudents = () => {
@@ -97,24 +97,29 @@ export default function AdminStudentResultsPage() {
 
     // Search filter
     if (searchTerm) {
-      filtered = filtered.filter(student =>
-        `${student.first_name} ${student.last_name}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        student.email.toLowerCase().includes(searchTerm.toLowerCase())
+      const lowercasedSearchTerm = searchTerm.toLowerCase();
+      filtered = filtered.filter(
+        (student) =>
+          `${student.first_name} ${student.last_name}`
+            .toLowerCase()
+            .includes(lowercasedSearchTerm) ||
+          student.email.toLowerCase().includes(lowercasedSearchTerm)
       )
     }
 
     // Status filter
     if (statusFilter !== "all") {
       filtered = filtered.filter(student => {
+        const score = student.test_score;
         switch (statusFilter) {
           case "completed":
             return student.test_completed
           case "not_completed":
             return !student.test_completed
           case "passed":
-            return student.test_completed && student.test_score && student.test_score >= 70
+            return student.test_completed && score !== null && score >= 70
           case "failed":
-            return student.test_completed && student.test_score && student.test_score < 70
+            return student.test_completed && score !== null && score < 70
           case "certified":
             return student.certificate_issued
           default:
@@ -126,29 +131,37 @@ export default function AdminStudentResultsPage() {
     setFilteredStudents(filtered)
   }
 
-  const updateTestScore = async (studentId: string, newScore: number) => {
-    const { error } = await supabase
-      .from("profiles")
-      .update({
-        test_score: newScore,
-        test_completed: true,
-        test_completed_at: new Date().toISOString()
-      })
-      .eq('id', studentId)
+  const updateTestScore = async (studentId: string, newScore: string) => {
+    const score = parseInt(newScore, 10);
+    if (isNaN(score)) return;
 
-    if (!error) {
+    const res = await fetch(`/api/users/${studentId}/score`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ score }),
+    });
+
+    if (res.ok) {
       await loadStudentResults() // Refresh data
+    } else {
+      alert('Failed to update score');
     }
   }
 
-  const toggleCertificate = async (studentId: string, currentStatus: boolean) => {
-    const { error } = await supabase
-      .from("profiles")
-      .update({ certificate_issued: !currentStatus })
-      .eq('id', studentId)
+  const toggleCertificate = async (
+    studentId: string,
+    currentStatus: boolean
+  ) => {
+    const res = await fetch(`/api/users/${studentId}/certificate`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ issue: !currentStatus }),
+    });
 
-    if (!error) {
+    if (res.ok) {
       await loadStudentResults() // Refresh data
+    } else {
+      alert('Failed to update certificate status');
     }
   }
 

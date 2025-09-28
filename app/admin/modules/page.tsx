@@ -12,7 +12,6 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Plus, Edit, Trash2, Eye, Users, Clock, DollarSign, Menu } from "lucide-react"
-import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 
 interface Module {
@@ -56,7 +55,6 @@ export default function AdminModulesPage() {
     syllabus: ''
   })
 
-  const supabase = createClient()
   const router = useRouter()
 
   useEffect(() => {
@@ -77,7 +75,7 @@ export default function AdminModulesPage() {
         setUserName(`${data?.profile?.first_name || ''} ${data?.profile?.last_name || ''}`.trim() || 'Admin')
         setUserEmail(data?.email || '')
 
-        fetchModules()
+        await fetchModules()
       } catch (err) {
         router.push('/auth/login')
         return
@@ -85,7 +83,7 @@ export default function AdminModulesPage() {
     }
 
     checkAdminAndLoadData()
-  }, [supabase, router])
+  }, [router])
 
   const fetchModules = async () => {
     try {

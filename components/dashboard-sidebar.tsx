@@ -23,7 +23,7 @@ import {
   Mail,
 } from "lucide-react"
 import { fetchJson } from '@/lib/api/client'
-import { useRouter } from "next/navigation"
+import { signOut } from "next-auth/react"
 import { getNavigationItems, getCurrentUserRole, type UserRole } from "@/lib/rbac"
 
 interface DashboardSidebarProps {
@@ -130,7 +130,6 @@ export function DashboardSidebar({
   const [collapsed, setCollapsed] = useState(false)
   const [actualUserRole, setActualUserRole] = useState<UserRole>('practitioner')
   const pathname = usePathname()
-  const router = useRouter()
   useEffect(() => {
     const fetchUserRole = async () => {
       const role = await getCurrentUserRole()
@@ -170,10 +169,10 @@ export function DashboardSidebar({
   const menuItems = getMenuItems()
 
   const handleLogout = async () => {
-    try {
-      await fetch('/api/auth/signout', { method: 'POST' })
-    } catch {}
-    router.push("/")
+    // NextAuth's signOut function is designed to handle all session cleanup,
+    // including removing the `next-auth.session-token` cookie.
+    // The `callbackUrl` ensures the user is redirected to the homepage after logout.
+    await signOut({ callbackUrl: '/', redirect: true });
   }
 
   return (

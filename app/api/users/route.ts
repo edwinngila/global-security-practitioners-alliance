@@ -18,7 +18,7 @@ export async function GET() {
       where: { id: session.user.id },
       include: { role: true }
     })
-    if (!authProfile || authProfile.role?.name !== 'admin') {
+    if (!authProfile || (authProfile.role?.name !== 'admin' && authProfile.role?.name !== 'master_practitioner')) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 

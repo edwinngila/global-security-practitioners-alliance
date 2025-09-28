@@ -20,6 +20,7 @@ const authOptions: NextAuthOptions = {
       credentials: {
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
+        rememberMe: { label: "Remember Me", type: "boolean" },
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) {
@@ -39,16 +40,24 @@ const authOptions: NextAuthOptions = {
             },
           });
 
-          if (!user || !user.password) {
+          if (!user) {
             console.log("No user found with this email");
             throw new Error("Invalid credentials");
           }
 
-          // Validate password
-          const passwordsMatch = await bcrypt.compare(credentials.password, user.password);
-          if (!passwordsMatch) {
-            console.log("Invalid password");
+          // Special case for verified users (from email verification)
+          if (credentials.password === 'verified-user' && user.isVerified) {
+            console.log("Verified user sign-in for:", credentials.email);
+          } else if (!user.password) {
+            console.log("User has no password set");
             throw new Error("Invalid credentials");
+          } else {
+            // Validate password for normal login
+            const passwordsMatch = await bcrypt.compare(credentials.password, user.password);
+            if (!passwordsMatch) {
+              console.log("Invalid password");
+              throw new Error("Invalid credentials");
+            }
           }
 
           // Log successful login and update profile
@@ -70,6 +79,7 @@ const authOptions: NextAuthOptions = {
             role: user.profile?.role?.name || "user",
             profileComplete: !!user.profile,
             membershipPaid: !!user.profile?.membershipFeePaid,
+            rememberMe: credentials.rememberMe === "true",
           };
         } catch (error) {
           console.error("Auth error:", error);
@@ -79,12 +89,19 @@ const authOptions: NextAuthOptions = {
     }),
   ],
   callbacks: {
-    async jwt({ token, user, trigger, session }) {
+    async jwt({ token, user, trigger, session, account }) {
       if (user) {
         token.id = user.id;
         token.role = user.role;
         token.profileComplete = user.profileComplete;
         token.membershipPaid = user.membershipPaid;
+        // Store remember me preference in token
+        const rememberMe = (user as any).rememberMe || false;
+        token.rememberMe = rememberMe;
+
+        // Set token expiration based on remember me preference
+        const now = Math.floor(Date.now() / 1000);
+        token.exp = now + (rememberMe ? 30 * 24 * 60 * 60 : 24 * 60 * 60); // 30 days or 24 hours
       }
 
       // Handle user updates

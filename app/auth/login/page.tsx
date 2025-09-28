@@ -12,7 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Shield, AlertCircle, Eye, EyeOff, Lock, Mail } from "lucide-react";
+import { Shield, AlertCircle, Eye, EyeOff, Lock, Mail, Check } from "lucide-react";
 import Link from "next/link";
 import Navigation from "@/components/navigation";
 import { emailValidation, rateLimiting } from "@/lib/validationUtils";
@@ -33,6 +33,7 @@ export default function LoginPage() {
   const [attemptCount, setAttemptCount] = useState(0);
   const [isBlocked, setIsBlocked] = useState(false);
   const [blockTimeRemaining, setBlockTimeRemaining] = useState(0);
+  const [rememberMe, setRememberMe] = useState(false);
 
   const {
     register,
@@ -75,6 +76,7 @@ export default function LoginPage() {
       redirect: false, // Important: handle redirect manually
       email,
       password,
+      rememberMe: rememberMe.toString(), // Pass remember me preference as string
     });
 
     setLoading(false);
@@ -88,30 +90,10 @@ export default function LoginPage() {
     }
   };
 
-  useEffect(() => {
-    // This effect runs when the session status changes
-    if (status === "authenticated" && session?.user?.role) {
-      const { role } = session.user;
-
-      // Redirect based on role
-      if (role === "admin") {
-        router.push("/admin/dashboard");
-      } else if (role === "master_practitioner") {
-        router.push("/master-practitioner");
-      } else if (role === "practitioner") {
-        router.push("/dashboard");
-      } else {
-        router.push("/dashboard"); // Default dashboard
-      }
-    }
-  }, [status, session, router]);
-
-  // Redirect if already authenticated
-  useEffect(() => {
-    if (status === "authenticated") {
-      // Optional: redirect immediately if already logged in
-    }
-  }, [status]);
+  // The redirection logic for authenticated users has been removed.
+  // Now, if a user is already logged in and navigates to /auth/login,
+  // they will see the login page instead of being redirected.
+  // Redirection will only happen *after* a successful login attempt.
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-background via-muted/10 to-background">
@@ -172,6 +154,9 @@ export default function LoginPage() {
               )}
 
               <form onSubmit={onSubmit} className="space-y-6">
+                {/* Hidden input for remember me */}
+                <input type="hidden" name="rememberMe" value={rememberMe.toString()} />
+
                 <div className="space-y-2">
                   <Label
                     htmlFor="email"
@@ -230,7 +215,23 @@ export default function LoginPage() {
                   {errors.password && <p className="text-sm text-red-600 font-medium">{errors.password.message}</p>}
                 </div>
 
-                <div className="text-right">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <input
+                      id="rememberMe"
+                      type="checkbox"
+                      checked={rememberMe}
+                      onChange={(e) => setRememberMe(e.target.checked)}
+                      className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
+                      disabled={isBlocked}
+                    />
+                    <Label
+                      htmlFor="rememberMe"
+                      className="text-sm font-medium text-muted-foreground cursor-pointer"
+                    >
+                      Remember me
+                    </Label>
+                  </div>
                   <Link
                     href="/auth/forgot-password"
                     className="text-sm text-primary hover:text-primary/80 font-medium transition-colors"

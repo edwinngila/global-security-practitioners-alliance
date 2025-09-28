@@ -3,6 +3,8 @@ import { getServerSession } from 'next-auth'
 import { prisma } from '@/lib/prisma/client'
 import { authOptions } from '../../../auth/[...nextauth]/route'
 
+export const runtime = 'nodejs'
+
 // GET /api/admin/permissions/[id] - Get a specific permission (admin only)
 export async function GET(
   request: Request,

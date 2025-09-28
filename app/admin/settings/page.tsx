@@ -9,7 +9,6 @@ import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import { Settings, Mail, Shield, Menu, Save } from "lucide-react"
-import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 
 export default function AdminSettingsPage() {
@@ -32,7 +31,6 @@ export default function AdminSettingsPage() {
   })
   const [isSaving, setIsSaving] = useState(false)
   const router = useRouter()
-  const supabase = createClient()
 
   useEffect(() => {
     const checkAdmin = async () => {
@@ -52,43 +50,25 @@ export default function AdminSettingsPage() {
         setUserName(`${data?.profile?.first_name || ''} ${data?.profile?.last_name || ''}`.trim() || 'Admin')
         setUserEmail(data?.email || '')
 
-        // Load settings from database
-        const { data: siteSettings } = await supabase
-          .from("site_settings")
-          .select("*")
-          .single()
-
-      if (siteSettings) {
-        setSettings({
-          siteName: siteSettings.site_name || "GSPA Certification Platform",
-          adminEmail: siteSettings.admin_email || "admin@gspa.com",
-          emailNotifications: siteSettings.email_notifications ?? true,
-          maintenanceMode: siteSettings.maintenance_mode ?? false,
-          registrationEnabled: siteSettings.registration_enabled ?? true,
-          testFee: siteSettings.test_fee || 50,
-          membershipFee: siteSettings.membership_fee || 50,
-          supportEmail: siteSettings.support_email || "support@gspa.com",
-          privacyPolicy: "",
-          termsOfService: ""
-        })
-      }
-
-      // Load legal documents
-      const { data: legalDocs } = await supabase
-        .from("legal_documents")
-        .select("document_type, content")
-        .eq("is_active", true)
-
-      if (legalDocs) {
-        const privacyDoc = legalDocs.find((doc: any) => doc.document_type === 'privacy_policy')
-        const termsDoc = legalDocs.find((doc: any) => doc.document_type === 'terms_of_service')
-
-        setSettings(prev => ({
-          ...prev,
-          privacyPolicy: privacyDoc?.content || "",
-          termsOfService: termsDoc?.content || ""
-        }))
-      }
+        // Load settings from API
+        const settingsRes = await fetch('/api/settings')
+        if (settingsRes.ok) {
+          const siteSettings = await settingsRes.json()
+          if (siteSettings) {
+            setSettings({
+              siteName: siteSettings.siteName || "GSPA Certification Platform",
+              adminEmail: siteSettings.adminEmail || "admin@gspa.com",
+              emailNotifications: siteSettings.emailNotifications ?? true,
+              maintenanceMode: siteSettings.maintenanceMode ?? false,
+              registrationEnabled: siteSettings.registrationEnabled ?? true,
+              testFee: siteSettings.testFee || 50,
+              membershipFee: siteSettings.membershipFee || 50,
+              supportEmail: siteSettings.supportEmail || "support@gspa.com",
+              privacyPolicy: siteSettings.privacyPolicy || "",
+              termsOfService: siteSettings.termsOfService || ""
+            })
+          }
+        }
 
       setIsLoading(false)
       } catch (error) {
@@ -99,56 +79,20 @@ export default function AdminSettingsPage() {
     }
 
     checkAdmin()
-  }, [supabase, router])
+  }, [router])
 
   const handleSaveSettings = async () => {
     setIsSaving(true)
     try {
-      // Save site settings
-      const { error: settingsError } = await supabase
-        .from("site_settings")
-        .upsert({
-          id: 1, // Assuming single row
-          site_name: settings.siteName,
-          admin_email: settings.adminEmail,
-          support_email: settings.supportEmail,
-          email_notifications: settings.emailNotifications,
-          maintenance_mode: settings.maintenanceMode,
-          registration_enabled: settings.registrationEnabled,
-          test_fee: settings.testFee,
-          membership_fee: settings.membershipFee,
-          updated_at: new Date().toISOString()
-        })
+      const response = await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(settings)
+      })
 
-      if (settingsError) throw settingsError
-
-      // Save legal documents
-      if (settings.privacyPolicy) {
-        const { error: privacyError } = await supabase
-          .from("legal_documents")
-          .upsert({
-            document_type: 'privacy_policy',
-            title: 'Privacy Policy',
-            content: settings.privacyPolicy,
-            is_active: true,
-            updated_at: new Date().toISOString()
-          })
-
-        if (privacyError) throw privacyError
-      }
-
-      if (settings.termsOfService) {
-        const { error: termsError } = await supabase
-          .from("legal_documents")
-          .upsert({
-            document_type: 'terms_of_service',
-            title: 'Terms of Service',
-            content: settings.termsOfService,
-            is_active: true,
-            updated_at: new Date().toISOString()
-          })
-
-        if (termsError) throw termsError
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to save settings')
       }
 
       alert('Settings saved successfully!')

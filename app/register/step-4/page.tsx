@@ -19,15 +19,17 @@ export default function RegisterStep4() {
   const supabase = createClient()
 
   useEffect(() => {
-    const step1Data = JSON.parse(localStorage.getItem("registration-step-1") || "{}")
-    const step2Data = JSON.parse(localStorage.getItem("registration-step-2") || "{}")
-    const step3Data = JSON.parse(localStorage.getItem("registration-step-3") || "{}")
+    if (typeof window !== 'undefined') {
+      const step1Data = JSON.parse(localStorage.getItem("registration-step-1") || "{}")
+      const step2Data = JSON.parse(localStorage.getItem("registration-step-2") || "{}")
+      const step3Data = JSON.parse(localStorage.getItem("registration-step-3") || "{}")
 
-    setAllData({
-      ...step1Data,
-      ...step2Data,
-      ...step3Data,
-    })
+      setAllData({
+        ...step1Data,
+        ...step2Data,
+        ...step3Data,
+      })
+    }
   }, [])
 
   // Helper function to convert base64 to blob
@@ -91,18 +93,22 @@ export default function RegisterStep4() {
       let signatureUrl: string | null = null
 
       try {
-        const tempPhoto = localStorage.getItem('temp-passport-photo')
-        if (tempPhoto) {
-          passportPhotoUrl = await uploadImageToStorage(tempPhoto, 'passports', `passport-${Date.now()}.jpg`, 'image/jpeg')
+        if (typeof window !== 'undefined') {
+          const tempPhoto = localStorage.getItem('temp-passport-photo')
+          if (tempPhoto) {
+            passportPhotoUrl = await uploadImageToStorage(tempPhoto, 'passports', `passport-${Date.now()}.jpg`, 'image/jpeg')
+          }
         }
       } catch (photoErr) {
         console.error('[v0] Passport upload failed, continuing without it', photoErr)
       }
 
       try {
-        const tempSignature = localStorage.getItem('temp-signature')
-        if (tempSignature) {
-          signatureUrl = await uploadImageToStorage(tempSignature, 'signatures', `signature-${Date.now()}.png`, 'image/png')
+        if (typeof window !== 'undefined') {
+          const tempSignature = localStorage.getItem('temp-signature')
+          if (tempSignature) {
+            signatureUrl = await uploadImageToStorage(tempSignature, 'signatures', `signature-${Date.now()}.png`, 'image/png')
+          }
         }
       } catch (sigErr) {
         console.error('[v0] Signature upload failed, continuing without it', sigErr)
@@ -141,11 +147,13 @@ export default function RegisterStep4() {
       }
 
       // persist pending registration (for email confirmation flow)
-      localStorage.setItem('pending-registration', JSON.stringify({ id: result.id, ...allData, passportPhotoUrl, signatureUrl }))
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('pending-registration', JSON.stringify({ id: result.id, ...allData, passportPhotoUrl, signatureUrl }))
 
-      // cleanup temp images
-      localStorage.removeItem('temp-passport-photo')
-      localStorage.removeItem('temp-signature')
+        // cleanup temp images
+        localStorage.removeItem('temp-passport-photo')
+        localStorage.removeItem('temp-signature')
+      }
 
       setSubmitSuccess(true)
     } catch (err: any) {
@@ -275,10 +283,10 @@ export default function RegisterStep4() {
                     {allData.declarationAccepted ? "Accepted" : "Not Accepted"}
                   </div>
                   <div>
-                    <span className="font-medium">Signature:</span> {localStorage.getItem("temp-signature") ? "✓ Provided" : "Not provided"}
+                    <span className="font-medium">Signature:</span> {typeof window !== 'undefined' && localStorage.getItem("temp-signature") ? "✓ Provided" : "Not provided"}
                   </div>
                   <div>
-                    <span className="font-medium">Passport Photo:</span> {localStorage.getItem("temp-passport-photo") ? "✓ Uploaded" : "Not uploaded"}
+                    <span className="font-medium">Passport Photo:</span> {typeof window !== 'undefined' && localStorage.getItem("temp-passport-photo") ? "✓ Uploaded" : "Not uploaded"}
                   </div>
                 </div>
               </div>

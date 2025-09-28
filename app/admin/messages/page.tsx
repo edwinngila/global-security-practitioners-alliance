@@ -11,7 +11,6 @@ import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Mail, MessageSquare, Eye, Send, Menu, Loader2, CheckCircle } from "lucide-react"
-import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 
 interface ContactMessage {
@@ -41,7 +40,6 @@ export default function AdminMessagesPage() {
   const [responseSuccess, setResponseSuccess] = useState(false)
 
   const router = useRouter()
-  const supabase = createClient()
 
   useEffect(() => {
     const checkAdminAndLoadMessages = async () => {
@@ -61,7 +59,7 @@ export default function AdminMessagesPage() {
         setUserName(`${data?.profile?.first_name || ''} ${data?.profile?.last_name || ''}`.trim() || 'Admin')
         setUserEmail(data?.email || '')
 
-        fetchMessages()
+        await fetchMessages()
       } catch (err) {
         router.push('/auth/login')
         return
@@ -69,7 +67,7 @@ export default function AdminMessagesPage() {
     }
 
     checkAdminAndLoadMessages()
-  }, [supabase, router])
+  }, [router])
 
   const fetchMessages = async () => {
     try {

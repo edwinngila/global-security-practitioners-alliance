@@ -10,7 +10,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { User, Mail, Phone, MapPin, Briefcase, Calendar, Save, Menu, Eye, EyeOff, X } from "lucide-react"
-import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 import countriesData from "@/lib/countries.json"
 
@@ -67,7 +66,6 @@ export default function AdminProfilePage() {
   >([])
   const [loadingCountries, setLoadingCountries] = useState(true)
   const router = useRouter()
-  const supabase = createClient()
 
   // Form state
   const [formData, setFormData] = useState({
@@ -143,7 +141,7 @@ export default function AdminProfilePage() {
     }
 
     checkAdminAndLoadProfile()
-  }, [supabase, router])
+  }, [router])
 
   // Load countries data
   useEffect(() => {

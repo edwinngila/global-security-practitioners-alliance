@@ -22,20 +22,21 @@ model User {
   lastLogin   DateTime?
   loginCount  Int       @default(0)
 
-  profile               Profile?
-  testAttempts          TestAttempt[]
-  ongoingTest           OngoingTest?
-  enrollments           ModuleEnrollment[]
-  createdModules        Module[]              @relation("ModuleCreatedBy")
+  profile                 Profile?
+  testAttempts            TestAttempt[]
+  ongoingTest             OngoingTest?
+  enrollments             ModuleEnrollment[]
+  createdModules          Module[]              @relation("ModuleCreatedBy")
   // Opposite relation fields for models referencing User
-  moduleContentsCreated ModuleContent[]       @relation("ModuleContentCreatedBy")
-  userProgresses        UserProgress[]
-  respondedMessages     ContactMessage[]
-  siteAnalytics         SiteAnalytics[]
-  generatedReports      Report[]
-  createdExamConfigs    ExamConfiguration[]
-  userExams             UserExam[]
-  certificateTemplates  CertificateTemplate[]
+  moduleContentsCreated   ModuleContent[]       @relation("ModuleContentCreatedBy")
+  subTopicContentsCreated SubTopicContent[]     @relation("SubTopicContentCreatedBy")
+  userProgresses          UserProgress[]
+  respondedMessages       ContactMessage[]
+  siteAnalytics           SiteAnalytics[]
+  generatedReports        Report[]
+  createdExamConfigs      ExamConfiguration[]
+  userExams               UserExam[]
+  certificateTemplates    CertificateTemplate[]
 }
 
 model Profile {
@@ -114,6 +115,7 @@ model TestQuestion {
   id                 String           @id @default(uuid())
   question           String           @db.Text
   category           String
+  subjectModel       String?          // Subject area identifier (e.g., 'cybersecurity', 'networking')
   difficulty         Difficulty
   isActive           Boolean          @default(true)
   optionsCount       Int              @default(4)
@@ -121,6 +123,9 @@ model TestQuestion {
   options            QuestionOption[]
   moduleId           String?
   module             Module?          @relation(fields: [moduleId], references: [id])
+  // Test model association
+  modelType          String?          // 'subtopic', 'level', 'module', 'exam'
+  modelId            String?          // ID of the associated test model
   createdAt          DateTime         @default(now())
   updatedAt          DateTime         @updatedAt
 }
@@ -193,6 +198,8 @@ model Module {
   modulesContent     ModuleContent[]
   questions          TestQuestion[]
   enrollments        ModuleEnrollment[]
+  levels             Level[]
+  moduleTest         ModuleTest?
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
 }
@@ -216,8 +223,111 @@ model ModuleContent {
   createdBy       User           @relation("ModuleContentCreatedBy", fields: [createdById], references: [id])
   // User progress entries for this content
   userProgresses  UserProgress[]
+  levelId         String?
+  level           Level?         @relation(fields: [levelId], references: [id])
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
+}
+
+model Level {
+  id                 String          @id @default(uuid())
+  moduleId           String
+  module             Module          @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  title              String
+  description        String?
+  orderIndex         Int             @default(0)
+  isActive           Boolean         @default(true)
+  estimatedDuration  Int?
+  learningObjectives Json?
+  contents           ModuleContent[]
+  subTopics          SubTopic[]
+  levelTest          LevelTest?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+}
+
+model LevelTest {
+  id             String   @id @default(uuid())
+  levelId        String   @unique
+  level          Level    @relation(fields: [levelId], references: [id], onDelete: Cascade)
+  title          String
+  description    String?
+  questions      Json // Array of question IDs or question objects
+  totalQuestions Int
+  passingScore   Int      @default(70)
+  timeLimit      Int      @default(1800) // 30 minutes default
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model SubTopic {
+  id              String            @id @default(uuid())
+  levelId         String
+  level           Level             @relation(fields: [levelId], references: [id], onDelete: Cascade)
+  title           String
+  description     String?
+  orderIndex      Int               @default(0)
+  isActive        Boolean           @default(true)
+  estimatedDuration Int?
+  learningObjectives Json?
+  readingMaterial String?           @db.Text
+  attachments     Json?             @default("[]")
+  externalLinks   Json?             @default("[]")
+  contents        SubTopicContent[]
+  subTopicTest    SubTopicTest?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+}
+
+model SubTopicContent {
+  id              String      @id @default(uuid())
+  subTopicId      String
+  subTopic        SubTopic    @relation(fields: [subTopicId], references: [id], onDelete: Cascade)
+  title           String
+  description     String?
+  contentType     ContentType
+  contentUrl      String?
+  contentText     String?     @db.Text
+  durationMinutes Int?
+  isRequired      Boolean     @default(true)
+  orderIndex      Int         @default(0)
+  isPublished     Boolean     @default(false)
+  publishedAt     DateTime?
+  createdById     String
+  createdBy       User        @relation("SubTopicContentCreatedBy", fields: [createdById], references: [id])
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+}
+
+model SubTopicTest {
+  id             String   @id @default(uuid())
+  subTopicId     String   @unique
+  subTopic       SubTopic @relation(fields: [subTopicId], references: [id], onDelete: Cascade)
+  title          String
+  description    String?
+  questions      Json // Array of question IDs or question objects
+  totalQuestions Int
+  passingScore   Int      @default(70)
+  timeLimit      Int      @default(600) // 10 minutes default
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model ModuleTest {
+  id             String   @id @default(uuid())
+  moduleId       String   @unique
+  module         Module   @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  title          String
+  description    String?
+  questions      Json // Array of question IDs or question objects
+  totalQuestions Int
+  passingScore   Int      @default(70)
+  timeLimit      Int      @default(3600) // 60 minutes default
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 }
 
 model ModuleEnrollment {

@@ -119,14 +119,11 @@ export default function PaymentPage() {
         const examDate = urlParams.get('examDate')
 
         const enrollmentData = {
-          user_id: user.id,
-          module_id: module.id,
-          payment_status: 'completed',
-          payment_reference: reference.reference,
-          exam_date: examDate || null
+          moduleId: module.id,
+          paymentReference: reference.reference
         }
 
-        const res = await apiFetch('/api/modules/' + module.id + '/enroll', { method: 'POST', body: JSON.stringify({ examDate: enrollmentData.exam_date }), headers: { 'Content-Type': 'application/json' } })
+        const res = await apiFetch('/api/user-enrollments', { method: 'POST', body: JSON.stringify(enrollmentData), headers: { 'Content-Type': 'application/json' } })
         if (!res.ok) throw new Error('Enrollment failed')
 
         setPaymentSuccess(true)

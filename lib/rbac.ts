@@ -32,12 +32,6 @@ export interface Permission {
  * Falls back to 'practitioner' when unavailable.
  */
 export async function getCurrentUserRole(): Promise<UserRole> {
-  // Check stored role first
-  try {
-    const storedRole = typeof localStorage !== 'undefined' ? localStorage.getItem('userRole') : null
-    if (storedRole) return JSON.parse(storedRole) as UserRole
-  } catch {}
-
   try {
     const headers: any = {}
     try {
@@ -137,17 +131,20 @@ export function getNavigationItems(userRole: UserRole) {
     { href: '/dashboard/profile', label: 'Profile', icon: 'User' },
   ]
 
+  const masterPractitionerBaseItems = [
+    { href: '/master-practitioner', label: 'Dashboard', icon: 'LayoutDashboard' },
+    { href: '/master-practitioner/profile', label: 'Profile', icon: 'User' },
+  ]
+
   const practitionerItems = [
     { href: '/dashboard/results', label: 'Test Results', icon: 'BarChart3' },
     { href: '/dashboard/certificate', label: 'Certificate', icon: 'Award' },
   ]
 
   const masterPractitionerItems = [
-    { href: '/master-practitioner', label: 'Dashboard', icon: 'LayoutDashboard' },
-    { href: '/admin/modules', label: 'Manage Modules', icon: 'BookOpen' },
-    { href: '/admin/tests', label: 'Manage Tests', icon: 'FileText' },
-    { href: '/admin/certificates', label: 'Certificates', icon: 'Award' },
-    { href: '/admin/student-results', label: 'Student Results', icon: 'Users' },
+    { href: '/master-practitioner/content', label: 'Manage Content', icon: 'BookOpen' },
+    { href: '/master-practitioner/tests', label: 'Manage Tests', icon: 'FileText' },
+    { href: '/master-practitioner/results', label: 'Test Results', icon: 'BarChart3' },
   ]
 
   const adminItems = [
@@ -164,12 +161,14 @@ export function getNavigationItems(userRole: UserRole) {
   let items = [...baseItems]
 
   // Add practitioner items for non-admin users
-  if (userRole === 'practitioner' || userRole === 'master_practitioner') {
+  if (userRole === 'practitioner') {
     items = [...items, ...practitionerItems]
   }
 
-  if (userRole === 'master_practitioner' || userRole === 'admin') {
-    items = [...items, ...masterPractitionerItems]
+  if (userRole === 'master_practitioner') {
+    // For master practitioners, use master practitioner base items and their specific items
+    // They have their own dedicated results page, so remove practitioner results access
+    items = [...masterPractitionerBaseItems, ...masterPractitionerItems]
   }
 
   if (userRole === 'admin') {
@@ -204,10 +203,8 @@ export function canAccessPage(userRole: UserRole, pathname: string): boolean {
     ],
     master_practitioner: [
       '/master-practitioner',
-      '/admin/modules',
-      '/admin/tests',
-      '/admin/certificates',
-      '/admin/student-results'
+      '/master-practitioner/tests',
+      '/master-practitioner/results'
     ],
     admin: [
       '/admin',
