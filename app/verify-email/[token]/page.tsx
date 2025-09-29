@@ -36,11 +36,11 @@ export default function VerifyTokenPage() {
           return
         }
 
-        // on success, redirect to success page with token in fragment via server redirect is also supported
+        // on success, get the token from JSON response
         const data = await res.json()
         if (data?.token) {
-          // navigate to success page and let it store token
-          router.push(`/verify-email/success#token=${encodeURIComponent(data.token)}`)
+          // navigate to success page with token in URL params to avoid fragment issues
+          router.push(`/verify-email/success?token=${encodeURIComponent(data.token)}`)
         } else {
           // fallback
           router.push('/verify-email/success')

@@ -7,8 +7,9 @@ import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Progress } from "@/components/ui/progress"
 import { Award, Download, CheckCircle, XCircle, Clock, FileText, User, Calendar, BookOpen } from "lucide-react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
+import { getSession } from 'next-auth/react'
 import error from "next/error"
 
 interface UserProfile {
@@ -56,15 +57,25 @@ interface OngoingTest {
 }
 
 export default function DashboardPage() {
-   const [user, setUser] = useState<UserProfile | null>(null)
-   const [testAttempt, setTestAttempt] = useState<TestAttempt | null>(null)
-   const [ongoingTest, setOngoingTest] = useState<OngoingTest | null>(null)
-   const [moduleEnrollments, setModuleEnrollments] = useState<ModuleEnrollment[]>([])
-   const [isLoading, setIsLoading] = useState(true)
-   const router = useRouter()
+    const [user, setUser] = useState<UserProfile | null>(null)
+    const [testAttempt, setTestAttempt] = useState<TestAttempt | null>(null)
+    const [ongoingTest, setOngoingTest] = useState<OngoingTest | null>(null)
+    const [moduleEnrollments, setModuleEnrollments] = useState<ModuleEnrollment[]>([])
+    const [isLoading, setIsLoading] = useState(true)
+    const router = useRouter()
+    const searchParams = useSearchParams()
 
   useEffect(() => {
     const getUserData = async () => {
+      // Check if this is a payment success redirect
+      const paymentSuccess = searchParams.get('payment') === 'success'
+      if (paymentSuccess) {
+        console.log('Payment success detected - session should update naturally')
+        // Clean up URL after a short delay to avoid immediate redirect issues
+        setTimeout(() => {
+          router.replace('/dashboard', { scroll: false })
+        }, 1000)
+      }
       const res = await fetch('/api/auth/user-dashboard');
       if (res.status === 401) {
         router.push("/auth/login")

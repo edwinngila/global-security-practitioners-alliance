@@ -90,10 +90,35 @@ export default function LoginPage() {
     }
   };
 
-  // The redirection logic for authenticated users has been removed.
-  // Now, if a user is already logged in and navigates to /auth/login,
-  // they will see the login page instead of being redirected.
-  // Redirection will only happen *after* a successful login attempt.
+  // Handle redirection after successful login
+  useEffect(() => {
+    if (status === "authenticated" && session?.user) {
+      const userRole = (session.user as any).role;
+      const profileComplete = (session.user as any).profileComplete;
+      const membershipPaid = (session.user as any).membershipPaid;
+
+      // Redirect based on user role and completion status
+      if (!profileComplete) {
+        router.push("/register");
+      } else if (!membershipPaid && userRole === "practitioner") {
+        router.push("/payment");
+      } else {
+        // Role-based dashboard redirect
+        switch (userRole) {
+          case "admin":
+            router.push("/admin");
+            break;
+          case "master_practitioner":
+            router.push("/master-practitioner");
+            break;
+          case "practitioner":
+          default:
+            router.push("/dashboard");
+            break;
+        }
+      }
+    }
+  }, [status, session, router]);
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-background via-muted/10 to-background">

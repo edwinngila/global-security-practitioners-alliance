@@ -13,10 +13,16 @@ export default function VerifySuccessPage() {
 
   useEffect(() => {
     const handleVerification = async () => {
-      // read token from URL fragment (#token=...)
-      const hash = window.location.hash || ''
-      const m = hash.match(/token=([^&]+)/)
-      const token = m ? decodeURIComponent(m[1]) : null
+      // read token from URL params or fragment
+      const urlParams = new URLSearchParams(window.location.search)
+      let token = urlParams.get('token')
+
+      // fallback to hash fragment for backward compatibility
+      if (!token) {
+        const hash = window.location.hash || ''
+        const m = hash.match(/token=([^&]+)/)
+        token = m ? decodeURIComponent(m[1]) : null
+      }
 
       if (token) {
         try {
@@ -39,6 +45,27 @@ export default function VerifySuccessPage() {
             setError('Session setup failed. Please try logging in manually.')
           } else {
             console.log('Successfully signed in with NextAuth')
+
+            // Check membership payment status
+            try {
+              const userRes = await fetch('/api/auth/user')
+              if (userRes.ok) {
+                const userData = await userRes.json()
+                const membershipPaid = userData?.profile?.membership_fee_paid
+
+                // redirect after delay
+                setTimeout(() => {
+                  setDone(true)
+                  if (!error) {
+                    // Redirect to payment if membership not paid, otherwise dashboard
+                    router.push(membershipPaid ? '/dashboard' : '/payment')
+                  }
+                }, 1500)
+                return
+              }
+            } catch (e) {
+              console.error('Failed to check membership status:', e)
+            }
           }
         } catch (e) {
           console.error('Token processing error:', e)
@@ -48,13 +75,13 @@ export default function VerifySuccessPage() {
         setError('Verification token missing.')
       }
 
-      // redirect after delay
-      setTimeout(() => {
-        setDone(true)
-        if (!error) {
-          router.push('/dashboard')
-        }
-      }, 1500)
+      // Fallback redirect if membership check failed
+      if (!error) {
+        setTimeout(() => {
+          setDone(true)
+          router.push('/payment') // Default to payment page
+        }, 1500)
+      }
     }
 
     handleVerification()

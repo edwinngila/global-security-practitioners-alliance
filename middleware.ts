@@ -14,6 +14,7 @@ const PUBLIC_PATHS = [
   "/modules",
   "/results",
   "/verify-email",
+  "/verify-email/success",
 ]
 
 // Define paths that require specific roles
@@ -98,7 +99,9 @@ export default withAuth(
       }
 
       // Check membership payment for protected content
-      if (pathname.startsWith("/test") && !token.membershipPaid) {
+      // Allow temporary access if user just completed payment (check URL params)
+      const hasPaymentSuccess = req.nextUrl.searchParams.get('payment') === 'success'
+      if ((pathname.startsWith("/dashboard") || pathname.startsWith("/test")) && !token.membershipPaid && !hasPaymentSuccess) {
         return NextResponse.redirect(new URL("/payment", req.url))
       }
     }
@@ -117,7 +120,8 @@ export default withAuth(
             pathname.startsWith("/api/") ||
             pathname === "/register" ||
             pathname.startsWith("/register/") ||
-            pathname === "/payment") {
+            pathname === "/payment" ||
+            pathname.startsWith("/verify-email/")) {
           return true
         }
 

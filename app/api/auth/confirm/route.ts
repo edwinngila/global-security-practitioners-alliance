@@ -45,11 +45,9 @@ export async function GET(request: Request) {
       return NextResponse.json(result.body, { status: result.status })
     }
 
-    // On success, redirect the browser to a client success page and include auth token in fragment
-  const base = `${process.env.NEXT_PUBLIC_APP_URL}/verify-email/success`
-  const frag = result.body?.token ? `#token=${encodeURIComponent(String(result.body.token))}` : ''
-  const redirectUrl = `${base}${frag}`
-  return NextResponse.redirect(redirectUrl)
+    // Return JSON response for programmatic handling
+    // The client will handle the redirect to avoid NextAuth interception
+    return NextResponse.json(result.body, { status: result.status })
   } catch (error) {
     console.error('Confirm GET error', error)
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })

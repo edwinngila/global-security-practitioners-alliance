@@ -122,6 +122,13 @@ const authOptions: NextAuthOptions = {
       }
       return session;
     },
+    async redirect({ url, baseUrl }) {
+      // Handle post-login redirects based on user role
+      if (url.startsWith("/")) return `${baseUrl}${url}`
+      // If url is an absolute URL and it's from the same origin, allow it
+      else if (new URL(url).origin === baseUrl) return url
+      return baseUrl
+    },
   },
   pages: {
     signIn: "/auth/login",
