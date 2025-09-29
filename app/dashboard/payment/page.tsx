@@ -8,6 +8,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { CreditCard, CheckCircle, AlertCircle, Loader2 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter, useSearchParams } from "next/navigation"
+import { useSession } from "next-auth/react"
 
 const PaystackButton = dynamic(() => import("react-paystack").then((mod) => mod.PaystackButton), { ssr: false })
 
@@ -29,6 +30,7 @@ export default function DashboardPaymentPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const supabase = createClient()
+  const { data: session } = useSession()
 
   const PAYSTACK_PUBLIC_KEY = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || "pk_test_your_key_here"
   const MEMBERSHIP_FEE = 910000 // 9100 KES in cents
@@ -38,6 +40,12 @@ export default function DashboardPaymentPage() {
   useEffect(() => {
     const getUserProfile = async () => {
       const requestedType = searchParams.get('type') as 'membership' | 'test' | 'retake' | null
+
+      // Check NextAuth session first
+      if (!session?.user) {
+        router.push("/auth/login")
+        return
+      }
 
       const {
         data: { user: authUser },
@@ -72,7 +80,7 @@ export default function DashboardPaymentPage() {
     }
 
     getUserProfile()
-  }, [supabase, router, searchParams])
+  }, [supabase, router, searchParams, session])
 
   const handlePaymentSuccess = async (reference: any) => {
     if (!user) return
@@ -93,6 +101,7 @@ export default function DashboardPaymentPage() {
         updateData.payment_reference = reference.reference
       }
 
+      // Update Supabase profile
       const { error } = await supabase
         .from("profiles")
         .update(updateData)
@@ -100,12 +109,32 @@ export default function DashboardPaymentPage() {
 
       if (error) throw error
 
+      // Also update Prisma profile for membership payment
+      if (paymentType === 'membership' && session?.user?.id) {
+        const response = await fetch(`/api/profiles/${session.user.id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            membershipFeePaid: true,
+            paymentReference: reference.reference,
+          }),
+        })
+
+        if (!response.ok) {
+          console.error('Failed to update Prisma profile')
+          // Don't throw here, Supabase update succeeded
+        }
+
+      }
+
       setPaymentSuccess(true)
 
       localStorage.setItem("paid-user-id", user.id)
 
       setTimeout(() => {
-        router.push("/dashboard")
+        router.push("/dashboard?payment=success")
       }, 3000)
     } catch (error) {
       console.error("Payment update error:", error)
@@ -191,7 +220,7 @@ export default function DashboardPaymentPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="text-center">
-              <Button onClick={() => router.push("/dashboard")} className="w-full">
+              <Button onClick={() => router.push("/dashboard?payment=success")} className="w-full">
                 Return to Dashboard
               </Button>
             </CardContent>

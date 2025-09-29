@@ -46,7 +46,9 @@ export async function PUT(request: Request, { params }: { params: { id: string }
       designation,
       organization_name,
       document_type,
-      document_number
+      document_number,
+      membershipFeePaid,
+      paymentReference
     } = body
 
     console.log('Gender value received:', gender, 'Type:', typeof gender)
@@ -67,34 +69,29 @@ export async function PUT(request: Request, { params }: { params: { id: string }
     const documentTypeEnum = document_type ? documentTypeMap[document_type] as any : undefined
     console.log('Document type enum:', documentTypeEnum)
 
-    console.log('Updating profile with data:', {
-      firstName: first_name,
-      lastName: last_name,
-      phoneNumber: phone_number,
-      dateOfBirth: date_of_birth ? new Date(date_of_birth) : undefined,
-      nationality: nationality,
-      gender: genderEnum,
-      designation: designation,
-      organizationName: organization_name,
-      documentType: documentTypeEnum,
-      documentNumber: document_number,
-    })
+    // Build update data conditionally
+    const updateData: any = {
+      updatedAt: new Date()
+    }
+
+    if (first_name !== undefined) updateData.firstName = first_name
+    if (last_name !== undefined) updateData.lastName = last_name
+    if (phone_number !== undefined) updateData.phoneNumber = phone_number
+    if (date_of_birth !== undefined) updateData.dateOfBirth = date_of_birth ? new Date(date_of_birth) : undefined
+    if (nationality !== undefined) updateData.nationality = nationality
+    if (genderEnum !== undefined) updateData.gender = genderEnum
+    if (designation !== undefined) updateData.designation = designation
+    if (organization_name !== undefined) updateData.organizationName = organization_name
+    if (documentTypeEnum !== undefined) updateData.documentType = documentTypeEnum
+    if (document_number !== undefined) updateData.documentNumber = document_number
+    if (membershipFeePaid !== undefined) updateData.membershipFeePaid = membershipFeePaid
+    if (paymentReference !== undefined) updateData.paymentReference = paymentReference
+
+    console.log('Updating profile with data:', updateData)
 
     const updatedProfile = await prisma.profile.update({
       where: { id: params.id },
-      data: {
-        firstName: first_name,
-        lastName: last_name,
-        phoneNumber: phone_number,
-        dateOfBirth: date_of_birth ? new Date(date_of_birth) : undefined,
-        nationality: nationality,
-        gender: genderEnum,
-        designation: designation,
-        organizationName: organization_name,
-        documentType: documentTypeEnum,
-        documentNumber: document_number,
-        updatedAt: new Date()
-      }
+      data: updateData
     })
 
     console.log('Profile updated successfully:', updatedProfile.id)

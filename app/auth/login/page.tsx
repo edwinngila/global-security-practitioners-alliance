@@ -226,7 +226,7 @@ export default function LoginPage() {
                       type="button"
                       variant="ghost"
                       size="sm"
-                      className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 p-0 hover:bg-transparent"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 p-0 bg-background/80 hover:bg-background border border-border/50"
                       onClick={() => setShowPassword(!showPassword)}
                       disabled={isBlocked}
                     >
