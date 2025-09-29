@@ -1,3 +1,0 @@
--- AlterTable
-ALTER TABLE `user` ADD COLUMN `lastLogin` DATETIME(3) NULL,
-    ADD COLUMN `loginCount` INTEGER NOT NULL DEFAULT 0;

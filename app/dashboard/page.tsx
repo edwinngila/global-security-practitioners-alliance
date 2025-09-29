@@ -44,6 +44,19 @@ interface ModuleEnrollment {
   completed_at: string | null
 }
 
+interface AvailableModule {
+  id: string
+  title: string
+  description: string
+  category: string
+  difficultyLevel: string
+  estimatedDuration: number
+  instructorName: string
+  price: number
+  currency: string
+  isActive: boolean
+}
+
 interface OngoingTest {
   id: string
   user_id: string

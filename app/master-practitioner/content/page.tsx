@@ -25,10 +25,12 @@ import {
   ChevronRight,
   ChevronDown,
   TestTube,
-  Layers
+  Layers,
+  Eye
 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { RichTextEditor } from "@/components/rich-text-editor"
+import { useToast } from "@/hooks/use-toast"
 
 interface Module {
   id: string
@@ -100,6 +102,11 @@ export default function ContentManagementPage() {
   const [userEmail, setUserEmail] = useState("")
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [questions, setQuestions] = useState<TestQuestion[]>([])
+  const [isCreatingTest, setIsCreatingTest] = useState(false)
+  const [isLevelTest, setIsLevelTest] = useState(false)
+  const [showPreviewSheet, setShowPreviewSheet] = useState(false)
+  const [previewTest, setPreviewTest] = useState<any>(null)
+  const [isLoadingPreview, setIsLoadingPreview] = useState(false)
 
   // Sheet states
   const [showLevelSheet, setShowLevelSheet] = useState(false)
@@ -111,8 +118,10 @@ export default function ContentManagementPage() {
   const [editingLevel, setEditingLevel] = useState<Level | null>(null)
   const [editingSubTopic, setEditingSubTopic] = useState<SubTopic | null>(null)
   const [editingContent, setEditingContent] = useState<SubTopicContent | null>(null)
+  const [editingTest, setEditingTest] = useState<any>(null)
 
   const router = useRouter()
+  const { toast } = useToast()
 
   useEffect(() => {
     const checkMasterPractitionerAndLoadData = async () => {
@@ -176,23 +185,36 @@ export default function ContentManagementPage() {
               const levelsResponse = await fetch(`/api/levels?moduleId=${module.id}`)
               if (levelsResponse.ok) {
                 const levelsData = await levelsResponse.json()
-                // Load sub-topics for each level
-                const levelsWithSubTopics = await Promise.all(
+                // Load sub-topics and level tests for each level
+                const levelsWithSubTopicsAndTests = await Promise.all(
                   levelsData.map(async (level: any) => {
                     try {
+                      // Load sub-topics
                       const subTopicsResponse = await fetch(`/api/sub-topics?levelId=${level.id}`)
+                      let subTopicsData = []
                       if (subTopicsResponse.ok) {
-                        const subTopicsData = await subTopicsResponse.json()
-                        return { ...level, subTopics: subTopicsData }
+                        subTopicsData = await subTopicsResponse.json()
                       }
-                      return level
+
+                      // Load level test
+                      let levelTest = null
+                      try {
+                        const levelTestResponse = await fetch(`/api/level-tests?levelId=${level.id}`)
+                        if (levelTestResponse.ok) {
+                          levelTest = await levelTestResponse.json()
+                        }
+                      } catch (error) {
+                        // Level test API might not be available yet
+                      }
+
+                      return { ...level, subTopics: subTopicsData, levelTest }
                     } catch (error) {
                       console.warn('Sub-topics API not available yet')
                       return level
                     }
                   })
                 )
-                return { ...module, levels: levelsWithSubTopics }
+                return { ...module, levels: levelsWithSubTopicsAndTests }
               }
               return module
             } catch (error) {
@@ -272,8 +294,36 @@ export default function ContentManagementPage() {
     setShowContentSheet(true)
   }
 
-  const handleCreateTest = () => {
+  const handleCreateTest = (isLevel = false) => {
+    setIsLevelTest(isLevel)
     setShowTestSheet(true)
+  }
+
+  const handlePreviewTest = async (levelId: string) => {
+    setIsLoadingPreview(true)
+    try {
+      const response = await fetch(`/api/level-tests?levelId=${levelId}`)
+      if (response.ok) {
+        const testData = await response.json()
+        setPreviewTest(testData)
+        setShowPreviewSheet(true)
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to load test preview. Please try again.",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error('Error loading test preview:', error)
+      toast({
+        title: "Error",
+        description: "Failed to load test preview. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoadingPreview(false)
+    }
   }
 
   const handleCreateSubTopicForObjective = async (levelId: string, objectiveTitle: string) => {
@@ -382,19 +432,51 @@ export default function ContentManagementPage() {
   }
 
   const handleSaveTest = async (testData: any) => {
+    setIsCreatingTest(true)
     try {
-      const response = await fetch('/api/sub-topic-tests', {
-        method: 'POST',
+      const isUpdate = editingTest !== null
+      const apiUrl = isLevelTest ? '/api/level-tests' : '/api/sub-topic-tests'
+      const method = isUpdate ? 'PUT' : 'POST'
+
+      let bodyData
+      if (isLevelTest) {
+        bodyData = isUpdate
+          ? { ...testData, id: editingTest.id, levelId: selectedLevel }
+          : { ...testData, levelId: selectedLevel }
+      } else {
+        bodyData = isUpdate
+          ? { ...testData, id: editingTest.id, subTopicId: selectedSubTopic }
+          : { ...testData, subTopicId: selectedSubTopic }
+      }
+
+      const response = await fetch(isUpdate ? `${apiUrl}/${editingTest.id}` : apiUrl, {
+        method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...testData, subTopicId: selectedSubTopic })
+        body: JSON.stringify(bodyData)
       })
 
       if (response.ok) {
         await loadModules()
         setShowTestSheet(false)
+        setIsLevelTest(false)
+        setEditingTest(null)
+        toast({
+          title: "Success",
+          description: `${isLevelTest ? 'Level' : 'Sub-topic'} test ${isUpdate ? 'updated' : 'created'} successfully!`,
+        })
+      } else {
+        const errorData = await response.json()
+        throw new Error(errorData.error || `Failed to ${isUpdate ? 'update' : 'create'} test`)
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving test:', error)
+      toast({
+        title: "Error",
+        description: error.message || `Failed to ${editingTest ? 'update' : 'create'} test. Please try again.`,
+        variant: "destructive",
+      })
+    } finally {
+      setIsCreatingTest(false)
     }
   }
 
@@ -543,6 +625,12 @@ export default function ContentManagementPage() {
                                 </div>
                               </div>
                               <div className="flex items-center gap-2">
+                                {(level.levelTest || level.subTopics?.some(st => st.subTopicTest)) && (
+                                  <Badge variant="outline" className="text-xs">
+                                    <TestTube className="h-3 w-3 mr-1" />
+                                    Has Tests
+                                  </Badge>
+                                )}
                                 <Badge variant={level.isActive ? "default" : "secondary"}>
                                   {level.isActive ? "Active" : "Inactive"}
                                 </Badge>
@@ -570,18 +658,56 @@ export default function ContentManagementPage() {
                                   <Plus className="h-4 w-4 mr-1" />
                                   Sub-topic
                                 </Button>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    setSelectedLevel(level.id)
-                                    handleCreateTest()
-                                  }}
-                                >
-                                  <TestTube className="h-4 w-4 mr-1" />
-                                  Level Exam
-                                </Button>
+                                <div className="flex gap-2">
+                                  {level.levelTest ? (
+                                    <>
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                          handlePreviewTest(level.id)
+                                        }}
+                                        disabled={isLoadingPreview}
+                                      >
+                                        {isLoadingPreview ? (
+                                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current mr-1"></div>
+                                        ) : (
+                                          <Eye className="h-4 w-4 mr-1" />
+                                        )}
+                                        View Test
+                                      </Button>
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                          setSelectedLevel(level.id)
+                                          setSelectedSubTopic("")
+                                          setEditingTest(level.levelTest)
+                                          handleCreateTest(true)
+                                        }}
+                                      >
+                                        <Edit className="h-4 w-4 mr-1" />
+                                        Edit Test
+                                      </Button>
+                                    </>
+                                  ) : (
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        setSelectedLevel(level.id)
+                                        setSelectedSubTopic("")
+                                        handleCreateTest(true)
+                                      }}
+                                    >
+                                      <TestTube className="h-4 w-4 mr-1" />
+                                      Create Level Test
+                                    </Button>
+                                  )}
+                                </div>
                               </div>
                             </div>
 
@@ -848,6 +974,7 @@ export default function ContentManagementPage() {
           <div className="space-y-6">
             <ContentForm
               content={editingContent}
+              questions={questions}
               onSave={handleSaveContent}
               onCancel={() => {
                 setShowContentSheet(false)
@@ -860,21 +987,177 @@ export default function ContentManagementPage() {
 
       {/* Test Sheet */}
       <Sheet open={showTestSheet} onOpenChange={setShowTestSheet}>
-        <SheetContent side="right" className="w-full sm:max-w-lg p-6">
+        <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto p-6">
           <SheetHeader className="mb-6">
-            <SheetTitle>Create Sub-topic Test</SheetTitle>
+            <SheetTitle>
+              {editingTest ? 'Edit' : 'Create'} {isLevelTest ? 'Level' : 'Sub-topic'} Test
+            </SheetTitle>
             <SheetDescription>
-              Add a test for the selected sub-topic
+              {editingTest ? 'Update' : 'Add'} a test for the selected {isLevelTest ? 'level' : 'sub-topic'}
             </SheetDescription>
           </SheetHeader>
           <div className="space-y-6">
             <TestForm
               onSave={handleSaveTest}
-              onCancel={() => setShowTestSheet(false)}
+              onCancel={() => {
+                setShowTestSheet(false)
+                setEditingTest(null)
+              }}
+              questions={questions}
+              isLoading={isCreatingTest}
+              editingTest={editingTest}
+              isLevelTest={isLevelTest}
             />
           </div>
         </SheetContent>
       </Sheet>
+
+      {/* Preview Sheet */}
+      <Sheet open={showPreviewSheet} onOpenChange={setShowPreviewSheet}>
+        <SheetContent side="right" className="w-full sm:max-w-4xl overflow-y-auto p-6">
+          <SheetHeader className="mb-6">
+            <SheetTitle>Test Preview</SheetTitle>
+            <SheetDescription>
+              Preview the test questions and details
+            </SheetDescription>
+          </SheetHeader>
+          <div className="space-y-6">
+            {previewTest ? (
+              <TestPreview test={previewTest} questions={questions} />
+            ) : (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                <p>Loading test preview...</p>
+              </div>
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
+    </div>
+  )
+}
+
+// Test Preview Component
+function TestPreview({ test, questions }: {
+  test: any
+  questions: TestQuestion[]
+}) {
+  const formatTime = (seconds: number) => {
+    const minutes = Math.floor(seconds / 60)
+    return `${minutes} minute${minutes !== 1 ? 's' : ''}`
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Test Metadata */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <TestTube className="h-5 w-5" />
+            {test.title}
+          </CardTitle>
+          {test.description && (
+            <CardDescription>{test.description}</CardDescription>
+          )}
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="text-center">
+              <div className="text-2xl font-bold text-primary">{test.totalQuestions}</div>
+              <div className="text-sm text-muted-foreground">Questions</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-primary">{test.passingScore}%</div>
+              <div className="text-sm text-muted-foreground">Passing Score</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-primary">{formatTime(test.timeLimit)}</div>
+              <div className="text-sm text-muted-foreground">Time Limit</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-primary">
+                {test.isActive ? 'Active' : 'Inactive'}
+              </div>
+              <div className="text-sm text-muted-foreground">Status</div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Questions */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Questions</CardTitle>
+          <CardDescription>
+            Review the questions included in this test
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {test.questions && Array.isArray(test.questions) && test.questions.length > 0 ? (
+            <div className="space-y-4">
+              {test.questions.map((question: any, index: number) => {
+                // If question is an object with id, find the full question details
+                const fullQuestion = typeof question === 'string'
+                  ? questions.find(q => q.id === question)
+                  : question
+
+                if (!fullQuestion) return null
+
+                return (
+                  <div key={index} className="border rounded-lg p-4">
+                    <div className="flex items-start gap-3">
+                      <div className="flex-shrink-0 w-8 h-8 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-sm font-medium">
+                        {index + 1}
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="font-medium mb-3">{fullQuestion.question}</h4>
+
+                        {/* Display options if available */}
+                        {fullQuestion.options && Array.isArray(fullQuestion.options) ? (
+                          <div className="space-y-2">
+                            {fullQuestion.options.map((option: any, optionIndex: number) => (
+                              <div
+                                key={optionIndex}
+                                className={`p-2 rounded border ${
+                                  option.isCorrect
+                                    ? 'bg-green-50 border-green-200 text-green-800'
+                                    : 'bg-gray-50 border-gray-200'
+                                }`}
+                              >
+                                <span className="font-medium">{option.optionLetter}:</span> {option.optionText}
+                                {option.isCorrect && (
+                                  <Badge variant="default" className="ml-2 text-xs">
+                                    Correct Answer
+                                  </Badge>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-sm text-muted-foreground italic">
+                            Options not available in preview
+                          </p>
+                        )}
+
+                        {/* Question metadata */}
+                        <div className="flex items-center gap-4 mt-3 text-xs text-muted-foreground">
+                          <span>Category: {fullQuestion.category}</span>
+                          <span>Subject: {fullQuestion.subjectModel}</span>
+                          <span>Difficulty: {fullQuestion.difficulty}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          ) : (
+            <div className="text-center py-8 text-muted-foreground">
+              <p>No questions configured for this test</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   )
 }
@@ -911,52 +1194,6 @@ function LevelForm({ level, onSave, onCancel }: {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     onSave(formData)
-  }
-
-  const handleAddQuestion = () => {
-    if (!newQuestion.question || !newQuestion.optionA || !newQuestion.optionB ||
-        !newQuestion.optionC || !newQuestion.optionD || !newQuestion.correctAnswer) {
-      alert('Please fill in all question fields')
-      return
-    }
-
-    const questionToAdd = {
-      question: newQuestion.question,
-      optionA: newQuestion.optionA,
-      optionB: newQuestion.optionB,
-      optionC: newQuestion.optionC,
-      optionD: newQuestion.optionD,
-      correctAnswer: newQuestion.correctAnswer,
-      category: newQuestion.category,
-      difficulty: newQuestion.difficulty
-    }
-
-    setFormData(prev => ({
-      ...prev,
-      questions: [...prev.questions, questionToAdd],
-      totalQuestions: prev.questions.length + 1
-    }))
-
-    // Reset new question form
-    setNewQuestion({
-      question: '',
-      optionA: '',
-      optionB: '',
-      optionC: '',
-      optionD: '',
-      correctAnswer: '',
-      category: 'General',
-      difficulty: 'medium'
-    })
-    setShowAddQuestion(false)
-  }
-
-  const handleRemoveQuestion = (index: number) => {
-    setFormData(prev => ({
-      ...prev,
-      questions: prev.questions.filter((_, i) => i !== index),
-      totalQuestions: prev.questions.length - 1
-    }))
   }
 
   return (
@@ -1244,8 +1481,9 @@ Cybersecurity is the practice of protecting internet-connected systems, networks
 }
 
 // Content Form Component
-function ContentForm({ content, onSave, onCancel }: {
+function ContentForm({ content, questions, onSave, onCancel }: {
   content: SubTopicContent | null
+  questions: TestQuestion[]
   onSave: (data: any) => void
   onCancel: () => void
 }) {
@@ -1454,20 +1692,25 @@ You can include:
 }
 
 // Test Form Component
-function TestForm({ onSave, onCancel }: {
+function TestForm({ onSave, onCancel, questions, isLoading, editingTest, isLevelTest }: {
   onSave: (data: any) => void
   onCancel: () => void
+  questions: TestQuestion[]
+  isLoading?: boolean
+  editingTest?: any
+  isLevelTest?: boolean
 }) {
   const [formData, setFormData] = useState({
-    title: '',
-    description: '',
-    totalQuestions: 5,
-    passingScore: 70,
-    timeLimit: 600,
-    isActive: true,
-    questions: [] as any[] // Array to store questions added directly
+    title: editingTest?.title || '',
+    description: editingTest?.description || '',
+    totalQuestions: editingTest?.totalQuestions || 5,
+    passingScore: editingTest?.passingScore || 70,
+    timeLimit: editingTest?.timeLimit || 600,
+    isActive: editingTest?.isActive ?? true,
+    questions: editingTest?.questions || [] // Array to store questions added directly
   })
   const [showAddQuestion, setShowAddQuestion] = useState(false)
+  const [selectedExistingQuestions, setSelectedExistingQuestions] = useState<Set<string>>(new Set())
   const [newQuestion, setNewQuestion] = useState({
     question: '',
     optionA: '',
@@ -1478,6 +1721,84 @@ function TestForm({ onSave, onCancel }: {
     category: 'General',
     difficulty: 'medium'
   })
+
+  // Update form data when editingTest prop changes
+  useEffect(() => {
+    if (editingTest) {
+      setFormData({
+        title: editingTest.title || '',
+        description: editingTest.description || '',
+        totalQuestions: editingTest.totalQuestions || 5,
+        passingScore: editingTest.passingScore || 70,
+        timeLimit: editingTest.timeLimit || 600,
+        isActive: editingTest.isActive ?? true,
+        questions: editingTest.questions || []
+      })
+    } else {
+      // Reset to defaults when not editing
+      setFormData({
+        title: '',
+        description: '',
+        totalQuestions: 5,
+        passingScore: 70,
+        timeLimit: 600,
+        isActive: true,
+        questions: []
+      })
+    }
+  }, [editingTest])
+
+  const handleAddQuestion = () => {
+    if (!newQuestion.question || !newQuestion.optionA || !newQuestion.optionB ||
+        !newQuestion.optionC || !newQuestion.optionD || !newQuestion.correctAnswer) {
+      alert('Please fill in all required fields')
+      return
+    }
+
+    setFormData(prev => ({
+      ...prev,
+      questions: [...prev.questions, newQuestion]
+    }))
+
+    setNewQuestion({
+      question: '',
+      optionA: '',
+      optionB: '',
+      optionC: '',
+      optionD: '',
+      correctAnswer: '',
+      category: 'General',
+      difficulty: 'medium'
+    })
+
+    setShowAddQuestion(false)
+  }
+
+  const handleRemoveQuestion = (index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      questions: prev.questions.filter((_, i) => i !== index)
+    }))
+  }
+
+  const handleToggleExistingQuestion = (questionId: string) => {
+    const newSelected = new Set(selectedExistingQuestions)
+    if (newSelected.has(questionId)) {
+      newSelected.delete(questionId)
+    } else {
+      newSelected.add(questionId)
+    }
+    setSelectedExistingQuestions(newSelected)
+  }
+
+  const handleAddSelectedQuestions = () => {
+    const selectedQuestions = questions.filter(q => selectedExistingQuestions.has(q.id))
+    setFormData(prev => ({
+      ...prev,
+      questions: [...prev.questions, ...selectedQuestions]
+    }))
+    setSelectedExistingQuestions(new Set())
+  }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -1554,150 +1875,222 @@ function TestForm({ onSave, onCancel }: {
       <div className="space-y-4 pt-4 border-t">
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-semibold">Questions ({formData.questions.length})</h3>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => setShowAddQuestion(!showAddQuestion)}
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Add Question
-          </Button>
         </div>
 
-        {/* Add Question Form */}
-        {showAddQuestion && (
-          <Card className="p-4">
+        <Tabs defaultValue="existing" className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="existing">Select Existing Questions</TabsTrigger>
+            <TabsTrigger value="new">Add New Question</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="existing" className="space-y-4">
             <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="question">Question *</Label>
-                <Textarea
-                  id="question"
-                  value={newQuestion.question}
-                  onChange={(e) => setNewQuestion(prev => ({ ...prev, question: e.target.value }))}
-                  placeholder="Enter the question text"
-                  rows={2}
-                />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="optionA">Option A *</Label>
-                  <Input
-                    id="optionA"
-                    value={newQuestion.optionA}
-                    onChange={(e) => setNewQuestion(prev => ({ ...prev, optionA: e.target.value }))}
-                    placeholder="First option"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="optionB">Option B *</Label>
-                  <Input
-                    id="optionB"
-                    value={newQuestion.optionB}
-                    onChange={(e) => setNewQuestion(prev => ({ ...prev, optionB: e.target.value }))}
-                    placeholder="Second option"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="optionC">Option C *</Label>
-                  <Input
-                    id="optionC"
-                    value={newQuestion.optionC}
-                    onChange={(e) => setNewQuestion(prev => ({ ...prev, optionC: e.target.value }))}
-                    placeholder="Third option"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="optionD">Option D *</Label>
-                  <Input
-                    id="optionD"
-                    value={newQuestion.optionD}
-                    onChange={(e) => setNewQuestion(prev => ({ ...prev, optionD: e.target.value }))}
-                    placeholder="Fourth option"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="correctAnswer">Correct Answer *</Label>
-                  <Select
-                    value={newQuestion.correctAnswer}
-                    onValueChange={(value) => setNewQuestion(prev => ({ ...prev, correctAnswer: value }))}
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-muted-foreground">
+                  Select questions from the existing question bank ({questions.filter(q => q.isActive).length} available)
+                </p>
+                {selectedExistingQuestions.size > 0 && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={handleAddSelectedQuestions}
                   >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select correct answer" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="A">A</SelectItem>
-                      <SelectItem value="B">B</SelectItem>
-                      <SelectItem value="C">C</SelectItem>
-                      <SelectItem value="D">D</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="category">Category</Label>
-                  <Input
-                    id="category"
-                    value={newQuestion.category}
-                    onChange={(e) => setNewQuestion(prev => ({ ...prev, category: e.target.value }))}
-                    placeholder="e.g., General, Security"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="difficulty">Difficulty</Label>
-                  <Select
-                    value={newQuestion.difficulty}
-                    onValueChange={(value) => setNewQuestion(prev => ({ ...prev, difficulty: value }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="easy">Easy</SelectItem>
-                      <SelectItem value="medium">Medium</SelectItem>
-                      <SelectItem value="hard">Hard</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                    Add Selected ({selectedExistingQuestions.size})
+                  </Button>
+                )}
               </div>
 
-              <div className="flex gap-2">
-                <Button type="button" onClick={handleAddQuestion}>
-                  Add Question
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setShowAddQuestion(false)}
-                >
-                  Cancel
-                </Button>
-              </div>
+              {questions.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <p>No questions available in the question bank</p>
+                </div>
+              ) : (
+                <div className="space-y-2 max-h-96 overflow-y-auto">
+                  {questions.filter(q => q.isActive).map((question) => (
+                    <Card key={question.id} className="p-3">
+                      <div className="flex items-start gap-3">
+                        <input
+                          type="checkbox"
+                          checked={selectedExistingQuestions.has(question.id)}
+                          onChange={() => handleToggleExistingQuestion(question.id)}
+                          className="mt-1"
+                        />
+                        <div className="flex-1">
+                          <p className="font-medium mb-2">{question.question}</p>
+                          <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                            <span>Category: {question.category}</span>
+                            <span>Subject: {question.subjectModel}</span>
+                            <span>Difficulty: {question.difficulty}</span>
+                            <Badge variant="default" className="text-xs">
+                              Active
+                            </Badge>
+                          </div>
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              )}
             </div>
-          </Card>
-        )}
+          </TabsContent>
+
+          <TabsContent value="new" className="space-y-4">
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-muted-foreground">
+                Create a new question for this test
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setShowAddQuestion(!showAddQuestion)}
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                {showAddQuestion ? 'Hide Form' : 'Add Question'}
+              </Button>
+            </div>
+
+            {/* Add Question Form */}
+            {showAddQuestion && (
+              <Card className="p-4">
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="question">Question *</Label>
+                    <Textarea
+                      id="question"
+                      value={newQuestion.question}
+                      onChange={(e) => setNewQuestion(prev => ({ ...prev, question: e.target.value }))}
+                      placeholder="Enter the question text"
+                      rows={2}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="optionA">Option A *</Label>
+                      <Input
+                        id="optionA"
+                        value={newQuestion.optionA}
+                        onChange={(e) => setNewQuestion(prev => ({ ...prev, optionA: e.target.value }))}
+                        placeholder="First option"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="optionB">Option B *</Label>
+                      <Input
+                        id="optionB"
+                        value={newQuestion.optionB}
+                        onChange={(e) => setNewQuestion(prev => ({ ...prev, optionB: e.target.value }))}
+                        placeholder="Second option"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="optionC">Option C *</Label>
+                      <Input
+                        id="optionC"
+                        value={newQuestion.optionC}
+                        onChange={(e) => setNewQuestion(prev => ({ ...prev, optionC: e.target.value }))}
+                        placeholder="Third option"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="optionD">Option D *</Label>
+                      <Input
+                        id="optionD"
+                        value={newQuestion.optionD}
+                        onChange={(e) => setNewQuestion(prev => ({ ...prev, optionD: e.target.value }))}
+                        placeholder="Fourth option"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="correctAnswer">Correct Answer *</Label>
+                      <Select
+                        value={newQuestion.correctAnswer}
+                        onValueChange={(value) => setNewQuestion(prev => ({ ...prev, correctAnswer: value }))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select correct answer" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="A">A</SelectItem>
+                          <SelectItem value="B">B</SelectItem>
+                          <SelectItem value="C">C</SelectItem>
+                          <SelectItem value="D">D</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="category">Category</Label>
+                      <Input
+                        id="category"
+                        value={newQuestion.category}
+                        onChange={(e) => setNewQuestion(prev => ({ ...prev, category: e.target.value }))}
+                        placeholder="e.g., General, Security"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="difficulty">Difficulty</Label>
+                      <Select
+                        value={newQuestion.difficulty}
+                        onValueChange={(value) => setNewQuestion(prev => ({ ...prev, difficulty: value }))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="easy">Easy</SelectItem>
+                          <SelectItem value="medium">Medium</SelectItem>
+                          <SelectItem value="hard">Hard</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <Button type="button" onClick={handleAddQuestion}>
+                      Add Question
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setShowAddQuestion(false)}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              </Card>
+            )}
+          </TabsContent>
+        </Tabs>
 
         {/* Questions List */}
         {formData.questions.length > 0 && (
           <div className="space-y-2">
+            <h4 className="font-medium">Selected Questions:</h4>
             {formData.questions.map((question, index) => (
               <Card key={index} className="p-3">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <p className="font-medium mb-2">{question.question}</p>
-                    <div className="grid grid-cols-2 gap-2 text-sm text-muted-foreground">
-                      <span>A: {question.optionA}</span>
-                      <span>B: {question.optionB}</span>
-                      <span>C: {question.optionC}</span>
-                      <span>D: {question.optionD}</span>
-                    </div>
+                    {question.optionA ? (
+                      <div className="grid grid-cols-2 gap-2 text-sm text-muted-foreground">
+                        <span>A: {question.optionA}</span>
+                        <span>B: {question.optionB}</span>
+                        <span>C: {question.optionC}</span>
+                        <span>D: {question.optionD}</span>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">Question from bank - options not displayed</p>
+                    )}
                     <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
-                      <span>Correct: {question.correctAnswer}</span>
+                      {question.correctAnswer && <span>Correct: {question.correctAnswer}</span>}
                       <span>Category: {question.category}</span>
                       <span>Difficulty: {question.difficulty}</span>
+                      {question.subjectModel && <span>Subject: {question.subjectModel}</span>}
                     </div>
                   </div>
                   <Button
@@ -1717,12 +2110,16 @@ function TestForm({ onSave, onCancel }: {
       </div>
 
       <div className="flex justify-end gap-2 pt-4">
-        <Button type="button" variant="outline" onClick={onCancel}>
+        <Button type="button" variant="outline" onClick={onCancel} disabled={isLoading}>
           Cancel
         </Button>
-        <Button type="submit">
-          <Save className="h-4 w-4 mr-2" />
-          Create Test
+        <Button type="submit" disabled={isLoading}>
+          {isLoading ? (
+            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+          ) : (
+            <Save className="h-4 w-4 mr-2" />
+          )}
+          {isLoading ? (editingTest ? 'Updating...' : 'Creating...') : (editingTest ? 'Update Test' : 'Create Test')}
         </Button>
       </div>
     </form>

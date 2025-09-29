@@ -115,8 +115,9 @@ model TestQuestion {
   id                 String           @id @default(uuid())
   question           String           @db.Text
   category           String
-  subjectModel       String?          // Subject area identifier (e.g., 'cybersecurity', 'networking')
+  subjectModel       String? // Subject area identifier (e.g., 'cybersecurity', 'networking')
   difficulty         Difficulty
+  marks              Int              @default(1) // Marks assigned to this question
   isActive           Boolean          @default(true)
   optionsCount       Int              @default(4)
   usesDynamicOptions Boolean          @default(false)
@@ -124,8 +125,8 @@ model TestQuestion {
   moduleId           String?
   module             Module?          @relation(fields: [moduleId], references: [id])
   // Test model association
-  modelType          String?          // 'subtopic', 'level', 'module', 'exam'
-  modelId            String?          // ID of the associated test model
+  modelType          String? // 'subtopic', 'level', 'module', 'exam'
+  modelId            String? // ID of the associated test model
   createdAt          DateTime         @default(now())
   updatedAt          DateTime         @updatedAt
 }
@@ -187,7 +188,7 @@ model Module {
   createdById        String
   createdBy          User               @relation("ModuleCreatedBy", fields: [createdById], references: [id])
   instructorName     String?
-  instructorBio      String?
+  instructorBio      String?            @db.Text
   instructorImageUrl String?
   coverImageUrl      String?
   videoPreviewUrl    String?
@@ -262,22 +263,22 @@ model LevelTest {
 }
 
 model SubTopic {
-  id              String            @id @default(uuid())
-  levelId         String
-  level           Level             @relation(fields: [levelId], references: [id], onDelete: Cascade)
-  title           String
-  description     String?
-  orderIndex      Int               @default(0)
-  isActive        Boolean           @default(true)
-  estimatedDuration Int?
+  id                 String            @id @default(uuid())
+  levelId            String
+  level              Level             @relation(fields: [levelId], references: [id], onDelete: Cascade)
+  title              String
+  description        String?
+  orderIndex         Int               @default(0)
+  isActive           Boolean           @default(true)
+  estimatedDuration  Int?
   learningObjectives Json?
-  readingMaterial String?           @db.Text
-  attachments     Json?             @default("[]")
-  externalLinks   Json?             @default("[]")
-  contents        SubTopicContent[]
-  subTopicTest    SubTopicTest?
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
+  readingMaterial    String?           @db.Text
+  attachments        Json?             @default("[]")
+  externalLinks      Json?             @default("[]")
+  contents           SubTopicContent[]
+  subTopicTest       SubTopicTest?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
 }
 
 model SubTopicContent {
