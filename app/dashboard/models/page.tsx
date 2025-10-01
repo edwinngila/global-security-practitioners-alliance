@@ -8,27 +8,32 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Calendar } from "@/components/ui/calendar"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { CalendarIcon, Clock, Users, DollarSign, Search, Filter, BookOpen, CheckCircle, AlertCircle } from "lucide-react"
+import { Clock, Users, DollarSign, Search, Filter, BookOpen, CheckCircle, AlertCircle } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
-import { format } from "date-fns"
 import Link from "next/link"
 
 interface Module {
   id: string
   title: string
   description: string
-  short_description: string
+  shortDescription?: string
   category: string
-  difficulty: string
-  duration_hours: number
-  price_kes: number
-  price_usd: number
-  max_students: number
-  instructor_name: string
+  difficultyLevel: string
+  estimatedDuration?: number
+  price: number
+  currency: string
+  maxStudents?: number
+  instructorName?: string
+  instructorBio?: string
+  isActive: boolean
+  isFeatured: boolean
+  createdAt: string
+  updatedAt: string
+  createdById: string
+  questions?: any[]
+  enrollments?: any[]
   is_enrolled?: boolean
 }
 
@@ -62,32 +67,28 @@ export default function EnrolledPage() {
 
   const fetchModules = async () => {
     try {
-      // Get all active modules
-      const { data: modulesData, error: modulesError } = await supabase
-        .from('modules')
-        .select('*')
-        .eq('is_active', true)
-        .order('created_at', { ascending: false })
+      // Get all active modules using the API with authentication
+      const response = await fetch('/api/modules?active=true', {
+        credentials: 'include', // Include cookies for authentication
+      })
+      if (!response.ok) {
+        throw new Error('Failed to fetch modules')
+      }
 
-      if (modulesError) throw modulesError
+      const modulesData = await response.json()
 
-      // Check user authentication and enrollment status
-      const { data: { user } } = await supabase.auth.getUser()
+      // Get user enrollments using the same API as dashboard
+      const userResponse = await fetch('/api/auth/user-dashboard')
+      if (userResponse.ok) {
+        const { enrollments } = await userResponse.json()
 
-      if (user && modulesData) {
-        // Get user's enrollments
-        const { data: enrollments, error: enrollmentsError } = await supabase
-          .from('module_enrollments')
-          .select('module_id')
-          .eq('user_id', user.id)
-
-        if (!enrollmentsError && enrollments) {
+        if (enrollments && modulesData) {
           // Mark enrolled modules
           const modulesWithEnrollment = modulesData.map((module: any) => {
-            const isEnrolled = enrollments.some((e: any) => e.module_id === module.id)
+            const enrollment = enrollments.find((e: any) => e.moduleId === module.id)
             return {
               ...module,
-              is_enrolled: isEnrolled
+              is_enrolled: !!enrollment && enrollment.paymentStatus === 'COMPLETED'
             }
           })
           setModules(modulesWithEnrollment)
@@ -123,7 +124,7 @@ export default function EnrolledPage() {
 
     // Difficulty filter
     if (difficultyFilter !== "all") {
-      filtered = filtered.filter(module => module.difficulty === difficultyFilter)
+      filtered = filtered.filter(module => module.difficultyLevel === difficultyFilter)
     }
 
     setFilteredModules(filtered)
@@ -141,46 +142,46 @@ export default function EnrolledPage() {
       return
     }
 
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      router.push('/auth/login')
-      return
-    }
-
     setIsEnrolling(true)
 
     try {
-      // Create enrollment record
-      const enrollmentRecord = {
-        user_id: user.id,
-        module_id: selectedModule.id,
-        payment_status: 'pending',
-        exam_date: enrollmentData.examDate.toISOString().split('T')[0] // Convert to YYYY-MM-DD format
+      // Create pending enrollment record via API
+      const response = await fetch('/api/user-enrollments', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          moduleId: selectedModule.id,
+          paymentStatus: 'PENDING',
+          examDate: enrollmentData.examDate.toISOString().split('T')[0] // Convert to YYYY-MM-DD format
+        })
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        console.error('API Error:', errorData)
+        throw new Error(errorData.error || `Failed to create enrollment (${response.status})`)
       }
-
-      const { error: enrollmentError } = await supabase
-        .from('module_enrollments')
-        .insert(enrollmentRecord)
-
-      if (enrollmentError) throw enrollmentError
 
       // Redirect to payment with exam date
       const examDateParam = enrollmentData.examDate ? `&examDate=${enrollmentData.examDate.toISOString().split('T')[0]}` : ''
-      router.push(`/payment?type=module&moduleId=${selectedModule.id}${examDateParam}`)
+      router.push(`/dashboard/payment?type=module&moduleId=${selectedModule.id}${examDateParam}`)
     } catch (error) {
       console.error('Error creating enrollment:', error)
-      alert('Error creating enrollment. Please try again.')
+      alert(`Error creating enrollment: ${error instanceof Error ? error.message : String(error)}`)
     } finally {
       setIsEnrolling(false)
       setEnrollmentDialogOpen(false)
     }
   }
 
-  const getDifficultyColor = (difficulty: string) => {
-    switch (difficulty) {
-      case 'beginner': return 'bg-green-100 text-green-800 border-green-200'
-      case 'intermediate': return 'bg-yellow-100 text-yellow-800 border-yellow-200'
-      case 'advanced': return 'bg-red-100 text-red-800 border-red-200'
+  const getDifficultyColor = (difficultyLevel: string) => {
+    switch (difficultyLevel) {
+      case 'BEGINNER': return 'bg-green-100 text-green-800 border-green-200'
+      case 'INTERMEDIATE': return 'bg-yellow-100 text-yellow-800 border-yellow-200'
+      case 'ADVANCED': return 'bg-red-100 text-red-800 border-red-200'
       default: return 'bg-gray-100 text-gray-800 border-gray-200'
     }
   }
@@ -199,8 +200,8 @@ export default function EnrolledPage() {
     <div className="p-6">
       <div className="max-w-7xl mx-auto">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold mb-2">Enroll in Modules</h1>
-          <p className="text-muted-foreground">Select training modules, choose your exam date, and start your learning journey.</p>
+          <h1 className="text-3xl font-bold mb-2">Available Modules</h1>
+          <p className="text-muted-foreground">Browse and enroll in training modules to enhance your cybersecurity skills.</p>
         </div>
 
         {/* Filters Section */}
@@ -234,9 +235,9 @@ export default function EnrolledPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Levels</SelectItem>
-                    <SelectItem value="beginner">Beginner</SelectItem>
-                    <SelectItem value="intermediate">Intermediate</SelectItem>
-                    <SelectItem value="advanced">Advanced</SelectItem>
+                    <SelectItem value="BEGINNER">Beginner</SelectItem>
+                    <SelectItem value="INTERMEDIATE">Intermediate</SelectItem>
+                    <SelectItem value="ADVANCED">Advanced</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -260,8 +261,8 @@ export default function EnrolledPage() {
               <Card key={module.id} className="group hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 border-0 bg-gradient-to-br from-background to-muted/20 backdrop-blur-sm overflow-hidden">
                 <CardHeader className="pb-4">
                   <div className="flex items-start justify-between mb-3">
-                    <Badge className={getDifficultyColor(module.difficulty)}>
-                      {module.difficulty}
+                    <Badge className={getDifficultyColor(module.difficultyLevel)}>
+                      {module.difficultyLevel}
                     </Badge>
                     {module.is_enrolled && (
                       <Badge className="bg-green-100 text-green-800 border-green-200">
@@ -273,14 +274,14 @@ export default function EnrolledPage() {
                     {module.title}
                   </CardTitle>
                   <CardDescription className="line-clamp-2">
-                    {module.short_description || module.description.substring(0, 100) + '...'}
+                    {module.shortDescription || module.description.substring(0, 100) + '...'}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="flex items-center gap-4 text-sm text-muted-foreground">
                     <div className="flex items-center gap-1">
                       <Clock className="h-4 w-4" />
-                      <span>{module.duration_hours}h</span>
+                      <span>{module.estimatedDuration}h</span>
                     </div>
                     <div className="flex items-center gap-1">
                       <Users className="h-4 w-4" />
@@ -290,15 +291,15 @@ export default function EnrolledPage() {
 
                   <div className="flex items-center justify-between">
                     <div className="text-2xl font-bold text-primary">
-                      KES {module.price_kes.toLocaleString()}
+                      {module.currency} {module.price.toLocaleString()}
                     </div>
                     <div className="text-sm text-muted-foreground">
-                      ${module.price_usd}
+                      {module.currency === 'USD' ? `KES ${(module.price * 130).toLocaleString()}` : `$${(module.price / 130).toFixed(2)}`}
                     </div>
                   </div>
 
                   <div className="text-sm text-muted-foreground">
-                    <strong>Instructor:</strong> {module.instructor_name}
+                    <strong>Instructor:</strong> {module.instructorName || 'TBD'}
                   </div>
 
                   <div className="flex gap-2 pt-2">
@@ -312,7 +313,7 @@ export default function EnrolledPage() {
                         <DialogHeader>
                           <DialogTitle className="text-2xl">{module.title}</DialogTitle>
                           <DialogDescription className="text-base">
-                            {module.short_description}
+                            {module.shortDescription}
                           </DialogDescription>
                         </DialogHeader>
                         <div className="space-y-6">
@@ -323,16 +324,16 @@ export default function EnrolledPage() {
 
                           <div className="grid grid-cols-2 gap-4 text-sm">
                             <div>
-                              <strong>Duration:</strong> {module.duration_hours} hours
+                              <strong>Duration:</strong> {module.estimatedDuration} hours
                             </div>
                             <div>
-                              <strong>Difficulty:</strong> {module.difficulty}
+                              <strong>Difficulty:</strong> {module.difficultyLevel}
                             </div>
                             <div>
                               <strong>Category:</strong> {module.category}
                             </div>
                             <div>
-                              <strong>Instructor:</strong> {module.instructor_name}
+                              <strong>Instructor:</strong> {module.instructorName || 'TBD'}
                             </div>
                           </div>
 
@@ -340,10 +341,10 @@ export default function EnrolledPage() {
                             <div className="flex items-center justify-between mb-4">
                               <div>
                                 <div className="text-2xl font-bold text-primary">
-                                  KES {module.price_kes.toLocaleString()}
+                                  {module.currency} {module.price.toLocaleString()}
                                 </div>
                                 <div className="text-sm text-muted-foreground">
-                                  (${module.price_usd} USD)
+                                  {module.currency === 'USD' ? `KES ${(module.price * 130).toLocaleString()}` : `$${(module.price / 130).toFixed(2)} USD`}
                                 </div>
                               </div>
                               {module.is_enrolled ? (
@@ -393,32 +394,17 @@ export default function EnrolledPage() {
             <div className="space-y-4">
               <div>
                 <Label htmlFor="exam-date">Exam Date</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={`w-full justify-start text-left font-normal ${
-                        !enrollmentData.examDate && "text-muted-foreground"
-                      }`}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {enrollmentData.examDate ? (
-                        format(enrollmentData.examDate, "PPP")
-                      ) : (
-                        <span>Pick an exam date</span>
-                      )}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar
-                      mode="single"
-                      selected={enrollmentData.examDate}
-                      onSelect={(date) => setEnrollmentData({ ...enrollmentData, examDate: date })}
-                      disabled={(date) => date < new Date() || date < new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
+                <Input
+                  id="exam-date"
+                  type="date"
+                  value={enrollmentData.examDate ? enrollmentData.examDate.toISOString().split('T')[0] : ''}
+                  onChange={(e) => {
+                    const selectedDate = e.target.value ? new Date(e.target.value) : undefined
+                    setEnrollmentData({ ...enrollmentData, examDate: selectedDate })
+                  }}
+                  min={new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]}
+                  className="w-full"
+                />
                 <p className="text-xs text-muted-foreground mt-1">
                   Exam date must be at least 7 days from today
                 </p>
@@ -434,12 +420,12 @@ export default function EnrolledPage() {
                     </div>
                     <div className="flex justify-between">
                       <span>Fee:</span>
-                      <span>KES {selectedModule.price_kes.toLocaleString()}</span>
+                      <span>{selectedModule.currency} {selectedModule.price.toLocaleString()}</span>
                     </div>
                     {enrollmentData.examDate && (
                       <div className="flex justify-between">
                         <span>Exam Date:</span>
-                        <span>{format(enrollmentData.examDate, "PPP")}</span>
+                        <span>{enrollmentData.examDate.toLocaleDateString()}</span>
                       </div>
                     )}
                   </div>

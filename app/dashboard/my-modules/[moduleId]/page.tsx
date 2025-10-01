@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -10,6 +11,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Calendar, Clock, BookOpen, FileText, Video, CheckCircle, Play, ExternalLink, AlertCircle } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { format } from "date-fns"
+import { useSession } from "next-auth/react"
 
 interface Module {
   id: string
@@ -28,17 +30,16 @@ interface Enrollment {
   exam_score: number | null
 }
 
-interface ModuleContent {
+interface Level {
   id: string
   title: string
   description: string
-  content_type: string
-  content_url: string
-  content_text: string
-  duration_minutes: number
-  is_required: boolean
   order_index: number
-  is_published: boolean
+  is_active: boolean
+  estimated_duration: number
+  level_test_id?: string
+  contents_count?: number
+  completed_contents?: number
 }
 
 interface UserProgress {
@@ -48,72 +49,77 @@ interface UserProgress {
 }
 
 export default function ModuleDetailPage() {
-  const { moduleId } = useParams()
-  const router = useRouter()
-  const [module, setModule] = useState<Module | null>(null)
-  const [enrollment, setEnrollment] = useState<Enrollment | null>(null)
-  const [content, setContent] = useState<ModuleContent[]>([])
-  const [userProgress, setUserProgress] = useState<UserProgress[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+   const { moduleId } = useParams()
+   const router = useRouter()
+   const { data: session } = useSession()
+   const [module, setModule] = useState<Module | null>(null)
+   const [enrollment, setEnrollment] = useState<Enrollment | null>(null)
+   const [levels, setLevels] = useState<Level[]>([])
+   const [userProgress, setUserProgress] = useState<UserProgress[]>([])
+   const [isLoading, setIsLoading] = useState(true)
 
-  const supabase = createClient()
+   const supabase = createClient()
 
   useEffect(() => {
-    if (moduleId) {
+    if (moduleId && session?.user?.id) {
       fetchModuleData()
     }
-  }, [moduleId])
+  }, [moduleId, session])
 
   const fetchModuleData = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        router.push('/auth/login')
-        return
+      // Get module details from API
+      const moduleRes = await fetch(`/api/modules/${moduleId}`)
+      if (!moduleRes.ok) {
+        if (moduleRes.status === 404) {
+          router.push('/dashboard/models')
+          return
+        }
+        throw new Error('Failed to fetch module')
       }
+      const moduleData = await moduleRes.json()
+      setModule({
+        ...moduleData,
+        instructor_name: moduleData.instructorName,
+        duration_hours: moduleData.estimatedDuration
+      })
 
-      // Get module details
-      const { data: moduleData, error: moduleError } = await supabase
-        .from('modules')
-        .select('*')
-        .eq('id', moduleId)
-        .single()
+      // Get enrollment details from API
+      const enrollmentRes = await fetch(`/api/user-enrollments?userId=${session?.user?.id}`)
+      if (!enrollmentRes.ok) throw new Error('Failed to fetch enrollments')
+      const enrollmentsData = await enrollmentRes.json()
+      const enrollmentData = enrollmentsData.find((e: any) => e.moduleId === moduleId && e.paymentStatus === 'COMPLETED')
 
-      if (moduleError) throw moduleError
-      setModule(moduleData)
-
-      // Get enrollment details
-      const { data: enrollmentData, error: enrollmentError } = await supabase
-        .from('module_enrollments')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('module_id', moduleId)
-        .eq('payment_status', 'completed')
-        .single()
-
-      if (enrollmentError) {
-        router.push('/dashboard/enrolled')
+      if (!enrollmentData) {
+        router.push('/dashboard/models')
         return
       }
       setEnrollment(enrollmentData)
 
-      // Get module content
-      const { data: contentData, error: contentError } = await supabase
-        .from('module_content')
-        .select('*')
-        .eq('module_id', moduleId)
-        .eq('is_published', true)
-        .order('order_index')
+      // Get module levels from API
+      const levelsRes = await fetch(`/api/levels?moduleId=${moduleId}`)
+      if (levelsRes.ok) {
+        const levelsData = await levelsRes.json()
 
-      if (!contentError && contentData) {
-        setContent(contentData)
+        // Process levels with progress information
+        const levelsWithProgress = levelsData.map((level: any) => {
+          // Get subtopic count for this level (each subtopic is a lesson)
+          const subtopicCount = level.subTopics?.length || 0
+
+          return {
+            ...level,
+            contents_count: subtopicCount,
+            completed_contents: 0 // TODO: Implement proper progress tracking
+          }
+        })
+        setLevels(levelsWithProgress)
       }
 
-      // Get user progress
+      // Get user progress for all content
       const { data: progressData, error: progressError } = await supabase
         .from('user_progress')
         .select('content_id, completed, completed_at')
-        .eq('user_id', user.id)
+        .eq('user_id', session?.user?.id)
         .eq('enrollment_id', enrollmentData.id)
 
       if (!progressError && progressData) {
@@ -122,14 +128,14 @@ export default function ModuleDetailPage() {
 
     } catch (error) {
       console.error('Error fetching module data:', error)
-      router.push('/dashboard/enrolled')
+      router.push('/dashboard/models')
     } finally {
       setIsLoading(false)
     }
   }
 
   const markContentComplete = async (contentId: string) => {
-    if (!enrollment) return
+    if (!enrollment || !session?.user?.id) return
 
     try {
       const existingProgress = userProgress.find(p => p.content_id === contentId)
@@ -142,7 +148,7 @@ export default function ModuleDetailPage() {
             completed: true,
             completed_at: new Date().toISOString()
           })
-          .eq('user_id', (await supabase.auth.getUser()).data.user?.id)
+          .eq('user_id', session.user.id)
           .eq('content_id', contentId)
 
         if (error) throw error
@@ -151,7 +157,7 @@ export default function ModuleDetailPage() {
         const { error } = await supabase
           .from('user_progress')
           .insert({
-            user_id: (await supabase.auth.getUser()).data.user?.id,
+            user_id: session.user.id,
             enrollment_id: enrollment.id,
             content_id: contentId,
             completed: true,
@@ -189,10 +195,12 @@ export default function ModuleDetailPage() {
   }
 
   const updateEnrollmentProgress = async () => {
-    if (!enrollment || !content.length) return
+    if (!enrollment || !levels.length) return
 
-    const completedCount = userProgress.filter(p => p.completed).length
-    const newProgress = Math.round((completedCount / content.length) * 100)
+    // Calculate total content across all levels
+    const totalContent = levels.reduce((sum, level) => sum + (level.contents_count || 0), 0)
+    const completedContent = levels.reduce((sum, level) => sum + (level.completed_contents || 0), 0)
+    const newProgress = totalContent > 0 ? Math.round((completedContent / totalContent) * 100) : 0
 
     try {
       const { error } = await supabase
@@ -247,8 +255,8 @@ export default function ModuleDetailPage() {
       <div className="max-w-4xl mx-auto">
         {/* Module Header */}
         <div className="mb-8">
-          <Button variant="outline" onClick={() => router.push('/dashboard/enrolled')} className="mb-4">
-            ← Back to Modules
+          <Button variant="outline" onClick={() => router.push('/dashboard/models')} className="mb-4">
+            ← Back to Models
           </Button>
 
           <div className="bg-gradient-to-r from-primary/10 to-accent/10 rounded-xl p-6 mb-6">
@@ -293,9 +301,9 @@ export default function ModuleDetailPage() {
 
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
-                    <span className="text-muted-foreground">Completed:</span>
+                    <span className="text-muted-foreground">Levels:</span>
                     <span className="font-medium ml-2">
-                      {userProgress.filter(p => p.completed).length} / {content.length}
+                      {levels.length}
                     </span>
                   </div>
                   <div>
@@ -310,110 +318,98 @@ export default function ModuleDetailPage() {
           </Card>
         </div>
 
-        {/* Course Content */}
+        {/* Course Levels */}
         <div className="space-y-4">
-          <h2 className="text-2xl font-bold mb-4">Course Content</h2>
+          <h2 className="text-2xl font-bold mb-4">Course Levels</h2>
 
-          {content.length === 0 ? (
+          {levels.length === 0 ? (
             <Card>
               <CardContent className="text-center py-12">
                 <BookOpen className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-xl font-semibold mb-2">No content available</h3>
-                <p className="text-muted-foreground">Course materials will be published soon.</p>
+                <h3 className="text-xl font-semibold mb-2">Content Coming Soon</h3>
+                <p className="text-muted-foreground">This module is being prepared. Please check back later for the course content.</p>
               </CardContent>
             </Card>
           ) : (
-            content.map((item, index) => {
-              const completed = isContentCompleted(item.id)
+            levels.map((level, index) => {
+              const contentsCount = level.contents_count ?? 0
+              const completedContents = level.completed_contents ?? 0
+              const progress = contentsCount > 0 ? Math.round((completedContents / contentsCount) * 100) : 0
+              const isCompleted = progress === 100
+              const isAccessible = index === 0 || levels[index - 1].completed_contents === levels[index - 1].contents_count
+
               return (
-                <Card key={item.id} className={`transition-all hover:shadow-lg ${completed ? 'bg-green-50/50 border-green-200' : ''}`}>
+                <Card key={level.id} className={`transition-all hover:shadow-lg ${isCompleted ? 'bg-green-50/50 border-green-200' : ''}`}>
                   <CardContent className="p-6">
                     <div className="flex items-start gap-4">
                       <div className={`w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                        completed ? 'bg-green-100 text-green-600' : 'bg-primary/10 text-primary'
+                        isCompleted ? 'bg-green-100 text-green-600' : 'bg-primary/10 text-primary'
                       }`}>
-                        {completed ? (
+                        {isCompleted ? (
                           <CheckCircle className="h-6 w-6" />
                         ) : (
-                          getContentTypeIcon(item.content_type)
+                          <BookOpen className="h-6 w-6" />
                         )}
                       </div>
 
                       <div className="flex-1">
                         <div className="flex items-start justify-between mb-2">
                           <div>
-                            <h3 className="font-semibold text-lg mb-1">{item.title}</h3>
-                            {item.description && (
-                              <p className="text-muted-foreground mb-2">{item.description}</p>
+                            <h3 className="font-semibold text-lg mb-1">{level.title}</h3>
+                            {level.description && (
+                              <p className="text-muted-foreground mb-2">{level.description}</p>
                             )}
                           </div>
                           <div className="flex items-center gap-2">
-                            {item.is_required && (
-                              <Badge variant="outline">Required</Badge>
-                            )}
-                            <Badge variant={completed ? "default" : "secondary"}>
-                              {completed ? "Completed" : item.content_type}
+                            <Badge variant={isCompleted ? "default" : "secondary"}>
+                              {isCompleted ? "Completed" : "In Progress"}
                             </Badge>
                           </div>
                         </div>
 
                         <div className="flex items-center gap-4 text-sm text-muted-foreground mb-4">
-                          {item.duration_minutes > 0 && (
+                          {level.estimated_duration && (
                             <span className="flex items-center gap-1">
                               <Clock className="h-4 w-4" />
-                              {item.duration_minutes} min
+                              {level.estimated_duration} min
                             </span>
                           )}
-                          <span>Lesson {index + 1}</span>
+                          <span>Level {index + 1}</span>
+                          <span>{level.contents_count} lessons</span>
                         </div>
 
-                        {/* Content Display */}
-                        {item.content_type === 'notes' && item.content_text && (
-                          <div className="bg-muted/50 p-4 rounded-lg mb-4">
-                            <div className="prose prose-sm max-w-none">
-                              <div dangerouslySetInnerHTML={{ __html: item.content_text.replace(/\n/g, '<br>') }} />
-                            </div>
+                        {/* Progress Bar */}
+                        <div className="mb-4">
+                          <div className="flex justify-between text-sm mb-1">
+                            <span>Progress</span>
+                            <span>{level.completed_contents} / {level.contents_count} completed</span>
                           </div>
-                        )}
-
-                        {item.content_type === 'video' && item.content_url && (
-                          <div className="mb-4">
-                            <div className="aspect-video bg-black rounded-lg flex items-center justify-center">
-                              <Button asChild>
-                                <a href={item.content_url} target="_blank" rel="noopener noreferrer">
-                                  <Play className="h-8 w-8 mr-2" />
-                                  Watch Video
-                                </a>
-                              </Button>
-                            </div>
-                          </div>
-                        )}
-
-                        {item.content_type === 'document' && item.content_url && (
-                          <div className="mb-4">
-                            <Button variant="outline" asChild>
-                              <a href={item.content_url} target="_blank" rel="noopener noreferrer">
-                                <ExternalLink className="h-4 w-4 mr-2" />
-                                View Document
-                              </a>
-                            </Button>
-                          </div>
-                        )}
+                          <Progress value={progress} className="h-2" />
+                        </div>
 
                         <div className="flex justify-between items-center">
                           <div className="text-sm text-muted-foreground">
-                            {completed && userProgress.find(p => p.content_id === item.id)?.completed_at && (
-                              <span>
-                                Completed on {format(new Date(userProgress.find(p => p.content_id === item.id)!.completed_at!), "PPP")}
-                              </span>
+                            {isCompleted && (
+                              <span>Level completed</span>
                             )}
                           </div>
 
-                          {!completed && (
-                            <Button onClick={() => markContentComplete(item.id)}>
-                              Mark as Complete
+                          <div className="flex gap-2">
+                            {!isAccessible && !isCompleted && (
+                              <Badge variant="outline" className="text-orange-600">
+                                Complete previous level first
+                              </Badge>
+                            )}
+                            <Button
+                              asChild
+                              disabled={!isAccessible && !isCompleted}
+                              variant={isCompleted ? "outline" : "default"}
+                            >
+                              <Link href={`/dashboard/my-modules/${moduleId}/levels/${level.id}`}>
+                                {isCompleted ? 'Review Level' : 'Start Level'}
+                              </Link>
                             </Button>
-                          )}
+                          </div>
                         </div>
                       </div>
                     </div>

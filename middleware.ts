@@ -100,9 +100,10 @@ export default withAuth(
 
       // Check membership payment for protected content
       // Allow temporary access if user just completed payment (check URL params)
+      // Exclude payment page itself from this check
       const hasPaymentSuccess = req.nextUrl.searchParams.get('payment') === 'success'
-      if ((pathname.startsWith("/dashboard") || pathname.startsWith("/test")) && !token.membershipPaid && !hasPaymentSuccess) {
-        return NextResponse.redirect(new URL("/payment", req.url))
+      if ((pathname.startsWith("/dashboard") && !pathname.startsWith("/dashboard/payment")) && !token.membershipPaid && !hasPaymentSuccess) {
+        return NextResponse.redirect(new URL("/dashboard/payment", req.url))
       }
     }
 

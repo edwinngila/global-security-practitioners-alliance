@@ -10,9 +10,9 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Clock, Users, DollarSign, Search, Filter, BookOpen, Award, Star, CheckCircle } from "lucide-react"
-import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
+import { useSession } from "next-auth/react"
 
 interface Module {
   id: string
@@ -33,21 +33,21 @@ interface Module {
 }
 
 export default function ModulesPage() {
-  const [modules, setModules] = useState<Module[]>([])
-  const [filteredModules, setFilteredModules] = useState<Module[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [searchTerm, setSearchTerm] = useState("")
-  const [categoryFilter, setCategoryFilter] = useState("all")
-  const [difficultyFilter, setDifficultyFilter] = useState("all")
-  const [selectedModule, setSelectedModule] = useState<Module | null>(null)
-  const [isEnrolling, setIsEnrolling] = useState(false)
+   const { data: session } = useSession()
+   const [modules, setModules] = useState<Module[]>([])
+   const [filteredModules, setFilteredModules] = useState<Module[]>([])
+   const [isLoading, setIsLoading] = useState(true)
+   const [searchTerm, setSearchTerm] = useState("")
+   const [categoryFilter, setCategoryFilter] = useState("all")
+   const [difficultyFilter, setDifficultyFilter] = useState("all")
+   const [selectedModule, setSelectedModule] = useState<Module | null>(null)
+   const [isEnrolling, setIsEnrolling] = useState(false)
 
-  const supabase = createClient()
-  const router = useRouter()
+   const router = useRouter()
 
   useEffect(() => {
     fetchModules()
-  }, [])
+  }, [session])
 
   useEffect(() => {
     filterModules()
@@ -56,41 +56,48 @@ export default function ModulesPage() {
   const fetchModules = async () => {
     try {
       // Get all active modules
-      const { data: modulesData, error: modulesError } = await supabase
-        .from('modules')
-        .select('*')
-        .eq('is_active', true)
-        .order('created_at', { ascending: false })
+      const modulesRes = await fetch('/api/modules?active=true')
+      if (!modulesRes.ok) throw new Error('Failed to fetch modules')
+      const modulesData = await modulesRes.json()
 
-      if (modulesError) throw modulesError
+      // Map to interface
+      let mappedModules = modulesData.map((module: any) => ({
+        id: module.id,
+        title: module.title,
+        description: module.description,
+        short_description: module.description.substring(0, 100) + '...',
+        category: module.category,
+        difficulty: module.difficultyLevel,
+        duration_hours: module.estimatedDuration || 0,
+        price_kes: module.currency === 'KES' ? module.price : Math.round(module.price * 130),
+        price_usd: module.currency === 'USD' ? module.price : Math.round(module.price / 130),
+        max_students: module.maxStudents || 100,
+        instructor_name: module.instructorName || 'TBD',
+        instructor_bio: module.instructorBio || '',
+        learning_objectives: [], // Not in API, set empty
+        is_enrolled: false,
+        enrollment_status: 'not_enrolled'
+      }))
 
       // Check user authentication and enrollment status
-      const { data: { user } } = await supabase.auth.getUser()
-
-      if (user && modulesData) {
+      if (session?.user?.id) {
         // Get user's enrollments
-        const { data: enrollments, error: enrollmentsError } = await supabase
-          .from('module_enrollments')
-          .select('module_id, payment_status')
-          .eq('user_id', user.id)
-
-        if (!enrollmentsError && enrollments) {
+        const enrollmentsRes = await fetch(`/api/user-enrollments?userId=${session.user.id}`)
+        if (enrollmentsRes.ok) {
+          const enrollments = await enrollmentsRes.json()
           // Mark enrolled modules
-          const modulesWithEnrollment = modulesData.map((module: any) => {
-            const enrollment = enrollments.find((e: any) => e.module_id === module.id)
+          mappedModules = mappedModules.map((module: Module) => {
+            const enrollment = enrollments.find((e: any) => e.moduleId === module.id)
             return {
               ...module,
               is_enrolled: !!enrollment,
-              enrollment_status: enrollment?.payment_status || 'not_enrolled'
+              enrollment_status: enrollment?.paymentStatus || 'not_enrolled'
             }
           })
-          setModules(modulesWithEnrollment)
-        } else {
-          setModules(modulesData)
         }
-      } else {
-        setModules(modulesData || [])
       }
+
+      setModules(mappedModules)
     } catch (error) {
       console.error('Error fetching modules:', error)
     } finally {
@@ -124,9 +131,7 @@ export default function ModulesPage() {
   }
 
   const handleEnroll = async (module: Module) => {
-    const { data: { user } } = await supabase.auth.getUser()
-
-    if (!user) {
+    if (!session?.user) {
       router.push('/auth/login')
       return
     }

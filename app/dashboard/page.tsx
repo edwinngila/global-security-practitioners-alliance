@@ -106,15 +106,7 @@ export default function DashboardPage() {
       setOngoingTest(ongoingTest)
 
       if (enrollments) {
-        const formattedEnrollments = enrollments.map((enrollment: any) => ({
-          id: enrollment.id,
-          module_id: enrollment.moduleId,
-          module_title: enrollment.module.title || 'Unknown Module',
-          progress_percentage: enrollment.progressPercentage,
-          payment_status: enrollment.paymentStatus,
-          completed_at: enrollment.completedAt
-        }))
-        setModuleEnrollments(formattedEnrollments)
+        setModuleEnrollments(enrollments)
       }
 
       // Check and issue certificate if available
@@ -556,7 +548,7 @@ export default function DashboardPage() {
                         Enhance your skills with our comprehensive training modules covering various cybersecurity topics.
                       </div>
                       <Button asChild size="sm" variant="outline">
-                        <Link href="/modules">Browse Modules</Link>
+                        <Link href="/dashboard/models">Browse Models</Link>
                       </Button>
                     </div>
                   </div>

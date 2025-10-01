@@ -46,8 +46,8 @@ export default function DashboardLayout({
     switch (pathname) {
       case "/dashboard":
         return "Dashboard"
-      case "/dashboard/enrolled":
-        return "Enroll in Modules"
+      case "/dashboard/models":
+        return "Available Models"
       case "/dashboard/profile":
         return "Profile"
       case "/dashboard/test":
@@ -64,11 +64,12 @@ export default function DashboardLayout({
   }
 
   const isTestPage = pathname === '/dashboard/test'
+  const isLevelPage = pathname.includes('/levels/')
 
   return (
     <div className="min-h-screen flex">
-      {/* Mobile Sidebar - Hide on test page */}
-      {!isTestPage && mobileMenuOpen && (
+      {/* Mobile Sidebar - Hide on test page and level pages */}
+      {!isTestPage && !isLevelPage && mobileMenuOpen && (
         <div className="fixed inset-0 z-50 md:hidden">
           <div className="absolute inset-0 bg-black/50" onClick={() => setMobileMenuOpen(false)} />
           <div className="absolute left-0 top-0 h-full">
@@ -83,8 +84,8 @@ export default function DashboardLayout({
         </div>
       )}
 
-      {/* Desktop Sidebar - Hide on test page */}
-      {!isTestPage && (
+      {/* Desktop Sidebar - Hide on test page and level pages */}
+      {!isTestPage && !isLevelPage && (
         <div className="hidden md:block">
           <DashboardSidebar
             userRole={userRole}
@@ -97,11 +98,11 @@ export default function DashboardLayout({
       <main
         className={[
           "flex-1 min-h-screen overflow-y-auto", // base styles
-          !isTestPage ? "md:ml-1" : "", // sidebar spacing only on non-test pages
+          !isTestPage && !isLevelPage ? "md:ml-1" : "", // sidebar spacing only on non-test and non-level pages
         ].join(" ")}
       >
-        {/* Mobile Header - only render if not test page */}
-        {!isTestPage && (
+        {/* Mobile Header - only render if not test page and not level page */}
+        {!isTestPage && !isLevelPage && (
           <header className="md:hidden bg-background/95 backdrop-blur-sm border-b border-border p-4 flex items-center justify-between shadow-sm">
             <Button
               variant="ghost"
@@ -120,7 +121,7 @@ export default function DashboardLayout({
         )}
 
         {/* Page content */}
-        <div className={isTestPage ? "" : "p-4 md:p-6"}>{children}</div>
+        <div className={isTestPage || isLevelPage ? "" : "p-4 md:p-6"}>{children}</div>
       </main>
 
     </div>

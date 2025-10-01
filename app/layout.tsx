@@ -2,7 +2,6 @@ import type React from "react"
 import type { Metadata } from "next"
 import { GeistSans } from "geist/font/sans"
 import { GeistMono } from "geist/font/mono"
-import { Analytics } from "@vercel/analytics/next"
 import { Suspense } from "react"
 import ExamPopupWrapper from "@/components/exam-popup-wrapper"
 import { SkipLinks } from "@/components/skip-links"
@@ -103,7 +102,6 @@ export default function RootLayout({
               {children}
             </ExamPopupWrapper>
           </Suspense>
-          <Analytics />
         </Providers>
       </body>
     </html>

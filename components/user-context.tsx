@@ -139,8 +139,16 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     // Clear local state
     setProfileState(null)
     setRoleState(null)
+    // Full client-side cleanup
+    SessionManager.clearAllCookies()
+    SessionManager.clearLocalStorage()
+    SessionManager.clearSessionStorage()
     // Use NextAuth's signOut for a clean logout. It handles cookie removal.
     await signOut({ callbackUrl: '/auth/login' })
+    // Force reload to clear any cached state
+    if (typeof window !== 'undefined') {
+      window.location.reload()
+    }
   }
 
   const logout = async () => {

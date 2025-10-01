@@ -137,16 +137,17 @@ export default function PaymentPage() {
         const updateData: any = {}
 
         if (paymentType === 'membership') {
-          updateData.membership_fee_paid = true
-          updateData.membership_payment_reference = reference.reference
+          updateData.membershipFeePaid = true;
+          updateData.paymentStatus = "COMPLETED";
+          updateData.paymentReference = reference.reference;
         } else if (paymentType === 'test') {
-          updateData.payment_status = "completed"
-          updateData.payment_reference = reference.reference
+          updateData.paymentStatus = "COMPLETED";
+          updateData.paymentReference = reference.reference;
         } else if (paymentType === 'retake') {
-          updateData.payment_status = "completed"
-          updateData.test_completed = false // Allow retake
-          updateData.test_score = null
-          updateData.payment_reference = reference.reference
+          updateData.paymentStatus = "COMPLETED";
+          updateData.testCompleted = false; // Allow retake
+          updateData.testScore = null;
+          updateData.paymentReference = reference.reference;
         }
 
         const res = await apiFetch(`/api/profiles/${user.id}`, { method: 'PUT', body: JSON.stringify(updateData), headers: { 'Content-Type': 'application/json' } })

@@ -6,11 +6,14 @@ import { authOptions } from '../auth/[...nextauth]/route'
 // GET /api/modules - Get all modules
 export async function GET(request: Request) {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
     const url = new URL(request.url)
     const active = url.searchParams.get('active')
+
+    // Allow unauthenticated access for active modules only
+    if (active !== 'true') {
+      const session = await getServerSession(authOptions)
+      if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
 
     const whereClause = active === 'true' ? { isActive: true } : {}
 

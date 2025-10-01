@@ -230,17 +230,18 @@ export class SessionManager {
    */
   static async logout(): Promise<void> {
     console.log('Starting complete logout process...');
-
-    // Clear localStorage and sessionStorage first
+    // Clear cookies, localStorage, and sessionStorage
+    this.clearAllCookies();
     this.clearLocalStorage();
     console.log('✓ LocalStorage cleared');
     this.clearSessionStorage();
     console.log('✓ SessionStorage cleared');
-
     // Use next-auth's signOut function. It handles cookie removal and redirects.
-    // We redirect to '/' after logout.
-    await signOut({ redirect: true, callbackUrl: '/' });
-
+    await signOut({ redirect: true, callbackUrl: '/auth/login' });
+    // Force reload to clear any cached state
+    if (typeof window !== 'undefined') {
+      window.location.reload();
+    }
     console.log('✓ Complete logout finished');
   }
 

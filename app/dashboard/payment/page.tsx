@@ -8,7 +8,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { CreditCard, CheckCircle, AlertCircle, Loader2 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter, useSearchParams } from "next/navigation"
-import { useSession } from "next-auth/react"
+import { useSession } from "next-auth/react" // Keep import but don't use
 
 const PaystackButton = dynamic(() => import("react-paystack").then((mod) => mod.PaystackButton), { ssr: false })
 
@@ -26,11 +26,14 @@ export default function DashboardPaymentPage() {
   const [user, setUser] = useState<UserProfile | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [paymentSuccess, setPaymentSuccess] = useState(false)
-  const [paymentType, setPaymentType] = useState<'membership' | 'test' | 'retake'>('membership')
+  const [paymentType, setPaymentType] = useState<'membership' | 'test' | 'retake' | 'module'>('membership')
+  const [moduleId, setModuleId] = useState<string | null>(null)
+  const [examDate, setExamDate] = useState<string | null>(null)
+  const [moduleData, setModuleData] = useState<any>(null)
+  const [moduleDataLoading, setModuleDataLoading] = useState(false)
   const router = useRouter()
   const searchParams = useSearchParams()
   const supabase = createClient()
-  const { data: session } = useSession()
 
   const PAYSTACK_PUBLIC_KEY = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || "pk_test_your_key_here"
   const MEMBERSHIP_FEE = 910000 // 9100 KES in cents
@@ -39,94 +42,174 @@ export default function DashboardPaymentPage() {
 
   useEffect(() => {
     const getUserProfile = async () => {
-      const requestedType = searchParams.get('type') as 'membership' | 'test' | 'retake' | null
+      const requestedType = searchParams.get('type') as 'membership' | 'test' | 'retake' | 'module' | null
+      const requestedModuleId = searchParams.get('moduleId')
+      const requestedExamDate = searchParams.get('examDate')
 
-      // Check NextAuth session first
-      if (!session?.user) {
+      // Use the same authentication as dashboard
+      const res = await fetch('/api/auth/user')
+      if (res.status === 401) {
         router.push("/auth/login")
         return
       }
-
-      const {
-        data: { user: authUser },
-      } = await supabase.auth.getUser()
-
-      if (!authUser) {
-        router.push("/auth/login")
+      if (!res.ok) {
+        router.push("/register")
         return
       }
 
-      const { data: profile, error } = await supabase.from("profiles").select("*").eq("id", authUser.id).single()
+      const data = await res.json()
+      const profile = data.profile
 
-      if (error || !profile) {
+      if (!profile) {
         router.push("/register")
         return
       }
 
       setUser(profile)
 
-      if (profile.membership_fee_paid && profile.payment_status === "completed" && !requestedType) {
-        // Default to retake if test completed and failed, else test
-        if (profile.test_completed) {
-          setPaymentType('retake')
-        } else {
-          setPaymentType('test')
+      // Handle module payment
+      if (requestedType === 'module' && requestedModuleId) {
+        setPaymentType('module')
+        setModuleId(requestedModuleId)
+        setExamDate(requestedExamDate)
+        setModuleDataLoading(true)
+
+        // Fetch module data
+        try {
+          const moduleResponse = await fetch(`/api/modules/${requestedModuleId}`, {
+            credentials: 'include'
+          })
+          if (moduleResponse.ok) {
+            const moduleInfo = await moduleResponse.json()
+            setModuleData(moduleInfo)
+          } else {
+            console.error('Failed to fetch module data:', moduleResponse.status)
+            // Try to get module data from enrollment if fetch fails
+            try {
+              const enrollmentResponse = await fetch('/api/user-enrollments', {
+                credentials: 'include'
+              })
+              if (enrollmentResponse.ok) {
+                const enrollments = await enrollmentResponse.json()
+                const userEnrollment = enrollments.find((e: any) => e.moduleId === requestedModuleId)
+                if (userEnrollment) {
+                  setModuleData(userEnrollment.module)
+                }
+              }
+            } catch (enrollmentError) {
+              console.error('Failed to fetch enrollment data:', enrollmentError)
+            }
+          }
+        } catch (error) {
+          console.error('Error fetching module data:', error)
+          // Fallback: try to get from enrollment
+          try {
+            const enrollmentResponse = await fetch('/api/user-enrollments', {
+              credentials: 'include'
+            })
+            if (enrollmentResponse.ok) {
+              const enrollments = await enrollmentResponse.json()
+              const userEnrollment = enrollments.find((e: any) => e.moduleId === requestedModuleId)
+              if (userEnrollment) {
+                setModuleData(userEnrollment.module)
+              }
+            }
+          } catch (enrollmentError) {
+            console.error('Failed to fetch enrollment data:', enrollmentError)
+          }
+        } finally {
+          setModuleDataLoading(false)
         }
       } else {
-        setPaymentType(requestedType || (profile.membership_fee_paid ? 'test' : 'membership'))
+        // Handle other payment types
+        if (profile.membership_fee_paid && profile.payment_status === "completed" && !requestedType) {
+          // Default to retake if test completed and failed, else test
+          if (profile.test_completed) {
+            setPaymentType('retake')
+          } else {
+            setPaymentType('test')
+          }
+        } else {
+          setPaymentType(requestedType || (profile.membership_fee_paid ? 'test' : 'membership'))
+        }
       }
 
       setIsLoading(false)
     }
 
     getUserProfile()
-  }, [supabase, router, searchParams, session])
+  }, [router, searchParams])
 
   const handlePaymentSuccess = async (reference: any) => {
     if (!user) return
 
     try {
-      const updateData: any = {}
-
-      if (paymentType === 'membership') {
-        updateData.membership_fee_paid = true
-        updateData.membership_payment_reference = reference.reference
-      } else if (paymentType === 'test') {
-        updateData.payment_status = "completed"
-        updateData.payment_reference = reference.reference
-      } else if (paymentType === 'retake') {
-        updateData.payment_status = "completed"
-        updateData.test_completed = false // Allow retake
-        updateData.test_score = null
-        updateData.payment_reference = reference.reference
-      }
-
-      // Update Supabase profile
-      const { error } = await supabase
-        .from("profiles")
-        .update(updateData)
-        .eq("id", user.id)
-
-      if (error) throw error
-
-      // Also update Prisma profile for membership payment
-      if (paymentType === 'membership' && session?.user?.id) {
-        const response = await fetch(`/api/profiles/${session.user.id}`, {
-          method: 'PUT',
+      if (paymentType === 'module' && moduleId) {
+        // Complete the module enrollment
+        console.log('Completing module enrollment:', { moduleId, reference: reference.reference, examDate })
+        const response = await fetch('/api/user-enrollments', {
+          method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
+          credentials: 'include',
           body: JSON.stringify({
-            membershipFeePaid: true,
+            moduleId: moduleId,
             paymentReference: reference.reference,
-          }),
+            paymentStatus: 'COMPLETED',
+            examDate: examDate
+          })
         })
 
         if (!response.ok) {
-          console.error('Failed to update Prisma profile')
-          // Don't throw here, Supabase update succeeded
+          const errorData = await response.json()
+          console.error('Enrollment completion failed:', errorData)
+          throw new Error(errorData.error || `Failed to complete enrollment (${response.status})`)
+        }
+        console.log('Enrollment completed successfully')
+      } else {
+        // Handle other payment types
+        const updateData: any = {}
+
+        if (paymentType === 'membership') {
+          updateData.membership_fee_paid = true
+          updateData.membership_payment_reference = reference.reference
+        } else if (paymentType === 'test') {
+          updateData.payment_status = "completed"
+          updateData.payment_reference = reference.reference
+        } else if (paymentType === 'retake') {
+          updateData.payment_status = "completed"
+          updateData.test_completed = false // Allow retake
+          updateData.test_score = null
+          updateData.payment_reference = reference.reference
         }
 
+        // Update Supabase profile
+        const { error } = await supabase
+          .from("profiles")
+          .update(updateData)
+          .eq("id", user.id)
+
+        if (error) throw error
+
+        // Also update Prisma profile for membership payment
+        if (paymentType === 'membership' && user?.id) {
+          const response = await fetch(`/api/profiles/${user.id}`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              membershipFeePaid: true,
+              paymentReference: reference.reference,
+            }),
+          })
+
+          if (!response.ok) {
+            console.error('Failed to update Prisma profile')
+            // Don't throw here, Supabase update succeeded
+          }
+        }
       }
 
       setPaymentSuccess(true)
@@ -151,6 +234,12 @@ export default function DashboardPaymentPage() {
       case 'membership': return MEMBERSHIP_FEE
       case 'test': return TEST_FEE
       case 'retake': return RETAKE_FEE
+      case 'module':
+        if (moduleData && moduleData.price) {
+          return moduleData.price * 100 // Convert to cents
+        }
+        // If module data not available, show loading or error
+        return 0 // This will prevent payment until data loads
       default: return MEMBERSHIP_FEE
     }
   }
@@ -160,12 +249,13 @@ export default function DashboardPaymentPage() {
       case 'membership': return 'Membership Fee'
       case 'test': return 'Security Aptitude Test Fee'
       case 'retake': return 'Test Retake Fee'
+      case 'module': return moduleData ? `${moduleData.title} Module` : 'Module Fee'
       default: return 'Fee'
     }
   }
 
   const paystackConfig = {
-    reference: `GSPA-${paymentType}-${user?.id}-${Date.now()}`,
+    reference: `GSPA-${paymentType}-${moduleId || user?.id}-${Date.now()}`,
     email: user?.email || "",
     amount: getAmount(),
     publicKey: PAYSTACK_PUBLIC_KEY,
@@ -173,6 +263,8 @@ export default function DashboardPaymentPage() {
     metadata: {
       user_id: user?.id,
       payment_type: paymentType,
+      module_id: moduleId,
+      exam_date: examDate,
       custom_fields: [
         {
           display_name: getPaymentTitle(),
@@ -183,10 +275,15 @@ export default function DashboardPaymentPage() {
     },
   }
 
-  if (isLoading) {
+  if (isLoading || (paymentType === 'module' && moduleDataLoading)) {
     return (
       <div className="flex items-center justify-center py-8">
-        <Loader2 className="h-8 w-8 animate-spin" />
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+          <p className="text-muted-foreground">
+            {paymentType === 'module' && moduleDataLoading ? 'Loading module details...' : 'Loading...'}
+          </p>
+        </div>
       </div>
     )
   }
@@ -215,7 +312,11 @@ export default function DashboardPaymentPage() {
                   ? 'Your membership payment has been processed successfully. You are now a GSPA member.'
                   : paymentType === 'test'
                   ? 'Your payment has been processed successfully. You can now access the security aptitude test.'
-                  : 'Your retake payment has been processed successfully. You can now retake the security aptitude test.'
+                  : paymentType === 'retake'
+                  ? 'Your retake payment has been processed successfully. You can now retake the security aptitude test.'
+                  : paymentType === 'module'
+                  ? `Your payment has been processed successfully. You can now access the ${moduleData?.title} module and start learning.`
+                  : 'Your payment has been processed successfully.'
                 }
               </CardDescription>
             </CardHeader>
@@ -251,7 +352,11 @@ export default function DashboardPaymentPage() {
                 ? 'Complete your membership payment to become a GSPA member and access the security aptitude test.'
                 : paymentType === 'test'
                 ? 'Complete your payment to access the security aptitude test and earn your certification.'
-                : 'Complete your payment to retake the security aptitude test.'
+                : paymentType === 'retake'
+                ? 'Complete your payment to retake the security aptitude test.'
+                : paymentType === 'module'
+                ? `Complete your payment to enroll in the ${moduleData?.title} module and start your learning journey.`
+                : 'Complete your payment.'
               }
             </CardDescription>
           </CardHeader>
@@ -278,7 +383,11 @@ export default function DashboardPaymentPage() {
                   ? 'This fee covers GSPA membership, access to the security aptitude test, and membership benefits.'
                   : paymentType === 'test'
                   ? 'This fee covers the security aptitude test (30 questions), immediate results, and certificate issuance upon passing.'
-                  : 'This fee covers the retake of the security aptitude test with a new set of questions.'
+                  : paymentType === 'retake'
+                  ? 'This fee covers the retake of the security aptitude test with a new set of questions.'
+                  : paymentType === 'module'
+                  ? `This fee covers enrollment in the ${moduleData?.title} module, including access to all learning materials and assessments.`
+                  : 'This fee covers the requested service.'
                 }
               </p>
 
@@ -295,9 +404,10 @@ export default function DashboardPaymentPage() {
                 {...paystackConfig}
                 onSuccess={handlePaymentSuccess}
                 onClose={handlePaymentClose}
+                disabled={getAmount() === 0}
                 className="w-full bg-primary text-primary-foreground hover:bg-primary/90 h-12 px-4 py-2 rounded-md font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none"
               >
-                Pay KES {getAmount() / 100} with Paystack
+                {getAmount() === 0 ? 'Loading payment details...' : `Pay KES ${getAmount() / 100} with Paystack`}
               </PaystackButton>
             </div>
 
@@ -308,7 +418,11 @@ export default function DashboardPaymentPage() {
                   ? 'After payment, you become a GSPA member and can access the dashboard to take the security aptitude test.'
                   : paymentType === 'test'
                   ? 'After payment, you can take the 30-question security aptitude test and receive immediate results.'
-                  : 'After payment, you can retake the security aptitude test with a new set of questions.'
+                  : paymentType === 'retake'
+                  ? 'After payment, you can retake the security aptitude test with a new set of questions.'
+                  : paymentType === 'module'
+                  ? `After payment, you can access the ${moduleData?.title} module and start your learning journey with structured content and assessments.`
+                  : 'After payment, you will have access to the requested service.'
                 } All payments are processed in KES.
               </p>
             </div>

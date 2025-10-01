@@ -137,6 +137,8 @@ export function getNavigationItems(userRole: UserRole) {
   ]
 
   const practitionerItems = [
+    { href: '/dashboard/models', label: 'Modules', icon: 'BookOpen' },
+    { href: '/dashboard/enrolled-modules', label: 'Enrolled Modules', icon: 'BookOpen' },
     { href: '/dashboard/results', label: 'Test Results', icon: 'BarChart3' },
     { href: '/dashboard/certificate', label: 'Certificate', icon: 'Award' },
   ]
@@ -196,6 +198,9 @@ export function canAccessPage(userRole: UserRole, pathname: string): boolean {
     practitioner: [
       '/dashboard',
       '/dashboard/profile',
+      '/dashboard/models',
+      '/dashboard/enrolled-modules',
+      '/dashboard/my-modules',
       '/dashboard/results',
       '/dashboard/certificate',
       '/dashboard/payment',

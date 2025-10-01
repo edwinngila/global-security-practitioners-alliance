@@ -244,6 +244,8 @@ async function main() {
           documentType: 'PASSPORT',
           documentNumber: 'PRACT001',
           isActive: true,
+          membershipFeePaid: true,
+          paymentStatus: 'COMPLETED',
         }
       }
     },

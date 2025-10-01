@@ -28,7 +28,7 @@ export async function GET(request: Request) {
     const enrollments = await prisma.moduleEnrollment.findMany({
       where: {
         userId,
-        paymentStatus: 'COMPLETED' // Only show completed payments
+        // Include both completed and pending enrollments for the user
       },
       include: {
         module: {
@@ -62,7 +62,7 @@ export async function POST(request: Request) {
     if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const body = await request.json()
-    const { moduleId, paymentReference } = body
+    const { moduleId, paymentReference, paymentStatus = 'COMPLETED', examDate } = body
 
     if (!moduleId) return NextResponse.json({ error: 'Module ID is required' }, { status: 400 })
 
@@ -76,34 +76,63 @@ export async function POST(request: Request) {
       }
     })
 
-    if (existingEnrollment) {
-      return NextResponse.json({ error: 'Already enrolled in this module' }, { status: 400 })
-    }
+    let enrollment
 
-    const enrollment = await prisma.moduleEnrollment.create({
-      data: {
-        userId: session.user.id,
-        moduleId,
-        paymentStatus: 'COMPLETED',
-        paymentReference: paymentReference || null,
-        progressPercentage: 0
-      },
-      include: {
-        module: {
-          select: {
-            id: true,
-            title: true,
-            description: true,
-            category: true,
-            difficultyLevel: true,
-            estimatedDuration: true,
-            instructorName: true,
-            price: true,
-            currency: true
+    if (existingEnrollment) {
+      // Update existing enrollment (for payment completion)
+      enrollment = await prisma.moduleEnrollment.update({
+        where: {
+          id: existingEnrollment.id
+        },
+        data: {
+          paymentStatus: paymentStatus,
+          paymentReference: paymentReference || existingEnrollment.paymentReference,
+          examDate: examDate ? new Date(examDate) : existingEnrollment.examDate,
+        },
+        include: {
+          module: {
+            select: {
+              id: true,
+              title: true,
+              description: true,
+              category: true,
+              difficultyLevel: true,
+              estimatedDuration: true,
+              instructorName: true,
+              price: true,
+              currency: true
+            }
           }
         }
-      }
-    })
+      })
+    } else {
+      // Create new enrollment (for initial enrollment)
+      enrollment = await prisma.moduleEnrollment.create({
+        data: {
+          userId: session.user.id,
+          moduleId,
+          paymentStatus: paymentStatus,
+          paymentReference: paymentReference || null,
+          examDate: examDate ? new Date(examDate) : null,
+          progressPercentage: 0
+        },
+        include: {
+          module: {
+            select: {
+              id: true,
+              title: true,
+              description: true,
+              category: true,
+              difficultyLevel: true,
+              estimatedDuration: true,
+              instructorName: true,
+              price: true,
+              currency: true
+            }
+          }
+        }
+      })
+    }
 
     return NextResponse.json(enrollment)
   } catch (error) {

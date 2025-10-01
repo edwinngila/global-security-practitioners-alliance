@@ -48,7 +48,10 @@ export async function PUT(request: Request, { params }: { params: { id: string }
       document_type,
       document_number,
       membershipFeePaid,
-      paymentReference
+      paymentReference,
+      paymentStatus,
+      testCompleted,
+      testScore
     } = body
 
     console.log('Gender value received:', gender, 'Type:', typeof gender)
@@ -85,7 +88,10 @@ export async function PUT(request: Request, { params }: { params: { id: string }
     if (documentTypeEnum !== undefined) updateData.documentType = documentTypeEnum
     if (document_number !== undefined) updateData.documentNumber = document_number
     if (membershipFeePaid !== undefined) updateData.membershipFeePaid = membershipFeePaid
-    if (paymentReference !== undefined) updateData.paymentReference = paymentReference
+  if (paymentReference !== undefined) updateData.paymentReference = paymentReference
+  if (paymentStatus !== undefined) updateData.paymentStatus = paymentStatus
+  if (testCompleted !== undefined) updateData.testCompleted = testCompleted
+  if (testScore !== undefined) updateData.testScore = testScore
 
     console.log('Updating profile with data:', updateData)
 
