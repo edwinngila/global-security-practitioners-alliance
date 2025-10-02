@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, AwaitedReactNode, JSXElementConstructor, Key, ReactElement, ReactNode, ReactPortal } from "react"
 import { DashboardSidebar } from "@/components/dashboard-sidebar"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -1133,6 +1133,30 @@ function TestPreview({ test, questions }: {
                               </div>
                             ))}
                           </div>
+                        ) : fullQuestion.optionA ? (
+                          <div className="space-y-2">
+                            {['A', 'B', 'C', 'D'].map((letter) => {
+                              const optionKey = `option${letter}` as keyof typeof fullQuestion
+                              const isCorrect = fullQuestion.correctAnswer === letter
+                              return (
+                                <div
+                                  key={letter}
+                                  className={`p-2 rounded border ${
+                                    isCorrect
+                                      ? 'bg-green-50 border-green-200 text-green-800'
+                                      : 'bg-gray-50 border-gray-200'
+                                  }`}
+                                >
+                                  <span className="font-medium">{letter}:</span> {fullQuestion[optionKey] as string}
+                                  {isCorrect && (
+                                    <Badge variant="default" className="ml-2 text-xs">
+                                      Correct Answer
+                                    </Badge>
+                                  )}
+                                </div>
+                              )
+                            })}
+                          </div>
                         ) : (
                           <p className="text-sm text-muted-foreground italic">
                             Options not available in preview
@@ -1775,9 +1799,9 @@ function TestForm({ onSave, onCancel, questions, isLoading, editingTest, isLevel
   }
 
   const handleRemoveQuestion = (index: number) => {
-    setFormData(prev => ({
+    setFormData((prev: typeof formData) => ({
       ...prev,
-      questions: prev.questions.filter((_, i) => i !== index)
+      questions: prev.questions.filter((_: TestQuestion | typeof newQuestion, i: number) => i !== index)
     }))
   }
 
@@ -2071,7 +2095,7 @@ function TestForm({ onSave, onCancel, questions, isLoading, editingTest, isLevel
         {formData.questions.length > 0 && (
           <div className="space-y-2">
             <h4 className="font-medium">Selected Questions:</h4>
-            {formData.questions.map((question, index) => (
+            {formData.questions.map((question: any, index: number) => (
               <Card key={index} className="p-3">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
@@ -2097,7 +2121,7 @@ function TestForm({ onSave, onCancel, questions, isLoading, editingTest, isLevel
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={() => handleRemoveQuestion(index)}
+                    onClick={() => handleRemoveQuestion(Number(index))}
                     className="ml-2"
                   >
                     <X className="h-4 w-4" />

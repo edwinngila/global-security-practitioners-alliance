@@ -3,32 +3,19 @@ import { getServerSession } from 'next-auth'
 import { prisma } from '@/lib/prisma/client'
 import { authOptions } from '../../auth/[...nextauth]/route'
 
-export const dynamic = 'force-dynamic'
-
 export async function GET(request: Request, { params }: { params: { id: string } }) {
   try {
-    const subTopic = await prisma.subTopic.findUnique({
-      where: { id: params.id },
-      include: {
-        contents: {
-          orderBy: { orderIndex: 'asc' }
-        },
-        subTopicTest: true,
-        level: {
-          include: {
-            module: true
-          }
-        }
-      }
+    const test = await prisma.levelTest.findUnique({
+      where: { id: params.id }
     })
 
-    if (!subTopic) {
-      return NextResponse.json({ error: 'Sub-topic not found' }, { status: 404 })
+    if (!test) {
+      return NextResponse.json({ error: 'Test not found' }, { status: 404 })
     }
 
-    return NextResponse.json(subTopic)
+    return NextResponse.json(test)
   } catch (error) {
-    console.error('Error fetching sub-topic:', error)
+    console.error('Error fetching level test:', error)
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
   }
 }
@@ -38,6 +25,13 @@ export async function PUT(request: Request, { params }: { params: { id: string }
     const session = await getServerSession(authOptions)
     if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const body = await request.json()
+    const { title, description, questions, totalQuestions, passingScore, timeLimit, isActive } = body
+
+    if (!title) {
+      return NextResponse.json({ error: 'title is required' }, { status: 400 })
     }
 
     // Check if user is master practitioner
@@ -50,32 +44,22 @@ export async function PUT(request: Request, { params }: { params: { id: string }
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const body = await request.json()
-    const { title, description, orderIndex, isActive, estimatedDuration, learningObjectives, readingMaterial } = body
-
-    const subTopic = await prisma.subTopic.update({
+    const test = await prisma.levelTest.update({
       where: { id: params.id },
       data: {
         title,
         description,
-        orderIndex,
-        isActive,
-        estimatedDuration,
-        learningObjectives,
-        // Temporarily commented out due to Prisma client sync issue
-        // readingMaterial,
-        // attachments: body.attachments,
-        // externalLinks: body.externalLinks
-      },
-      include: {
-        contents: true,
-        subTopicTest: true
+        questions,
+        totalQuestions,
+        passingScore: passingScore || 70,
+        timeLimit: timeLimit || 1800,
+        isActive: isActive ?? true
       }
     })
 
-    return NextResponse.json(subTopic)
+    return NextResponse.json(test)
   } catch (error) {
-    console.error('Error updating sub-topic:', error)
+    console.error('Error updating level test:', error)
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
   }
 }
@@ -97,13 +81,13 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    await prisma.subTopic.delete({
+    await prisma.levelTest.delete({
       where: { id: params.id }
     })
 
-    return NextResponse.json({ message: 'Sub-topic deleted successfully' })
+    return NextResponse.json({ message: 'Test deleted successfully' })
   } catch (error) {
-    console.error('Error deleting sub-topic:', error)
+    console.error('Error deleting level test:', error)
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
   }
 }

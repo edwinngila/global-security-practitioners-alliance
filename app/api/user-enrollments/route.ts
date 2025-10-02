@@ -3,6 +3,54 @@ import { getServerSession } from 'next-auth'
 import { prisma } from '@/lib/prisma/client'
 import { authOptions } from '../auth/[...nextauth]/route'
 
+// Helper function to calculate progress based on completed subtopics
+async function calculateModuleProgress(enrollmentId: string) {
+  try {
+    // Get the enrollment with module details
+    const enrollment = await prisma.moduleEnrollment.findUnique({
+      where: { id: enrollmentId },
+      include: {
+        module: {
+          include: {
+            levels: {
+              include: {
+                subTopics: true
+              }
+            }
+          }
+        }
+      }
+    })
+
+    if (!enrollment) return 0
+
+    // Count total subtopics in the module
+    const totalSubtopics = enrollment.module.levels.reduce((total, level) => {
+      return total + level.subTopics.length
+    }, 0)
+
+    if (totalSubtopics === 0) return 0
+
+    // For now, we'll use a simple approach: assume subtopics are completed
+    // when they have been accessed (we'll need to add completion tracking)
+    // TODO: Implement proper subtopic completion tracking
+    const completedSubtopics = 0 // This will be calculated based on actual completion
+
+    const progressPercentage = Math.round((completedSubtopics / totalSubtopics) * 100)
+
+    // Update the enrollment with the calculated progress
+    await prisma.moduleEnrollment.update({
+      where: { id: enrollmentId },
+      data: { progressPercentage }
+    })
+
+    return progressPercentage
+  } catch (error) {
+    console.error('Error calculating module progress:', error)
+    return 0
+  }
+}
+
 // GET /api/user-enrollments - Get user's module enrollments
 export async function GET(request: Request) {
   try {

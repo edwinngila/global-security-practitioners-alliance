@@ -347,6 +347,7 @@ model ModuleEnrollment {
   examDate           DateTime?
   examCompleted      Boolean       @default(false)
   examScore          Int?
+  completedSubTopics Json?         // Array of completed subtopic IDs
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
 

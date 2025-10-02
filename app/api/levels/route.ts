@@ -37,3 +37,69 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
   }
 }
+
+export async function POST(request: Request) {
+  try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const body = await request.json()
+    const { title, description, orderIndex, isActive, estimatedDuration, learningObjectives, moduleId } = body
+
+    if (!title || !moduleId) {
+      return NextResponse.json({ error: 'Title and moduleId are required' }, { status: 400 })
+    }
+
+    const level = await prisma.level.create({
+      data: {
+        title,
+        description,
+        orderIndex: orderIndex || 0,
+        isActive: isActive ?? true,
+        estimatedDuration,
+        learningObjectives,
+        moduleId
+      }
+    })
+
+    console.log('Created level:', level.id, level.title)
+
+    return NextResponse.json(level)
+  } catch (error) {
+    console.error('Error creating level:', error)
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
+  }
+}
+
+export async function PUT(request: Request) {
+  try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const body = await request.json()
+    const { id, title, description, orderIndex, isActive, estimatedDuration, learningObjectives } = body
+
+    if (!id) {
+      return NextResponse.json({ error: 'Level ID is required' }, { status: 400 })
+    }
+
+    const level = await prisma.level.update({
+      where: { id },
+      data: {
+        title,
+        description,
+        orderIndex,
+        isActive,
+        estimatedDuration,
+        learningObjectives
+      }
+    })
+
+    console.log('Updated level:', level.id, level.title)
+
+    return NextResponse.json(level)
+  } catch (error) {
+    console.error('Error updating level:', error)
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
+  }
+}

@@ -109,7 +109,7 @@ export default function ModuleDetailPage() {
           return {
             ...level,
             contents_count: subtopicCount,
-            completed_contents: 0 // TODO: Implement proper progress tracking
+            completed_contents: 0 // Will be calculated from enrollment.completedSubTopics
           }
         })
         setLevels(levelsWithProgress)
@@ -195,25 +195,21 @@ export default function ModuleDetailPage() {
   }
 
   const updateEnrollmentProgress = async () => {
-    if (!enrollment || !levels.length) return
-
-    // Calculate total content across all levels
-    const totalContent = levels.reduce((sum, level) => sum + (level.contents_count || 0), 0)
-    const completedContent = levels.reduce((sum, level) => sum + (level.completed_contents || 0), 0)
-    const newProgress = totalContent > 0 ? Math.round((completedContent / totalContent) * 100) : 0
+    // Progress is now automatically calculated by the API when subtopics are completed
+    // Just refresh the enrollment data to get the updated progress
+    if (!enrollment || !session?.user?.id) return
 
     try {
-      const { error } = await supabase
-        .from('module_enrollments')
-        .update({ progress_percentage: newProgress })
-        .eq('id', enrollment.id)
-
-      if (error) throw error
-
-      // Update local state
-      setEnrollment(prev => prev ? { ...prev, progress_percentage: newProgress } : null)
+      const enrollmentRes = await fetch(`/api/user-enrollments?userId=${session.user.id}`)
+      if (enrollmentRes.ok) {
+        const enrollmentsData = await enrollmentRes.json()
+        const updatedEnrollment = enrollmentsData.find((e: any) => e.moduleId === moduleId && e.paymentStatus === 'COMPLETED')
+        if (updatedEnrollment) {
+          setEnrollment(updatedEnrollment)
+        }
+      }
     } catch (error) {
-      console.error('Error updating enrollment progress:', error)
+      console.error('Error refreshing enrollment progress:', error)
     }
   }
 
